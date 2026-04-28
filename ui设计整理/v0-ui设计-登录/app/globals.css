@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 262 60% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 199 89% 86%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 15 80% 85%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 262 60% 65%;
+    --radius: 0.75rem;
+
+    --lilac: 262 60% 65%;
+    --sky: 199 89% 68%;
+    --peach: 15 80% 75%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Mesh gradient background animation */
+@keyframes mesh-move-1 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); }
+  25% { transform: translate(10%, -15%) scale(1.1); }
+  50% { transform: translate(-5%, 10%) scale(0.95); }
+  75% { transform: translate(-10%, -5%) scale(1.05); }
+}
+
+@keyframes mesh-move-2 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); }
+  25% { transform: translate(-15%, 10%) scale(1.05); }
+  50% { transform: translate(10%, -10%) scale(1.1); }
+  75% { transform: translate(5%, 15%) scale(0.9); }
+}
+
+@keyframes mesh-move-3 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); }
+  25% { transform: translate(15%, 10%) scale(0.95); }
+  50% { transform: translate(-10%, -15%) scale(1.1); }
+  75% { transform: translate(10%, 5%) scale(1); }
+}
+
+@keyframes float-orb {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(5deg); }
+}
+
+@keyframes float-orb-reverse {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(15px) rotate(-5deg); }
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.9; }
+}
+
+.animate-mesh-1 {
+  animation: mesh-move-1 20s ease-in-out infinite;
+}
+
+.animate-mesh-2 {
+  animation: mesh-move-2 25s ease-in-out infinite;
+}
+
+.animate-mesh-3 {
+  animation: mesh-move-3 22s ease-in-out infinite;
+}
+
+.animate-float-orb {
+  animation: float-orb 6s ease-in-out infinite;
+}
+
+.animate-float-orb-reverse {
+  animation: float-orb-reverse 7s ease-in-out infinite;
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 4s ease-in-out infinite;
+}
