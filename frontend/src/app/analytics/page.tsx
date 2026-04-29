@@ -86,8 +86,8 @@ function normalize(payload: unknown) {
 
 export default function AnalyticsPage() {
   const [activeDay, setActiveDay] = useState(26)
+  const [monthOffset, setMonthOffset] = useState(0)
   const [aiInsight, setAiInsight] = useState(fallbackInsight)
-  const [summaryLoaded, setSummaryLoaded] = useState(false)
   const [trendData, setTrendData] = useState(weekTrend)
   const [shareData, setShareData] = useState(moodShare)
   const [heatmapData, setHeatmapData] = useState(heatCells)
@@ -150,9 +150,8 @@ export default function AnalyticsPage() {
           )
         }
         setAiInsight(summary.insight || summary.suggestion || fallbackInsight)
-        setSummaryLoaded(true)
       } catch {
-        if (active) setSummaryLoaded(false)
+        if (active) setAiInsight(fallbackInsight)
       }
     }
 
@@ -163,6 +162,10 @@ export default function AnalyticsPage() {
   }, [])
 
   const selectedMood = getMoodOption(calendarData[activeDay] ?? "happy")
+  const visibleMonth = useMemo(() => {
+    const date = new Date(2026, 3 + monthOffset, 1)
+    return `${date.getFullYear()}年${date.getMonth() + 1}月`
+  }, [monthOffset])
   const calendarDays = useMemo(() => {
     const previous = [30, 31]
     const current = Array.from({ length: 30 }, (_, index) => index + 1)
@@ -175,7 +178,7 @@ export default function AnalyticsPage() {
       title="我的情绪趋势"
       rightSlot={
         <button className="hidden items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(255,205,216,0.18)] md:inline-flex">
-          2026年4月
+          {visibleMonth}
           <CalendarDays className="h-4 w-4 text-[#ff7f96]" />
         </button>
       }
@@ -183,14 +186,24 @@ export default function AnalyticsPage() {
       <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-7">
           <div className="flex items-center justify-between">
-            <button className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setMonthOffset((value) => value - 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm"
+              aria-label="上个月"
+            >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="text-center">
-              <h2 className="text-xl font-semibold">4月 2026</h2>
+              <h2 className="text-xl font-semibold">{visibleMonth}</h2>
               <p className="mt-1 text-xs text-slate-400">按日期回看每一次情绪波动</p>
             </div>
-            <button className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setMonthOffset((value) => value + 1)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm"
+              aria-label="下个月"
+            >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -311,7 +324,7 @@ export default function AnalyticsPage() {
           <section className="rounded-[30px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-semibold">AI 月度洞察</h3>
-              <span className="rounded-full bg-[#eefbf8] px-3 py-1 text-xs text-[#44b9aa]">{summaryLoaded ? "接口已连接" : "Mock 数据"}</span>
+              <Sparkles className="h-5 w-5 text-[#ff8fa3]" />
             </div>
             <div className="mt-4 rounded-[24px] bg-gradient-to-r from-[#fff5d8] via-[#fff0f5] to-[#effdfa] p-4 text-sm leading-7 text-slate-600">
               <Sparkles className="mr-2 inline h-4 w-4 text-[#ff8fa3]" />

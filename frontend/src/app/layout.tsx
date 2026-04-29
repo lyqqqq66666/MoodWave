@@ -1,9 +1,26 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#FF97AD',
+}
+
 export const metadata: Metadata = {
-  title: 'MoodWave - 情绪日记与可视化音乐',
-  description: '记录你的情绪，发现音乐的力量',
+  title: 'MoodWave 灵音 — 情绪日记与可视化音乐',
+  description: '记录情绪的潮汐，遇见内心的风景',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '灵音',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 }
 
 export default function RootLayout({
@@ -13,6 +30,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+      </head>
       <body>{children}</body>
     </html>
   )

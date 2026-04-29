@@ -7,17 +7,26 @@ const featureCards = [
     icon: TrendingUp,
     title: "情绪记录",
     description: "用 5 步把今天的感受留住，形成你自己的情绪地图。",
+    href: "/mood",
   },
   {
     icon: Sparkles,
     title: "AI 分析",
     description: "从情绪、强度、标签里给出温柔而不说教的洞察。",
+    href: "/analytics",
   },
   {
     icon: Music4,
     title: "治愈音乐",
     description: "把心情转成更适合当下的声音与陪伴氛围。",
+    href: "/music",
   },
+]
+
+const previewLinks = [
+  { href: "/analytics", label: "我的趋势", icon: TrendingUp },
+  { href: "/music", label: "治愈音乐", icon: Music4 },
+  { href: "/discovery", label: "解忧角", icon: HeartHandshake },
 ]
 
 export default function LandingPage() {
@@ -41,7 +50,7 @@ export default function LandingPage() {
 
         <div className="grid flex-1 items-center gap-12 pb-6 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pt-14">
           <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm text-[#ff6f8c] shadow-[0_10px_30px_rgba(255,205,215,0.18)] ring-1 ring-white/70">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm text-[#ff6f8c] ring-1 ring-white/70">
               <HeartHandshake className="h-4 w-4" />
               78.1% 的大学生每周都会经历负面情绪
             </div>
@@ -68,10 +77,10 @@ export default function LandingPage() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
-                href="/dashboard"
+                href="/login"
                 className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#ffe0e8] bg-white/80 px-6 py-3 text-sm font-semibold text-slate-700"
               >
-                查看原型首页
+                立即开始
               </Link>
             </div>
 
@@ -79,8 +88,9 @@ export default function LandingPage() {
               {featureCards.map((feature) => {
                 const Icon = feature.icon
                 return (
-                  <article
+                  <Link
                     key={feature.title}
+                    href={feature.href}
                     className="rounded-[28px] bg-white/76 p-5 shadow-[0_20px_45px_rgba(255,214,224,0.18)] ring-1 ring-white/75 backdrop-blur-xl"
                   >
                     <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#fff0f5] to-[#eefdfa] text-[#ff7894]">
@@ -88,7 +98,7 @@ export default function LandingPage() {
                     </div>
                     <h2 className="text-lg font-semibold">{feature.title}</h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{feature.description}</p>
-                  </article>
+                  </Link>
                 )
               })}
             </div>
@@ -113,22 +123,27 @@ export default function LandingPage() {
                     <p className="mt-5 text-sm text-slate-500">今日心情</p>
                     <p className="mt-1 text-2xl font-semibold">平静，也有一点点疲惫</p>
                   </div>
-                  <div className="mt-6 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] p-[1px]">
+                  <Link href="/mood" className="mt-6 block rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] p-[1px]">
                     <div className="flex items-center justify-center rounded-full bg-white px-4 py-3 text-sm font-medium text-slate-700">
                       🎤 说说此刻的心情
                     </div>
-                  </div>
+                  </Link>
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
-                  {["📊 我的趋势", "🎵 治愈音乐", "🤝 解忧角"].map((item) => (
-                    <div
-                      key={item}
+                  {previewLinks.map((item) => {
+                    const Icon = item.icon
+                    return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
                       className="rounded-[24px] bg-white/90 px-4 py-5 text-center text-sm font-medium text-slate-700 shadow-[0_12px_30px_rgba(255,209,219,0.14)]"
                     >
-                      {item}
-                    </div>
-                  ))}
+                      <Icon className="mx-auto mb-2 h-4 w-4 text-[#ff7894]" />
+                      {item.label}
+                    </Link>
+                    )
+                  })}
                 </div>
               </div>
             </div>

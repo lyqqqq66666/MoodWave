@@ -15,8 +15,9 @@ from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional
 
-from src.core.models import Post, PostCreate, PostResponse, PostListResponse, MoodEntry
+from src.core.models import Post, PostCreate, PostResponse, PostListResponse, MoodEntry, User
 from src.db.database import get_session
+from src.api.auth import get_current_user
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -59,6 +60,7 @@ def _post_to_response(post: Post, session: Session) -> PostResponse:
 async def create_post(
     data: PostCreate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     创建新帖子（解忧角发帖）
@@ -80,7 +82,7 @@ async def create_post(
         mood_id=data.mood_id,
         is_anonymous=data.is_anonymous,
         category=data.category,
-        user_id=1,  # MVP 固定用户
+        user_id=current_user.id,  # 从 JWT token 解析
     )
     session.add(post)
     session.commit()
@@ -164,6 +166,7 @@ async def get_post(
 async def like_post(
     post_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """点赞帖子"""
     post = session.get(Post, post_id)
@@ -186,6 +189,7 @@ async def like_post(
 async def unlike_post(
     post_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """取消点赞"""
     post = session.get(Post, post_id)
@@ -225,6 +229,7 @@ async def comment_post(
     post_id: int,
     data: CommentCreate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """评论帖子（MVP 简化：评论内容直接存在 posts 表的额外字段里）"""
     post = session.get(Post, post_id)
@@ -257,10 +262,11 @@ async def comment_post(
 async def delete_post(
     post_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """删除帖子"""
     post = session.get(Post, post_id)
-    if not post:
+    if not post or post.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="帖子不存在")
 
     session.delete(post)

@@ -9,6 +9,24 @@ const apiClient = axios.create({
   },
 })
 
+// 请求拦截器：每次请求自动注入 JWT token
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('moodwave-auth')
+    if (token) {
+      try {
+        const { state } = JSON.parse(token)
+        if (state?.token) {
+          config.headers.Authorization = `Bearer ${state.token}`
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }
+  return config
+})
+
 // 情绪相关接口
 export const moodAPI = {
   create: (data: any) => apiClient.post('/api/moods', data),
@@ -47,5 +65,17 @@ export const aiAPI = {
 
 // 健康检查
 export const healthCheck = () => apiClient.get('/api/health')
+
+// 认证接口（裸请求，不走拦截器，避免循环）
+export const authAPI = {
+  register: (data: { email: string; username: string; password: string }) =>
+    axios.post(`${API_URL}/api/auth/register`, data),
+  login: (data: { email: string; password: string }) =>
+    axios.post(`${API_URL}/api/auth/login`, data),
+  me: (token: string) =>
+    axios.get(`${API_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+}
 
 export default apiClient

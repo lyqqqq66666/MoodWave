@@ -30,7 +30,7 @@ def create_db_and_tables():
     否则 SQLModel.metadata 不知道它们的存在。
     """
     # 导入所有数据库模型（让 SQLModel.metadata 扫描到它们）
-    from src.core.models import MoodEntry, Post  # noqa: F401
+    from src.core.models import MoodEntry, Post, User  # noqa: F401
     SQLModel.metadata.create_all(engine)
 
 

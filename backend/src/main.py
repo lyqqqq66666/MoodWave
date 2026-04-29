@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from src.db.database import create_db_and_tables
-from src.api import moods, analytics, music, upload, ai, posts
+from src.api import moods, analytics, music, upload, ai, posts, auth
 
 # 应用生命周期管理
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.add_middleware(
 )
 
 # 包含路由
+app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(moods.router, prefix="/api", tags=["moods"])
 app.include_router(analytics.router, prefix="/api", tags=["analytics"])
 app.include_router(music.router, prefix="/api", tags=["music"])

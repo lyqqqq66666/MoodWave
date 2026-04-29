@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Mic, Sparkles } from "lucide-react"
+import { Mic } from "lucide-react"
 import { moodAPI } from "@/lib/api"
 import { buildDailyMessage, dashboardFeatureCards, getGreetingForHour, getMoodOption, moodOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
@@ -30,6 +30,11 @@ const fallbackHistory: RecentMood[] = [
   },
 ]
 
+function unwrapData(payload: unknown) {
+  const wrapped = payload as { data?: unknown }
+  return wrapped?.data ?? payload
+}
+
 export default function DashboardPage() {
   const [currentMoodIndex, setCurrentMoodIndex] = useState(1)
   const [recentMoods, setRecentMoods] = useState<RecentMood[]>(fallbackHistory)
@@ -45,8 +50,8 @@ export default function DashboardPage() {
       try {
         const response = await moodAPI.list({ limit: 3 })
         if (!active) return
-        const rows = Array.isArray(response.data) ? response.data : []
-        if (rows.length > 0) {
+        const rows = unwrapData(response.data)
+        if (Array.isArray(rows) && rows.length > 0) {
           setRecentMoods(
             rows.map((item: any) => ({
               id: String(item.id),
@@ -73,12 +78,7 @@ export default function DashboardPage() {
   return (
     <MoodWaveShell
       title={greeting.greeting}
-      rightSlot={
-        <span className="hidden rounded-full bg-[#fff0f5] px-4 py-2 text-sm text-[#ff6f8c] md:inline-flex">
-          <Sparkles className="mr-2 h-4 w-4" />
-          温柔模式进行中
-        </span>
-      }
+      rightSlot={null}
     >
       <div className="mx-auto grid max-w-6xl gap-6">
         <section className="rounded-[36px] bg-white/80 p-6 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/70 md:p-8">
@@ -135,7 +135,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold">最近记录</h3>
-                <p className="mt-1 text-sm text-slate-500">展示 `GET /api/moods` 的最新记录，接口未就绪时用本地占位数据。</p>
+                <p className="mt-1 text-sm text-slate-500">最近记录的情绪会在这里轻轻排好队。</p>
               </div>
               <Link href="/mood" className="text-sm font-medium text-[#ff7894]">
                 新建记录
@@ -172,14 +172,9 @@ export default function DashboardPage() {
 
           <div className="rounded-[32px] bg-white/80 p-6 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/70">
             <h3 className="text-xl font-semibold">AI 每日寄语</h3>
-            <p className="mt-1 text-sm text-slate-500">这里先由前端根据时间与当前情绪做文案占位，后续交给 `workbuddy` 接接口。</p>
+            <p className="mt-1 text-sm text-slate-500">一段适合今天的温柔提醒。</p>
             <div className="mt-6 rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-6">
               <p className="text-sm leading-7 text-slate-700">{buildDailyMessage(mood.value)}</p>
-            </div>
-            <div className="mt-6 rounded-[28px] border border-dashed border-[#ffd5e0] p-5 text-sm leading-7 text-slate-500">
-              联调接口建议：
-              `GET /api/moods` 返回最近 3 条记录；
-              后续可补 `GET /api/analytics/summary` 或 `POST /api/analytics/analyze` 来生成个性化寄语。
             </div>
           </div>
         </section>

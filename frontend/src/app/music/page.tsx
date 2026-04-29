@@ -287,7 +287,7 @@ function MusicPageContent() {
     } catch (error) {
       if ((error as Error).name === "AbortError") return
       setAiInsight(profile.insight)
-      setInsightError("AI 连接暂时不可用，已显示本地陪伴建议。")
+      setInsightError("灵灵先送上一段本地陪伴建议，稍后可以再试一次。")
     } finally {
       setIsInsightLoading(false)
     }
@@ -557,7 +557,7 @@ function MusicPageContent() {
                   <div className="pointer-events-none absolute inset-x-5 top-5 flex items-start justify-between">
                     <div className="rounded-[24px] bg-white/68 px-4 py-3 text-sm text-slate-600 backdrop-blur-md">
                       <p className="font-semibold text-slate-800">{profile.texture}</p>
-                      <p className="mt-1 text-xs">Canvas 粒子正在跟随情绪节奏呼吸</p>
+                      <p className="mt-1 text-xs">跟随此刻心情缓慢流动</p>
                     </div>
                     <AnimatePresence mode="wait">
                       <motion.div
@@ -672,9 +672,9 @@ function MusicPageContent() {
                   {isInsightLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircleHeart className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">AI mood insight</h3>
+                  <h3 className="font-semibold text-slate-900">AI 陪伴建议</h3>
                   <p className="text-xs text-slate-500">
-                    {isInsightLoading ? "灵灵正在生成陪伴语..." : "来自 DeepSeek SSE 流式回复"}
+                    {isInsightLoading ? "灵灵正在生成陪伴语..." : "给此刻的你一段轻轻回应"}
                   </p>
                 </div>
               </div>

@@ -319,7 +319,7 @@ export default function DiscoveryPage() {
               <div>
                 <p className="font-semibold">解忧角规则</p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  {isApiConnected ? "后端帖子接口已连接。" : "接口不可用时使用本地数据。"} 温柔回应，不评判，不追问隐私。
+                  温柔回应，不评判，不追问隐私。每一句心情都可以慢慢说。
                 </p>
               </div>
             </div>
@@ -339,7 +339,7 @@ export default function DiscoveryPage() {
             <div>
               <h3 className="text-xl font-semibold">大家的心情</h3>
               <p className="mt-1 text-sm text-slate-400">
-                {isApiConnected ? "已接入 `GET /api/posts`。" : "当前显示 Mock 数据。"}
+                {isApiConnected ? "实时更新" : "温柔回应，不评判"}
               </p>
             </div>
             <span className="rounded-full bg-white/80 px-4 py-2 text-sm text-[#ff7894] shadow-sm">

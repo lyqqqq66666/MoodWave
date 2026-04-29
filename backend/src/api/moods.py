@@ -13,8 +13,10 @@ from src.core.models import (
     MoodEntryCreate,
     MoodEntryUpdate,
     MoodEntryResponse,
+    User,
 )
 from src.db.database import get_session
+from src.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -23,17 +25,19 @@ router = APIRouter()
 async def create_mood(
     mood: MoodEntryCreate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     创建新的情绪记录
-    
+
     Args:
         mood: 情绪记录数据（前端传tags数组）
         session: 数据库会话
-    
+        current_user: 当前登录用户
+
     Returns:
         dict: 统一返回格式 {code, msg, data}
-    
+
     Raises:
         HTTPException: 如果创建失败
     """
@@ -41,14 +45,14 @@ async def create_mood(
         import json
         # 将 tags 数组转成 JSON 字符串存入数据库
         tags_str = json.dumps(mood.tags, ensure_ascii=False) if isinstance(mood.tags, list) else "[]"
-        
+
         db_mood = MoodEntry(
             date=mood.date,
             mood_type=mood.mood_type,
             intensity=mood.intensity,
             tags=tags_str,  # 存 JSON 字符串
             note=mood.note,
-            user_id=1  # MVP阶段使用固定用户
+            user_id=current_user.id  # 从 JWT token 解析
         )
         session.add(db_mood)
         session.commit()
@@ -82,20 +86,28 @@ async def list_moods(
     skip: int = 0,
     limit: int = 100,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    获取情绪记录列表
-    
+    获取情绪记录列表（仅返回当前用户的记录）
+
     Args:
         skip: 跳过的记录数
         limit: 返回的最大记录数（用于Dashboard拉取最近3条）
         session: 数据库会话
-    
+        current_user: 当前登录用户
+
     Returns:
         dict: 统一返回格式 {code, msg, data}
     """
     import json
-    statement = select(MoodEntry).offset(skip).limit(limit)
+    statement = (
+        select(MoodEntry)
+        .where(MoodEntry.user_id == current_user.id)
+        .order_by(MoodEntry.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     moods = session.exec(statement).all()
     
     # 转换为响应格式（将JSON字符串转成数组）
@@ -126,6 +138,7 @@ async def list_moods(
 async def get_mood(
     mood_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取单条情绪记录
@@ -142,12 +155,11 @@ async def get_mood(
     """
     import json
     mood = session.get(MoodEntry, mood_id)
-    if not mood:
+    if not mood or mood.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="情绪记录不存在")
-    
-    # 将 tags 从 JSON 字符串转成数组
+
     tags_list = json.loads(mood.tags) if mood.tags else []
-    
+
     return {
         "code": 0,
         "msg": "ok",
@@ -170,6 +182,7 @@ async def update_mood(
     mood_id: int,
     mood_update: MoodEntryUpdate,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     更新情绪记录
@@ -187,7 +200,7 @@ async def update_mood(
     """
     import json
     mood = session.get(MoodEntry, mood_id)
-    if not mood:
+    if not mood or mood.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="情绪记录不存在")
 
     update_data = mood_update.model_dump(exclude_unset=True)
@@ -229,6 +242,7 @@ async def update_mood(
 async def delete_mood(
     mood_id: int,
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
     """
     删除情绪记录
@@ -244,7 +258,7 @@ async def delete_mood(
         HTTPException: 如果记录不存在
     """
     mood = session.get(MoodEntry, mood_id)
-    if not mood:
+    if not mood or mood.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="情绪记录不存在")
 
     session.delete(mood)

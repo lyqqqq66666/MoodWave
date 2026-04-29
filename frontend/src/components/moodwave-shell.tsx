@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Bell, LogOut, Sparkles } from "lucide-react"
-import { ReactNode } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { BarChart3, Bell, HeartHandshake, Home, LogOut, Music2, PenLine, Sparkles, UserRound } from "lucide-react"
+import { ReactNode, useState } from "react"
 import { appNavItems } from "@/lib/moodwave"
 import { cn } from "@/lib/utils"
 import { MoodWaveLogo } from "./moodwave-logo"
+import { useAuthStore } from "@/store/auth"
 
 type MoodWaveShellProps = {
   title?: string
@@ -22,22 +23,36 @@ export function MoodWaveShell({
   rightSlot,
 }: MoodWaveShellProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout } = useAuthStore()
+  const [notice, setNotice] = useState("")
+
+  const handleLogout = () => {
+    logout()
+    router.push("/login")
+  }
+
+  const sideNavItems = [
+    { href: "/dashboard", label: "首页", icon: Home },
+    { href: "/mood", label: "情绪录入", icon: PenLine },
+    { href: "/analytics", label: "情绪趋势", icon: BarChart3 },
+    { href: "/music", label: "治愈音乐", icon: Music2 },
+    { href: "/discovery", label: "解忧角", icon: HeartHandshake },
+    { href: "/profile", label: "个人主页", icon: UserRound },
+  ]
+
+  const displayName = user?.username || "用户"
+  const avatarChar = displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col lg:flex-row">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800">
+      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col overflow-x-hidden lg:flex-row">
         <aside className="hidden w-[248px] shrink-0 border-r border-white/60 bg-white/72 px-6 py-8 backdrop-blur-xl lg:flex lg:flex-col">
           <MoodWaveLogo href="/dashboard" />
           <nav className="mt-10 space-y-2">
-            {[
-              { href: "/dashboard", label: "首页", icon: "🏠" },
-              { href: "/mood", label: "情绪录入", icon: "✏️" },
-              { href: "/analytics", label: "情绪趋势", icon: "📈" },
-              { href: "/music", label: "治愈音乐", icon: "🎵" },
-              { href: "/discovery", label: "解忧角", icon: "🤝" },
-              { href: "/profile", label: "个人主页", icon: "👤" },
-            ].map((item) => {
+            {sideNavItems.map((item) => {
               const active = pathname === item.href
+              const Icon = item.icon
               return (
                 <Link
                   key={item.href}
@@ -49,7 +64,7 @@ export function MoodWaveShell({
                       : "text-slate-500 hover:bg-white/80 hover:text-slate-800",
                   )}
                 >
-                  <span className="text-lg">{item.icon}</span>
+                  <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                 </Link>
               )
@@ -57,22 +72,26 @@ export function MoodWaveShell({
           </nav>
           <div className="mt-auto rounded-[28px] bg-white/80 p-4 shadow-[0_12px_30px_rgba(255,214,224,0.24)]">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-white">
-                小
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-white text-sm font-semibold">
+                {avatarChar}
               </div>
               <div>
-                <p className="text-sm font-medium">小鱼</p>
+                <p className="text-sm font-medium">{displayName}</p>
                 <p className="text-xs text-slate-500">今天也值得被温柔接住</p>
               </div>
             </div>
-            <button className="mt-4 flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-800">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-4 flex items-center gap-2 text-sm text-slate-500 transition hover:text-slate-800"
+            >
               <LogOut className="h-4 w-4" />
               退出登录
             </button>
           </div>
         </aside>
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
           <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/60 bg-white/70 px-5 py-4 backdrop-blur-xl lg:px-10">
             <div className="flex items-center gap-3">
               <div className="lg:hidden">
@@ -82,14 +101,24 @@ export function MoodWaveShell({
             </div>
             <div className="flex items-center gap-3">
               {rightSlot}
-              <button className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-[0_8px_24px_rgba(255,192,203,0.18)] transition hover:text-slate-800">
+              <button
+                type="button"
+                onClick={() => setNotice("通知中心即将上线，今天先把重要心情留在这里。")}
+                className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-[0_8px_24px_rgba(255,192,203,0.18)] transition hover:text-slate-800"
+                aria-label="通知"
+              >
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#ff7f96]" />
               </button>
             </div>
           </header>
+          {notice ? (
+            <div className="mx-4 mt-4 rounded-[22px] border border-[#d6f3ea] bg-white/88 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(255,216,225,0.16)] md:mx-6 lg:mx-10">
+              {notice}
+            </div>
+          ) : null}
 
-          <main className={cn("flex-1 px-4 pb-28 pt-5 md:px-6 lg:px-10 lg:pb-10", contentClassName)}>
+          <main className={cn("min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-5 md:px-6 lg:px-10 lg:pb-10", contentClassName)}>
             {children}
           </main>
 

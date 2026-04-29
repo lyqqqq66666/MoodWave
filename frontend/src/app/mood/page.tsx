@@ -41,11 +41,11 @@ export default function MoodPage() {
         date: new Date().toISOString().slice(0, 10),
         mood_type: selectedMood,
         intensity,
-        tags: JSON.stringify(selectedTags),
+        tags: selectedTags,
         note,
       })
     } catch {
-      // 后端 tags 结构还未统一，先允许前端流转完成。
+      // 网络波动时仍允许用户看到本次记录的分析反馈。
     } finally {
       setIsSubmitting(false)
       setSubmitted(true)
@@ -154,7 +154,7 @@ export default function MoodPage() {
               {step === 3 && (
                 <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
                   <h2 className="text-xl font-semibold">记录心情</h2>
-                  <p className="mt-2 text-sm text-slate-500">文字先落地，图片和语音先保留前端入口给后续接口。</p>
+                  <p className="mt-2 text-sm text-slate-500">用文字、图片或语音记录此刻，轻轻把感受放下来。</p>
                   <div className="mt-5 flex flex-wrap gap-3">
                     {[
                       { key: "text", label: "文字", icon: PenLine },
@@ -200,7 +200,7 @@ export default function MoodPage() {
                       <label className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-[#f4d7e0] bg-[#fffafb] px-5 py-10 text-center">
                         <UploadCloud className="h-10 w-10 text-[#ff87a0]" />
                         <p className="mt-4 text-sm font-medium text-slate-700">点击上传图片</p>
-                        <p className="mt-2 text-xs text-slate-400">后续由 `POST /api/upload/image` 接入</p>
+                        <p className="mt-2 text-xs text-slate-400">最多选择 3 张，让画面帮你记住此刻</p>
                         <input
                           type="file"
                           accept="image/*"
@@ -218,9 +218,9 @@ export default function MoodPage() {
                     {inputMode === "voice" && (
                       <div className="rounded-[24px] border border-dashed border-[#f4d7e0] bg-[#fffafb] px-5 py-10 text-center">
                         <Mic className="mx-auto h-10 w-10 text-[#85dfd4]" />
-                        <p className="mt-4 text-sm font-medium text-slate-700">语音入口已预留</p>
+                        <p className="mt-4 text-sm font-medium text-slate-700">语音功能即将上线</p>
                         <p className="mt-2 text-xs leading-6 text-slate-400">
-                          先完成 UI 和状态流，录音转文字由后续接口接入。
+                          现在可以先用文字记录，稍后再把声音也放进日记里。
                         </p>
                       </div>
                     )}
@@ -267,8 +267,8 @@ export default function MoodPage() {
                   <h2 className="mt-5 text-2xl font-semibold">正在分析你的情绪波纹</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-500">
                     {submitted
-                      ? "提交已经完成。当前页面先展示前端占位分析，后续可由 AI 接口替换。"
-                      : "准备就绪后会提交到 `POST /api/moods`，再进入分析结果。"}
+                      ? "情绪分析完成，下面是为你整理出的温柔反馈。"
+                      : "正在分析你的情绪波纹，马上给你一段轻轻的回应。"}
                   </p>
                   <div className="mx-auto mt-6 max-w-xl rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-6 text-left">
                     <p className="text-sm leading-7 text-slate-700">
@@ -345,12 +345,10 @@ export default function MoodPage() {
               </div>
 
               <div className="rounded-[30px] bg-white/85 p-6 shadow-[0_16px_40px_rgba(255,213,223,0.18)] ring-1 ring-white/70">
-                <h3 className="text-lg font-semibold">接口预留</h3>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-                  <li>`POST /api/moods`：当前已接入提交动作，后端字段还需与 `workbuddy` 对齐。</li>
-                  <li>`POST /api/upload/image`：图片上传入口已预留，现阶段只保留前端文件选择。</li>
-                  <li>`POST /api/ai/chat` 或 `POST /api/analytics/analyze`：Step 5 结果区后续可替换。</li>
-                </ul>
+                <h3 className="text-lg font-semibold">今日小提示</h3>
+                <p className="mt-4 text-sm leading-7 text-slate-600">
+                  情绪不需要一次说完整。先写下一句话、一个标签，或选一种最接近的心情，就已经是在照顾自己。
+                </p>
               </div>
             </aside>
           </div>

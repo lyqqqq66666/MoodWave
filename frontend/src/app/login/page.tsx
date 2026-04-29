@@ -1,84 +1,357 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
-import { Eye, EyeOff, Lock, Mail } from "lucide-react"
-import { useState } from "react"
-import { MoodWaveLogo } from "@/components/moodwave-logo"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { Eye, EyeOff, Lock, Mail, User } from "lucide-react"
+import { useAuthStore } from "@/store/auth"
+
+type Mode = "login" | "register"
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectUrl = searchParams.get("redirect") || "/dashboard"
+  const { user, isLoading, error, login, register, clearError } = useAuthStore()
+
+  const [mode, setMode] = useState<Mode>("login")
   const [showPassword, setShowPassword] = useState(false)
+
+  // 表单字段
+  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [localError, setLocalError] = useState("")
+  const [notice, setNotice] = useState("")
+
+  // 已登录则跳走
+  useEffect(() => {
+    if (user) {
+      router.replace(redirectUrl)
+    }
+  }, [user, router, redirectUrl])
+
+  // 切换模式时清除状态
+  const switchMode = (m: Mode) => {
+    setMode(m)
+    setLocalError("")
+    setNotice("")
+    clearError()
+  }
+
+  const showComingSoon = (label: string) => {
+    setNotice(`${label}即将上线，当前请使用邮箱登录。`)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLocalError("")
+
+    if (!email.includes("@")) {
+      setLocalError("请输入有效的邮箱地址")
+      return
+    }
+    if (password.length < 6) {
+      setLocalError("密码至少 6 位")
+      return
+    }
+    if (mode === "register" && !username.trim()) {
+      setLocalError("请输入用户名")
+      return
+    }
+
+    try {
+      if (mode === "login") {
+        await login(email, password)
+        router.push(redirectUrl)
+      } else {
+        await register(email, username, password)
+        router.push(redirectUrl)
+      }
+    } catch {
+      // error 已由 store 持有，UI 靠 error 状态展示
+    }
+  }
+
+  const displayError = localError || error || ""
 
   return (
     <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,200,214,0.8),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(171,236,227,0.8),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(203,198,255,0.4),_transparent_24%),linear-gradient(180deg,#fffdfb_0%,#fff5ef_100%)]">
       <div className="mx-auto grid min-h-screen max-w-[1600px] items-stretch lg:grid-cols-[1.05fr_0.95fr]">
+        {/* 左侧品牌区 */}
         <section className="relative hidden overflow-hidden px-10 py-12 lg:flex lg:flex-col">
-          <MoodWaveLogo href="/" />
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="relative h-20 w-28 shrink-0">
+              <Image
+                src="/brand/moodwave-logo-mark.png"
+                alt=""
+                fill
+                sizes="112px"
+                className="object-contain drop-shadow-[0_14px_24px_rgba(255,151,173,0.26)]"
+                priority
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="font-display text-3xl font-bold text-[#263145]">
+                MoodWave
+              </p>
+              <p className="text-sm font-medium text-slate-500">
+                记录情绪的潮汐，遇见内心的风景
+              </p>
+            </div>
+          </div>
           <div className="pointer-events-none absolute left-10 top-16 h-80 w-80 rounded-full bg-[#ffd2dc]/70 blur-3xl" />
           <div className="pointer-events-none absolute right-6 top-10 h-72 w-72 rounded-full bg-[#c9fff3]/60 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-48 bg-[radial-gradient(circle_at_center,_rgba(189,174,255,0.4),_transparent_55%)]" />
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-56 bg-[radial-gradient(circle_at_center,_rgba(189,174,255,0.34),_transparent_58%)]" />
           <div className="relative z-10 flex flex-1 flex-col justify-center">
-            <div className="max-w-xl space-y-6">
-              <div className="inline-flex h-24 w-24 items-center justify-center rounded-[32px] bg-white/70 text-5xl shadow-[0_20px_55px_rgba(255,204,214,0.2)] backdrop-blur-xl">
-                🌊
-              </div>
+            <div className="max-w-2xl space-y-7">
               <div className="space-y-4">
-                <h1 className="font-display text-5xl font-semibold tracking-tight text-slate-900">
-                  MoodWave
-                </h1>
-                <p className="text-lg leading-8 text-slate-600">
-                  记录情绪的潮汐，遇见内心的风景。今天不用逞强，先把自己的感受放到一个安全的地方。
+                <p className="inline-flex rounded-full bg-white/58 px-4 py-2 text-sm font-semibold text-[#ff7894] shadow-[0_14px_32px_rgba(255,214,224,0.14)] backdrop-blur-xl">
+                  AI 情绪分析 · 可视化音乐疗愈
                 </p>
+                <h1 className="max-w-2xl font-display text-5xl font-bold leading-tight text-[#121b33]">
+                  今天的感受，会被温柔接住。
+                </h1>
+                <p className="max-w-xl text-lg leading-8 text-slate-600">
+                  写下此刻心情，MoodWave 会为你生成情绪洞察和一段专属的治愈声音。
+                </p>
+              </div>
+
+              <div className="relative w-full max-w-[610px] overflow-hidden rounded-[40px] border border-white/75 bg-white/60 p-5 shadow-[0_28px_90px_rgba(255,190,205,0.28)] backdrop-blur-2xl">
+                <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#a8e6cf]/55 blur-3xl" />
+                <div className="absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-[#ffc6d4]/60 blur-3xl" />
+                <div className="relative overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,rgba(255,248,251,0.96),rgba(232,255,249,0.9))] p-7">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#ff7894]">
+                        Mood Map
+                      </p>
+                      <p className="mt-2 font-display text-3xl font-bold text-[#263145]">
+                        把杂乱的情绪，变成可听见的风景
+                      </p>
+                    </div>
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/85 shadow-[0_14px_28px_rgba(255,181,194,0.22)]">
+                      <span className="text-2xl">♪</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 h-40 overflow-hidden rounded-[28px] bg-white/65 p-5 shadow-inner">
+                    <svg
+                      viewBox="0 0 460 150"
+                      className="h-full w-full"
+                      aria-hidden="true"
+                    >
+                      <defs>
+                        <linearGradient id="loginWaveMain" x1="0" x2="1" y1="0" y2="0">
+                          <stop offset="0%" stopColor="#FF97AD" />
+                          <stop offset="55%" stopColor="#FFD6A5" />
+                          <stop offset="100%" stopColor="#85DFD4" />
+                        </linearGradient>
+                        <linearGradient id="loginWaveSoft" x1="0" x2="1" y1="0" y2="0">
+                          <stop offset="0%" stopColor="#CBC3E3" />
+                          <stop offset="100%" stopColor="#A8E6CF" />
+                        </linearGradient>
+                        <linearGradient id="loginWaveFill" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0%" stopColor="#FF97AD" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#85DFD4" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        d="M18 88 C 68 34, 115 36, 164 86 C 218 142, 272 142, 326 82 C 367 36, 404 42, 442 86 L442 146 L18 146 Z"
+                        fill="url(#loginWaveFill)"
+                      />
+                      <path
+                        d="M18 94 C 68 40, 116 42, 164 92 C 218 148, 274 148, 328 88 C 368 44, 405 48, 442 92"
+                        fill="none"
+                        stroke="url(#loginWaveSoft)"
+                        strokeLinecap="round"
+                        strokeWidth="16"
+                        opacity="0.28"
+                      />
+                      <path
+                        d="M18 82 C 68 28, 116 30, 164 80 C 218 136, 274 136, 328 76 C 368 32, 405 36, 442 80"
+                        fill="none"
+                        stroke="url(#loginWaveMain)"
+                        strokeLinecap="round"
+                        strokeWidth="12"
+                      />
+                      <circle cx="96" cy="48" r="7" fill="#FFD166" />
+                      <circle cx="338" cy="70" r="8" fill="#85DFD4" />
+                      <circle cx="385" cy="51" r="14" fill="#FF97AD" opacity="0.58" />
+                      <circle cx="412" cy="102" r="5" fill="#FF97AD" opacity="0.75" />
+                      <circle cx="62" cy="114" r="4" fill="#CBC3E3" opacity="0.8" />
+                    </svg>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    {[
+                      ["平静", "68%"],
+                      ["被理解", "AI"],
+                      ["治愈音色", "Soft"],
+                    ].map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="rounded-2xl bg-white/72 px-4 py-3 shadow-[0_10px_24px_rgba(255,214,224,0.14)]"
+                      >
+                        <p className="font-display text-lg font-bold text-[#263145]">{value}</p>
+                        <p className="mt-1 text-xs text-slate-500">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-8 grid max-w-[610px] grid-cols-3 gap-3">
+                {["30 秒记录", "AI 温柔反馈", "一键进入音乐房间"].map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-[24px] border border-white/70 bg-white/48 px-4 py-3 text-center text-sm font-semibold text-slate-600 shadow-[0_12px_28px_rgba(255,214,224,0.12)] backdrop-blur-xl"
+                  >
+                    {item}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-          <div className="relative z-10 mt-auto text-sm text-slate-500">
-            ✦ 让每一份情绪都值得被温柔以待
+          <div className="relative z-10 mt-12 flex max-w-xl items-center gap-3 rounded-full bg-white/55 px-4 py-3 text-sm font-medium text-slate-500 shadow-[0_16px_36px_rgba(255,214,224,0.14)] backdrop-blur-xl">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff1f5] text-[#ff7894]">♡</span>
+            <span>先登录，再把今晚的心情交给一段柔软的声音。</span>
           </div>
         </section>
 
+        {/* 右侧表单区 */}
         <section className="flex min-h-screen items-center justify-center px-4 py-8 md:px-6">
           <div className="w-full max-w-md rounded-[36px] border border-white/70 bg-white/82 p-6 shadow-[0_24px_80px_rgba(255,201,213,0.3)] backdrop-blur-2xl md:p-8">
             <div className="mb-8 lg:hidden">
-              <MoodWaveLogo href="/" />
+              <Link href="/" className="flex min-w-0 items-center gap-3">
+                <div className="relative h-14 w-20 shrink-0">
+                  <Image
+                    src="/brand/moodwave-logo-mark.png"
+                    alt=""
+                    fill
+                    sizes="80px"
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+                <div>
+                  <p className="font-display text-2xl font-bold tracking-tight text-[#263145]">
+                    MoodWave
+                  </p>
+                  <p className="text-sm font-medium text-slate-500">记录情绪的潮汐</p>
+                </div>
+              </Link>
+            </div>
+
+            {/* 模式切换 Tab */}
+            <div className="mb-6 flex rounded-full bg-[#fff1f5] p-1">
+              <button
+                type="button"
+                onClick={() => switchMode("login")}
+                className={`flex-1 rounded-full py-2 text-sm font-medium transition-all ${
+                  mode === "login"
+                    ? "bg-white shadow-sm text-[#ff708b]"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                登录
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode("register")}
+                className={`flex-1 rounded-full py-2 text-sm font-medium transition-all ${
+                  mode === "register"
+                    ? "bg-white shadow-sm text-[#ff708b]"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                注册
+              </button>
             </div>
 
             <div className="text-center">
               <div className="mx-auto inline-flex rounded-full bg-[#fff1f5] px-4 py-2 text-sm text-[#ff708b]">
-                欢迎回来
+                {mode === "login" ? "欢迎回来" : "开启你的情绪之旅"}
               </div>
-              <h1 className="mt-4 font-display text-3xl font-semibold text-slate-900">
-                登录你的情绪空间
+              <h1 className="mt-4 font-display text-[34px] font-bold leading-tight text-slate-900 md:text-4xl">
+                {mode === "login" ? "登录你的情绪空间" : "创建账号"}
               </h1>
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                移动端优先体验已经准备好，今晚的感受可以继续留在这里。
+                {mode === "login"
+                  ? "登录后继续你的情绪之旅，今晚的感受会被温柔接住。"
+                  : "只需几步，开启你的情绪觉察之旅。"}
               </p>
             </div>
 
-            <form className="mt-8 space-y-5">
+            {/* 错误提示 */}
+            {displayError && (
+              <div className="mt-4 rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+                {displayError}
+              </div>
+            )}
+            {notice && (
+              <div className="mt-4 rounded-2xl border border-[#d6f3ea] bg-[#effdfa] px-4 py-3 text-sm text-slate-600">
+                {notice}
+              </div>
+            )}
+
+            <form className="mt-8 min-h-[310px] space-y-5 transition-all duration-300" onSubmit={handleSubmit}>
+              {/* 用户名（仅注册） */}
+              {mode === "register" && (
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-700">用户名</span>
+                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                    <User className="h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="给自己起个昵称"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                  </span>
+                </label>
+              )}
+
+              {/* 邮箱 */}
               <label className="block space-y-2">
                 <span className="text-sm font-medium text-slate-700">邮箱地址</span>
-                <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)]">
+                <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                   <Mail className="h-4 w-4 text-slate-400" />
                   <input
                     type="email"
                     placeholder="hello@moodwave.app"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                   />
                 </span>
               </label>
 
+              {/* 密码 */}
               <label className="block space-y-2">
                 <span className="text-sm font-medium text-slate-700">密码</span>
-                <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)]">
+                <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                   <Lock className="h-4 w-4 text-slate-400" />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="请输入密码"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((value) => !value)}
+                    onClick={() => setShowPassword((v) => !v)}
                     className="text-slate-400"
                     aria-label={showPassword ? "隐藏密码" : "显示密码"}
                   >
@@ -87,24 +360,38 @@ export default function LoginPage() {
                 </span>
               </label>
 
-              <div className="flex justify-end">
-                <button type="button" className="text-sm text-slate-500 transition hover:text-[#ff7894]">
-                  忘记密码？
-                </button>
-              </div>
+              {mode === "login" && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => showComingSoon("找回密码")}
+                    className="text-sm text-slate-500 transition hover:text-[#ff7894]"
+                  >
+                    忘记密码？
+                  </button>
+                </div>
+              )}
 
-              <Link
-                href="/dashboard"
-                className="flex min-h-[52px] items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,180,194,0.32)] transition hover:scale-[1.01]"
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex min-h-[52px] w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,180,194,0.32)] transition hover:scale-[1.01] disabled:opacity-60 disabled:hover:scale-100"
               >
-                登录
-              </Link>
+                {isLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    {mode === "login" ? "登录中..." : "注册中..."}
+                  </span>
+                ) : (
+                  mode === "login" ? "登录" : "注册"
+                )}
+              </button>
             </form>
 
             <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-[#f2dfe4]" />
+              <div className="h-px flex-1 bg-[#f2dde4]" />
               <span className="text-xs text-slate-400">或</span>
-              <div className="h-px flex-1 bg-[#f2dfe4]" />
+              <div className="h-px flex-1 bg-[#f2dde4]" />
             </div>
 
             <div className="flex items-center justify-center gap-4">
@@ -112,8 +399,19 @@ export default function LoginPage() {
                 {
                   label: "微信登录",
                   content: (
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                      <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM16.938 8.858c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-7.062-6.122z" />
+                    <svg viewBox="0 0 28 28" className="h-6 w-6" aria-hidden="true">
+                      <path
+                        d="M11.6 5.2C6.6 5.2 2.5 8.5 2.5 12.6c0 2.2 1.2 4.1 3.1 5.5l-.6 2.1c-.1.4.3.7.6.5l2.5-1.5c1.1.4 2.2.6 3.5.6.4 0 .8 0 1.2-.1-.5-.9-.8-1.9-.8-2.9 0-3.7 3.4-6.7 7.8-6.9C18.7 7.1 15.5 5.2 11.6 5.2Z"
+                        fill="#1AAD19"
+                      />
+                      <path
+                        d="M20.1 10.8c-3.8 0-6.9 2.5-6.9 5.7s3.1 5.7 6.9 5.7c.9 0 1.7-.1 2.5-.4l2 1.2c.3.2.6-.1.5-.4l-.5-1.7c1.5-1.1 2.4-2.6 2.4-4.4 0-3.2-3.1-5.7-6.9-5.7Z"
+                        fill="#07C160"
+                      />
+                      <circle cx="8.7" cy="11.6" r="1" fill="white" />
+                      <circle cx="14" cy="11.6" r="1" fill="white" />
+                      <circle cx="17.9" cy="15.8" r=".85" fill="white" />
+                      <circle cx="22.2" cy="15.8" r=".85" fill="white" />
                     </svg>
                   ),
                 },
@@ -140,7 +438,9 @@ export default function LoginPage() {
                 <button
                   key={item.label}
                   type="button"
+                  onClick={() => showComingSoon(item.label)}
                   aria-label={item.label}
+                  title="即将上线"
                   className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#f4dde3] bg-white text-slate-700 shadow-[0_10px_24px_rgba(255,214,224,0.16)] transition hover:-translate-y-0.5"
                 >
                   {item.content}
@@ -149,10 +449,14 @@ export default function LoginPage() {
             </div>
 
             <p className="mt-6 text-center text-sm text-slate-500">
-              还没有账号？
-              <Link href="/" className="ml-1 font-semibold text-[#ff7894]">
-                免费注册
-              </Link>
+              {mode === "login" ? "还没有账号？" : "已有账号？"}
+              <button
+                type="button"
+                onClick={() => switchMode(mode === "login" ? "register" : "login")}
+                className="ml-1 font-semibold text-[#ff7894]"
+              >
+                {mode === "login" ? "免费注册" : "去登录"}
+              </button>
             </p>
           </div>
         </section>

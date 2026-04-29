@@ -8,6 +8,64 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
+import os
+
+# JWT 密钥（生产环境建议从环境变量读取）
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "moodwave-dev-secret-key-2024-change-in-prod")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_DAYS = 7
+
+
+# ==================== 用户模型 ====================
+
+class User(SQLModel, table=True):
+    """用户数据库模型"""
+    __tablename__ = "users"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    username: str = Field(index=True)
+    hashed_password: str
+    avatar_url: Optional[str] = Field(default=None)
+    mbti: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserCreate(BaseModel):
+    """注册请求模型"""
+    email: str
+    username: str
+    password: str
+
+
+class UserLogin(BaseModel):
+    """登录请求模型"""
+    email: str
+    password: str
+
+
+class Token(BaseModel):
+    """JWT Token 响应"""
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenData(BaseModel):
+    """Token 解析后的数据"""
+    user_id: Optional[int] = None
+
+
+class UserResponse(BaseModel):
+    """用户信息响应"""
+    id: int
+    email: str
+    username: str
+    avatar_url: Optional[str] = None
+    mbti: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # ==================== 数据库模型 ====================
 
