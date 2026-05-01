@@ -6,6 +6,7 @@
 
 import os
 from sqlmodel import SQLModel, create_engine, Session
+from sqlalchemy import inspect, text
 from sqlalchemy.pool import StaticPool
 
 # 数据库 URL
@@ -21,6 +22,31 @@ engine = create_engine(
 )
 
 
+def _ensure_runtime_columns():
+    """
+    为已有开发库补齐新增字段。
+
+    SQLModel.create_all 只会建新表，不会修改旧表。第二轮新增多模态字段后，
+    本地旧 SQLite 数据库会缺列，导致接口 500；这里做轻量兼容迁移。
+    """
+    inspector = inspect(engine)
+    if "mood_entries" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("mood_entries")}
+    required_columns = {
+        "images": "TEXT DEFAULT '[]'",
+        "image_analysis": "TEXT DEFAULT ''",
+        "voice_url": "TEXT DEFAULT ''",
+        "voice_text": "TEXT DEFAULT ''",
+    }
+
+    with engine.begin() as connection:
+        for column_name, column_sql in required_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(text(f"ALTER TABLE mood_entries ADD COLUMN {column_name} {column_sql}"))
+
+
 def create_db_and_tables():
     """
     创建数据库和所有表
@@ -30,8 +56,9 @@ def create_db_and_tables():
     否则 SQLModel.metadata 不知道它们的存在。
     """
     # 导入所有数据库模型（让 SQLModel.metadata 扫描到它们）
-    from src.core.models import MoodEntry, Post, User  # noqa: F401
+    from src.core.models import FavoriteMusic, MoodEntry, Post, User  # noqa: F401
     SQLModel.metadata.create_all(engine)
+    _ensure_runtime_columns()
 
 
 def get_session():

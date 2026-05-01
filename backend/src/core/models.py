@@ -76,6 +76,10 @@ class MoodEntryBase(SQLModel):
     intensity: int = Field(ge=1, le=10)  # 1-10 的强度
     tags: str = Field(default="[]")  # JSON字符串，存储标签列表
     note: str = Field(default="")  # 描述文本
+    images: str = Field(default="[]")  # JSON字符串，图片URL列表
+    image_analysis: str = Field(default="")  # qwen3-vl-plus 图片分析结果（JSON）
+    voice_url: str = Field(default="")  # 语音文件URL
+    voice_text: str = Field(default="")  # qwen3-asr-flash 语音转文字结果
 
 
 class MoodEntry(MoodEntryBase, table=True):
@@ -97,6 +101,10 @@ class MoodEntryCreate(SQLModel):
     intensity: int
     tags: List[str] = []  # 前端传数组
     note: str = ""
+    images: List[str] = []  # 图片URL数组
+    image_analysis: Optional[str] = None  # AI分析结果
+    voice_url: Optional[str] = None
+    voice_text: Optional[str] = None
 
 
 class MoodEntryUpdate(BaseModel):
@@ -208,3 +216,42 @@ class PostListResponse(SQLModel):
     total: int
     page: int
     page_size: int
+
+
+# ==================== 音乐收藏模型 ====================
+
+class FavoriteMusic(SQLModel, table=True):
+    """音乐收藏数据库模型"""
+    __tablename__ = "favorite_music"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    music_id: str = Field(index=True)  # 音乐ID（来自推荐系统）
+    title: str = Field(default="")
+    artist: str = Field(default="MoodWave AI")
+    mood_type: str = Field(default="calm")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        from_attributes = True
+
+
+class FavoriteMusicRequest(BaseModel):
+    """收藏/取消收藏请求"""
+    music_id: str
+    title: str = ""
+    artist: str = "MoodWave AI"
+    mood_type: str = "calm"
+
+
+class FavoriteMusicResponse(BaseModel):
+    """收藏音乐响应"""
+    id: int
+    music_id: str
+    title: str
+    artist: str
+    mood_type: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

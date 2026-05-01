@@ -7,13 +7,14 @@ const withPWA = require('next-pwa')({
 })
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+const isStaticExport = process.env.NEXT_OUTPUT === 'export'
 
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
 
-  // 静态导出模式（服务器 Nginx 托管）
-  output: 'export',
+  // 本地开发使用 Next dev server；需要静态导出时运行 NEXT_OUTPUT=export npm run build。
+  ...(isStaticExport ? { output: 'export' } : {}),
   images: { unoptimized: true },
 
   env: {

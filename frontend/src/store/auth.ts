@@ -26,6 +26,7 @@ interface AuthState {
   logout: () => void
   clearError: () => void
   fetchMe: () => Promise<void>
+  updateUser: (patch: Partial<AuthUser>) => void
 }
 
 // Cookie 名（与 middleware 同步）
@@ -113,6 +114,12 @@ export const useAuthStore = create<AuthState>()(
           set({ user: null, token: null })
         }
       },
+
+      updateUser: (patch) => {
+        const { user } = get()
+        if (!user) return
+        set({ user: { ...user, ...patch } })
+      },
     }),
     {
       name: "moodwave-auth",
@@ -125,4 +132,3 @@ export const useAuthStore = create<AuthState>()(
 )
 
 export const getToken = () => useAuthStore.getState().token
-

@@ -9,6 +9,25 @@ import { useAuthStore } from "@/store/auth"
 
 type Mode = "login" | "register"
 
+const moodBullets = [
+  { text: "今天终于把拖了很久的事做完了，心里轻了一点。", tone: "pink", top: "14%", duration: 34, delay: 0 },
+  { text: "有点累，但听到喜欢的歌以后慢慢安静下来了。", tone: "mint", top: "28%", duration: 38, delay: -12 },
+  { text: "我好像只是需要有人说一句：你已经很努力了。", tone: "cream", top: "43%", duration: 42, delay: -22 },
+  { text: "和朋友散步之后，心情真的变好很多。", tone: "blue", top: "59%", duration: 36, delay: -7 },
+  { text: "今天没有很开心，但我有认真照顾自己。", tone: "lavender", top: "72%", duration: 40, delay: -18 },
+  { text: "deadline 前夜有点紧张，不过我开始一点点推进了。", tone: "pink", top: "20%", duration: 44, delay: -28 },
+  { text: "想把脑袋里的声音调小一点，先深呼吸三次。", tone: "mint", top: "52%", duration: 39, delay: -31 },
+  { text: "谢谢这里，让我可以不用解释太多。", tone: "cream", top: "83%", duration: 35, delay: -16 },
+]
+
+const bulletToneClass: Record<string, string> = {
+  pink: "border-[#ffdbe4] bg-white/76 text-[#c75f78]",
+  mint: "border-[#d7f7ef] bg-[#f6fffc]/78 text-[#218f82]",
+  cream: "border-[#fff0c8] bg-[#fffdf2]/80 text-[#9c7a25]",
+  blue: "border-[#ddecff] bg-[#f7fbff]/78 text-[#597498]",
+  lavender: "border-[#eadfff] bg-[#fbf8ff]/78 text-[#7b65a5]",
+}
+
 export default function LoginPage() {
   return (
     <Suspense>
@@ -115,9 +134,6 @@ function LoginForm() {
           <div className="relative z-10 flex flex-1 flex-col justify-center">
             <div className="max-w-2xl space-y-7">
               <div className="space-y-4">
-                <p className="inline-flex rounded-full bg-white/58 px-4 py-2 text-sm font-semibold text-[#ff7894] shadow-[0_14px_32px_rgba(255,214,224,0.14)] backdrop-blur-xl">
-                  AI 情绪分析 · 可视化音乐疗愈
-                </p>
                 <h1 className="max-w-2xl font-display text-5xl font-bold leading-tight text-[#121b33]">
                   今天的感受，会被温柔接住。
                 </h1>
@@ -126,84 +142,52 @@ function LoginForm() {
                 </p>
               </div>
 
-              <div className="relative w-full max-w-[610px] overflow-hidden rounded-[40px] border border-white/75 bg-white/60 p-5 shadow-[0_28px_90px_rgba(255,190,205,0.28)] backdrop-blur-2xl">
-                <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full bg-[#a8e6cf]/55 blur-3xl" />
-                <div className="absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-[#ffc6d4]/60 blur-3xl" />
-                <div className="relative overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,rgba(255,248,251,0.96),rgba(232,255,249,0.9))] p-7">
-                  <div className="flex items-center justify-between">
+              <div className="relative w-full max-w-[640px] overflow-hidden rounded-[36px] border border-white/75 bg-white/62 p-4 shadow-[0_28px_90px_rgba(255,190,205,0.24)] backdrop-blur-2xl">
+                <div className="absolute -right-10 -top-14 h-44 w-44 rounded-full bg-[#9de8dc]/45 blur-3xl" />
+                <div className="absolute -bottom-20 left-8 h-52 w-52 rounded-full bg-[#ffd0db]/55 blur-3xl" />
+                <div className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,rgba(255,251,252,0.95),rgba(236,255,250,0.88))] p-6">
+                  <div className="relative z-10 flex items-start justify-between gap-5">
                     <div>
-                      <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#ff7894]">
-                        Mood Map
+                      <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#ff7894]">
+                        Mood Notes
                       </p>
-                      <p className="mt-2 font-display text-3xl font-bold text-[#263145]">
-                        把杂乱的情绪，变成可听见的风景
-                      </p>
+                      <h2 className="mt-3 max-w-md font-display text-3xl font-bold leading-tight text-[#263145]">
+                        这里流过很多真实的心情，也会接住你的这一条。
+                      </h2>
                     </div>
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/85 shadow-[0_14px_28px_rgba(255,181,194,0.22)]">
-                      <span className="text-2xl">♪</span>
+                    <div className="hidden rounded-full bg-white/70 px-4 py-2 text-sm font-semibold text-[#20a797] shadow-sm md:block">
+                      今日 128 条共鸣
                     </div>
                   </div>
 
-                  <div className="mt-8 h-40 overflow-hidden rounded-[28px] bg-white/65 p-5 shadow-inner">
-                    <svg
-                      viewBox="0 0 460 150"
-                      className="h-full w-full"
-                      aria-hidden="true"
-                    >
-                      <defs>
-                        <linearGradient id="loginWaveMain" x1="0" x2="1" y1="0" y2="0">
-                          <stop offset="0%" stopColor="#FF97AD" />
-                          <stop offset="55%" stopColor="#FFD6A5" />
-                          <stop offset="100%" stopColor="#85DFD4" />
-                        </linearGradient>
-                        <linearGradient id="loginWaveSoft" x1="0" x2="1" y1="0" y2="0">
-                          <stop offset="0%" stopColor="#CBC3E3" />
-                          <stop offset="100%" stopColor="#A8E6CF" />
-                        </linearGradient>
-                        <linearGradient id="loginWaveFill" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor="#FF97AD" stopOpacity="0.22" />
-                          <stop offset="100%" stopColor="#85DFD4" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      <path
-                        d="M18 88 C 68 34, 115 36, 164 86 C 218 142, 272 142, 326 82 C 367 36, 404 42, 442 86 L442 146 L18 146 Z"
-                        fill="url(#loginWaveFill)"
-                      />
-                      <path
-                        d="M18 94 C 68 40, 116 42, 164 92 C 218 148, 274 148, 328 88 C 368 44, 405 48, 442 92"
-                        fill="none"
-                        stroke="url(#loginWaveSoft)"
-                        strokeLinecap="round"
-                        strokeWidth="16"
-                        opacity="0.28"
-                      />
-                      <path
-                        d="M18 82 C 68 28, 116 30, 164 80 C 218 136, 274 136, 328 76 C 368 32, 405 36, 442 80"
-                        fill="none"
-                        stroke="url(#loginWaveMain)"
-                        strokeLinecap="round"
-                        strokeWidth="12"
-                      />
-                      <circle cx="96" cy="48" r="7" fill="#FFD166" />
-                      <circle cx="338" cy="70" r="8" fill="#85DFD4" />
-                      <circle cx="385" cy="51" r="14" fill="#FF97AD" opacity="0.58" />
-                      <circle cx="412" cy="102" r="5" fill="#FF97AD" opacity="0.75" />
-                      <circle cx="62" cy="114" r="4" fill="#CBC3E3" opacity="0.8" />
-                    </svg>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-3 gap-3">
-                    {[
-                      ["平静", "68%"],
-                      ["被理解", "AI"],
-                      ["治愈音色", "Soft"],
-                    ].map(([label, value]) => (
+                  <div className="relative mt-7 h-[260px] overflow-hidden rounded-[28px] border border-white/70 bg-white/44 shadow-inner">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-24 bg-gradient-to-r from-[#fffbfc] to-transparent" />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-24 bg-gradient-to-l from-[#f1fffb] to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-white/80 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-white/70 to-transparent" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_36%,rgba(255,216,226,0.56),transparent_28%),radial-gradient(circle_at_72%_70%,rgba(157,232,220,0.46),transparent_30%)]" />
+                    {moodBullets.map((item, index) => (
                       <div
-                        key={label}
-                        className="rounded-2xl bg-white/72 px-4 py-3 shadow-[0_10px_24px_rgba(255,214,224,0.14)]"
+                        key={`${item.text}-${index}`}
+                        className={`mood-bullet absolute whitespace-nowrap rounded-full border px-5 py-3 text-sm font-medium shadow-[0_12px_28px_rgba(255,200,214,0.18)] backdrop-blur-xl ${bulletToneClass[item.tone]}`}
+                        style={{
+                          top: item.top,
+                          animationDuration: `${item.duration}s`,
+                          animationDelay: `${item.delay}s`,
+                        }}
                       >
-                        <p className="font-display text-lg font-bold text-[#263145]">{value}</p>
-                        <p className="mt-1 text-xs text-slate-500">{label}</p>
+                        {item.text}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="relative z-10 mt-5 grid grid-cols-3 gap-3">
+                    {["匿名记录", "温柔评论", "情绪共鸣"].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-2xl bg-white/66 px-4 py-3 text-center text-sm font-semibold text-slate-600 shadow-[0_10px_24px_rgba(255,214,224,0.12)]"
+                      >
+                        {item}
                       </div>
                     ))}
                   </div>
@@ -461,6 +445,45 @@ function LoginForm() {
           </div>
         </section>
       </div>
+      <style jsx>{`
+        .mood-bullet {
+          left: max(100%, 640px);
+          animation-name: moodBulletFlow;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+          will-change: transform;
+        }
+
+        .mood-bullet:nth-child(even) {
+          transform: translateX(0) translateY(6px);
+        }
+
+        @keyframes moodBulletFlow {
+          0% {
+            transform: translateX(0) translateY(0);
+            opacity: 0;
+          }
+          8%,
+          88% {
+            opacity: 0.92;
+          }
+          100% {
+            transform: translateX(calc(-100vw - 760px)) translateY(-6px);
+            opacity: 0;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .mood-bullet {
+            animation: none;
+            left: 6%;
+            position: relative;
+            top: auto !important;
+            display: inline-flex;
+            margin: 0.4rem;
+          }
+        }
+      `}</style>
     </main>
   )
 }

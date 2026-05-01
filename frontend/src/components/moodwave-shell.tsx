@@ -45,9 +45,9 @@ export function MoodWaveShell({
   const avatarChar = displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col overflow-x-hidden lg:flex-row">
-        <aside className="hidden w-[248px] shrink-0 border-r border-white/60 bg-white/72 px-6 py-8 backdrop-blur-xl lg:flex lg:flex-col">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800 lg:h-screen lg:overflow-hidden">
+      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col overflow-x-hidden lg:h-screen lg:flex-row lg:overflow-hidden">
+        <aside className="hidden w-[248px] shrink-0 border-r border-white/60 bg-white/72 px-6 py-8 backdrop-blur-xl lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto">
           <MoodWaveLogo href="/dashboard" />
           <nav className="mt-10 space-y-2">
             {sideNavItems.map((item) => {
@@ -91,11 +91,11 @@ export function MoodWaveShell({
           </div>
         </aside>
 
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
-          <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/60 bg-white/70 px-5 py-4 backdrop-blur-xl lg:px-10">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden lg:h-screen">
+          <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-5 py-4 backdrop-blur-xl lg:px-10">
             <div className="flex items-center gap-3">
               <div className="lg:hidden">
-                <MoodWaveLogo href="/dashboard" compact />
+                <MoodWaveLogo href="/dashboard" compact markOnly />
               </div>
               {title ? <h1 className="text-lg font-semibold lg:text-2xl">{title}</h1> : null}
             </div>
@@ -118,7 +118,7 @@ export function MoodWaveShell({
             </div>
           ) : null}
 
-          <main className={cn("min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-5 md:px-6 lg:px-10 lg:pb-10", contentClassName)}>
+          <main className={cn("min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-5 md:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:pb-10", contentClassName)}>
             {children}
           </main>
 

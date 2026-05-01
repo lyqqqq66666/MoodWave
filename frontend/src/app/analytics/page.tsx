@@ -1,127 +1,277 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CalendarDays, ChevronLeft, ChevronRight, Medal, Sparkles } from "lucide-react"
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Edit3,
+  Save,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react"
 import {
   Area,
   AreaChart,
-  Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts"
-import { analyticsAPI } from "@/lib/api"
-import { getMoodOption } from "@/lib/moodwave"
+import { analyticsAPI, moodAPI } from "@/lib/api"
+import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import type { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { cn } from "@/lib/utils"
 
-type TrendPoint = { day: string; calm: number; happy: number }
-type MoodShare = { mood: MoodType; label: string; value: number; color: string }
-type HeatCell = { date: string; mood: MoodType; intensity: number }
-type WeeklyApiItem = { date: string; mood_type: MoodType; avg_intensity: number }
-type DistributionApiItem = { mood_type: MoodType; percentage: number }
-type HeatmapApiItem = { date: string; mood_type: MoodType; intensity: number }
-
-const weekTrend: TrendPoint[] = [
-  { day: "18", calm: 4, happy: 6 },
-  { day: "19", calm: 5, happy: 8 },
-  { day: "20", calm: 4, happy: 5 },
-  { day: "21", calm: 7, happy: 9 },
-  { day: "22", calm: 6, happy: 7 },
-  { day: "23", calm: 8, happy: 10 },
-  { day: "24", calm: 6, happy: 8 },
-  { day: "25", calm: 7, happy: 9 },
-  { day: "26", calm: 5, happy: 7 },
-]
-
-const moodShare: MoodShare[] = [
-  { mood: "happy", label: "开心", value: 35, color: "#FFD166" },
-  { mood: "calm", label: "平静", value: 30, color: "#7ED9CB" },
-  { mood: "anxious", label: "焦虑", value: 15, color: "#8EA5FF" },
-  { mood: "neutral", label: "平淡", value: 10, color: "#B9E58B" },
-  { mood: "angry", label: "愤怒", value: 10, color: "#FF8F78" },
-]
-
-const calendarMoods: Record<number, MoodType> = {
-  1: "happy",
-  4: "angry",
-  8: "happy",
-  9: "anxious",
-  11: "angry",
-  14: "happy",
-  15: "anxious",
-  16: "angry",
-  22: "calm",
-  25: "neutral",
-  26: "happy",
+type TrendPoint = { day: string; date: string; intensity: number; mood: MoodType; moodLabel: string }
+type MoodShare = { mood: MoodType; label: string; value: number; count: number; color: string }
+type HeatCell = {
+  date: string
+  day: number
+  mood: MoodType
+  intensity: number
+  note?: string
+  tags?: string[]
+  id?: number
+  hasRecord: boolean
 }
-
-const heatCells: HeatCell[] = Array.from({ length: 30 }, (_, index) => {
-  const mood = (["calm", "happy", "happy", "anxious", "neutral", "sad"] as MoodType[])[index % 6]
-  return {
-    date: `${index + 1}`,
-    mood,
-    intensity: 3 + ((index * 7) % 7),
-  }
-})
+type MoodRecord = {
+  id: number
+  mood: MoodType
+  date: string
+  intensity: number
+  tags: string[]
+  note: string
+}
+type WeeklyApiItem = { date: string; mood_type: MoodType; avg_intensity: number }
+type DistributionApiItem = { mood_type: MoodType; percentage: number; count?: number }
+type HeatmapApiItem = { date: string; mood_type: MoodType; intensity: number; note?: string; tags?: string[]; id?: number }
+type MoodApiItem = {
+  id: number
+  date?: string
+  mood_type: MoodType
+  intensity: number
+  tags?: string[] | string
+  note?: string
+  created_at?: string
+  updated_at?: string
+}
 
 const fallbackInsight = "连续打卡 7 天，本月记录 12 篇，情绪以开心和平静为主。你正在慢慢形成稳定的自我观察节奏。"
-const moodColorMap: Record<MoodType, string> = {
-  happy: "#FFD166",
-  calm: "#7ED9CB",
-  anxious: "#8EA5FF",
-  angry: "#FF8F78",
-  sad: "#8BCF97",
-  neutral: "#C9B6F2",
-}
+
+const fallbackRecords: MoodRecord[] = [
+  { id: 1001, mood: "happy", date: "2026-04-26", intensity: 8, tags: ["社交", "娱乐"], note: "和朋友散步，聊了很久，心情亮起来一点。" },
+  { id: 1002, mood: "calm", date: "2026-04-25", intensity: 6, tags: ["学习"], note: "把任务拆小以后，压力下降了。" },
+  { id: 1003, mood: "anxious", date: "2026-04-24", intensity: 7, tags: ["截止"], note: "有点紧张，但已经开始推进。" },
+  { id: 1004, mood: "happy", date: "2026-04-22", intensity: 7, tags: ["反馈"], note: "努力被看见的时候很开心。" },
+]
 
 function normalize(payload: unknown) {
   const wrapped = payload as { data?: unknown }
   return wrapped?.data ?? payload
 }
 
+function toDateKey(value?: string) {
+  if (!value) return new Date().toISOString().slice(0, 10)
+  return value.includes("T") ? value.slice(0, 10) : value
+}
+
+function formatMonth(date: Date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`
+}
+
+function formatReadableDate(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`)
+  return `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
+function parseTags(tags?: string[] | string) {
+  if (Array.isArray(tags)) return tags
+  if (!tags) return []
+  try {
+    const parsed = JSON.parse(tags)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return tags.split(",").map((tag) => tag.trim()).filter(Boolean)
+  }
+}
+
+function withAlpha(hex: string, alpha: number) {
+  const value = hex.replace("#", "")
+  const red = parseInt(value.slice(0, 2), 16)
+  const green = parseInt(value.slice(2, 4), 16)
+  const blue = parseInt(value.slice(4, 6), 16)
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+function recordTitle(record: MoodRecord) {
+  const firstLine = record.note.trim().split(/\n/)[0]
+  return firstLine || `${getMoodOption(record.mood).label}记录`
+}
+
+function mapMoodRecord(item: MoodApiItem): MoodRecord {
+  return {
+    id: item.id,
+    mood: item.mood_type,
+    date: toDateKey(item.date || item.created_at || item.updated_at),
+    intensity: item.intensity,
+    tags: parseTags(item.tags),
+    note: item.note || "",
+  }
+}
+
+function buildTrendFromRecords(records: MoodRecord[], selectedMonth: Date): TrendPoint[] {
+  const monthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`
+  return records
+    .filter((record) => record.date.startsWith(monthKey))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-30)
+    .map((record) => {
+      const mood = getMoodOption(record.mood)
+      return {
+        day: String(Number(record.date.slice(-2))),
+        date: record.date,
+        intensity: record.intensity,
+        mood: record.mood,
+        moodLabel: mood.label,
+      }
+    })
+}
+
+function buildShareFromRecords(records: MoodRecord[], selectedMonth: Date): MoodShare[] {
+  const monthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`
+  const monthRecords = records.filter((record) => record.date.startsWith(monthKey))
+  const total = Math.max(monthRecords.length, 1)
+  return moodOptions
+    .map((mood) => {
+      const count = monthRecords.filter((record) => record.mood === mood.value).length
+      return {
+        mood: mood.value,
+        label: mood.label,
+        value: Math.round((count / total) * 100),
+        count,
+        color: mood.accent,
+      }
+    })
+    .filter((item) => item.count > 0)
+}
+
+function buildHeatmap(records: MoodRecord[], selectedMonth: Date, apiHeatmap: HeatCell[]) {
+  const year = selectedMonth.getFullYear()
+  const month = selectedMonth.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`
+  const recordsByDay = new Map(records.filter((record) => record.date.startsWith(monthKey)).map((record) => [Number(record.date.slice(-2)), record]))
+  const apiByDay = new Map(apiHeatmap.map((cell) => [cell.day, cell]))
+
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1
+    const record = recordsByDay.get(day)
+    if (record) {
+      return {
+        date: record.date,
+        day,
+        mood: record.mood,
+        intensity: record.intensity,
+        note: record.note,
+        tags: record.tags,
+        id: record.id,
+        hasRecord: true,
+      }
+    }
+
+    const apiCell = apiByDay.get(day)
+    if (apiCell) return apiCell
+
+    return {
+      date: `${monthKey}-${String(day).padStart(2, "0")}`,
+      day,
+      mood: "neutral" as MoodType,
+      intensity: 0,
+      hasRecord: false,
+    }
+  })
+}
+
+function TrendTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: TrendPoint; value: number }> }) {
+  if (!active || !payload?.length) return null
+  const point = payload[0].payload
+  return (
+    <div className="rounded-[18px] border border-[#f8dfe7] bg-white/95 px-4 py-3 text-sm shadow-[0_14px_34px_rgba(255,181,194,0.22)]">
+      <p className="font-semibold text-slate-700">{formatReadableDate(point.date)}</p>
+      <p className="mt-1 text-slate-500">
+        {getMoodOption(point.mood).emoji} {point.moodLabel} · 强度 {point.intensity}/10
+      </p>
+    </div>
+  )
+}
+
 export default function AnalyticsPage() {
-  const [activeDay, setActiveDay] = useState(26)
-  const [monthOffset, setMonthOffset] = useState(0)
+  const [activeDay, setActiveDay] = useState(() => new Date().getDate())
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date(2026, 3, 1))
+  const [showMonthPicker, setShowMonthPicker] = useState(false)
+  const [selectedShareMood, setSelectedShareMood] = useState<MoodType | null>(null)
   const [aiInsight, setAiInsight] = useState(fallbackInsight)
-  const [trendData, setTrendData] = useState(weekTrend)
-  const [shareData, setShareData] = useState(moodShare)
-  const [heatmapData, setHeatmapData] = useState(heatCells)
-  const [calendarData, setCalendarData] = useState<Record<number, MoodType>>(calendarMoods)
+  const [trendData, setTrendData] = useState<TrendPoint[]>([])
+  const [shareData, setShareData] = useState<MoodShare[]>([])
+  const [apiHeatmapData, setApiHeatmapData] = useState<HeatCell[]>([])
+  const [records, setRecords] = useState<MoodRecord[]>(fallbackRecords)
+  const [editingRecord, setEditingRecord] = useState<MoodRecord | null>(null)
+  const [editMood, setEditMood] = useState<MoodType>("calm")
+  const [editDate, setEditDate] = useState("")
+  const [editIntensity, setEditIntensity] = useState(5)
+  const [editTags, setEditTags] = useState("")
+  const [editNote, setEditNote] = useState("")
+  const [savingId, setSavingId] = useState<number | null>(null)
 
   useEffect(() => {
     let active = true
 
     async function loadAnalytics() {
+      const month = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`
       try {
-        const [weeklyResponse, summaryResponse] = await Promise.all([
-          analyticsAPI.weekly(),
-          analyticsAPI.summary(),
+        const [weeklyResponse, summaryResponse, moodResponse] = await Promise.all([
+          analyticsAPI.weekly({ month }),
+          analyticsAPI.summary({ month }),
+          moodAPI.list({ limit: 100 }),
         ])
         if (!active) return
 
         const weekly = normalize(weeklyResponse.data) as { weekly_trend?: WeeklyApiItem[] }
-        if (Array.isArray(weekly.weekly_trend) && weekly.weekly_trend.length > 0) {
-          setTrendData(
-            weekly.weekly_trend.map((item) => ({
-              day: item.date.slice(5).replace("-", "/"),
-              calm: item.mood_type === "calm" ? item.avg_intensity : Math.max(1, item.avg_intensity - 2),
-              happy: item.avg_intensity,
-            })),
-          )
-        }
-
         const summary = normalize(summaryResponse.data) as {
           insight?: string
           suggestion?: string
           mood_distribution?: DistributionApiItem[]
           heatmap_data?: HeatmapApiItem[]
         }
-        if (Array.isArray(summary.mood_distribution) && summary.mood_distribution.length > 0) {
+        const moodPayload = normalize(moodResponse.data)
+        const loadedRecords = Array.isArray(moodPayload) ? (moodPayload as MoodApiItem[]).map(mapMoodRecord) : []
+
+        if (loadedRecords.length > 0) {
+          setRecords(loadedRecords)
+          setTrendData(buildTrendFromRecords(loadedRecords, selectedMonth))
+          setShareData(buildShareFromRecords(loadedRecords, selectedMonth))
+        } else if (Array.isArray(weekly.weekly_trend) && weekly.weekly_trend.length > 0) {
+          setTrendData(
+            weekly.weekly_trend.slice(-30).map((item) => {
+              const mood = getMoodOption(item.mood_type)
+              return {
+                day: String(Number(item.date.slice(-2))),
+                date: item.date,
+                intensity: item.avg_intensity,
+                mood: item.mood_type,
+                moodLabel: mood.label,
+              }
+            }),
+          )
+        } else {
+          setTrendData(buildTrendFromRecords(fallbackRecords, selectedMonth))
+          setShareData(buildShareFromRecords(fallbackRecords, selectedMonth))
+        }
+
+        if (loadedRecords.length === 0 && Array.isArray(summary.mood_distribution) && summary.mood_distribution.length > 0) {
           setShareData(
             summary.mood_distribution.map((item) => {
               const mood = getMoodOption(item.mood_type)
@@ -129,29 +279,34 @@ export default function AnalyticsPage() {
                 mood: item.mood_type,
                 label: mood.label,
                 value: Math.round(item.percentage),
-                color: moodColorMap[item.mood_type],
+                count: item.count ?? 0,
+                color: mood.accent,
               }
             }),
           )
         }
-        if (Array.isArray(summary.heatmap_data) && summary.heatmap_data.length > 0) {
-          setHeatmapData(
-            summary.heatmap_data.slice(-30).map((item) => ({
-              date: String(Number(item.date.slice(-2))),
+
+        if (Array.isArray(summary.heatmap_data)) {
+          setApiHeatmapData(
+            summary.heatmap_data.map((item) => ({
+              date: item.date,
+              day: Number(item.date.slice(-2)),
               mood: item.mood_type,
               intensity: item.intensity,
+              note: item.note,
+              tags: item.tags,
+              id: item.id,
+              hasRecord: item.intensity > 0,
             })),
-          )
-          setCalendarData(
-            summary.heatmap_data.reduce<Record<number, MoodType>>((result, item) => {
-              result[Number(item.date.slice(-2))] = item.mood_type
-              return result
-            }, {}),
           )
         }
         setAiInsight(summary.insight || summary.suggestion || fallbackInsight)
       } catch {
-        if (active) setAiInsight(fallbackInsight)
+        if (!active) return
+        setRecords(fallbackRecords)
+        setTrendData(buildTrendFromRecords(fallbackRecords, selectedMonth))
+        setShareData(buildShareFromRecords(fallbackRecords, selectedMonth))
+        setAiInsight(fallbackInsight)
       }
     }
 
@@ -159,171 +314,274 @@ export default function AnalyticsPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [selectedMonth])
 
-  const selectedMood = getMoodOption(calendarData[activeDay] ?? "happy")
-  const visibleMonth = useMemo(() => {
-    const date = new Date(2026, 3 + monthOffset, 1)
-    return `${date.getFullYear()}年${date.getMonth() + 1}月`
-  }, [monthOffset])
-  const calendarDays = useMemo(() => {
-    const previous = [30, 31]
-    const current = Array.from({ length: 30 }, (_, index) => index + 1)
-    const next = [1, 2, 3]
-    return { previous, current, next }
-  }, [])
+  const visibleMonth = useMemo(() => formatMonth(selectedMonth), [selectedMonth])
+  const heatmapDays = useMemo(() => buildHeatmap(records, selectedMonth, apiHeatmapData), [apiHeatmapData, records, selectedMonth])
+  const heatmapWeeks = useMemo(() => {
+    const firstDay = (new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getDay() + 6) % 7
+    const cells: Array<HeatCell | null> = [...Array.from({ length: firstDay }, () => null), ...heatmapDays]
+    while (cells.length % 7 !== 0) cells.push(null)
+    return Array.from({ length: cells.length / 7 }, (_, index) => cells.slice(index * 7, index * 7 + 7))
+  }, [heatmapDays, selectedMonth])
+  const activeCell = heatmapDays.find((cell) => cell.day === activeDay) ?? heatmapDays.find((cell) => cell.hasRecord) ?? heatmapDays[0]
+  const monthRecords = useMemo(() => {
+    const monthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`
+    return records
+      .filter((record) => record.date.startsWith(monthKey))
+      .filter((record) => (selectedShareMood ? record.mood === selectedShareMood : true))
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [records, selectedMonth, selectedShareMood])
+  const monthOptions = useMemo(
+    () => Array.from({ length: 12 }, (_, index) => new Date(selectedMonth.getFullYear(), index, 1)),
+    [selectedMonth],
+  )
+
+  function moveMonth(offset: number) {
+    setSelectedMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))
+    setActiveDay(1)
+    setSelectedShareMood(null)
+  }
+
+  function startEdit(record: MoodRecord) {
+    setEditingRecord(record)
+    setEditMood(record.mood)
+    setEditDate(record.date)
+    setEditIntensity(record.intensity)
+    setEditTags(record.tags.join("、"))
+    setEditNote(record.note)
+  }
+
+  async function saveEdit() {
+    if (!editingRecord) return
+    const tags = editTags.split(/[、,，]/).map((tag) => tag.trim()).filter(Boolean)
+    const nextRecord: MoodRecord = {
+      ...editingRecord,
+      mood: editMood,
+      date: editDate,
+      intensity: editIntensity,
+      tags,
+      note: editNote,
+    }
+    setSavingId(editingRecord.id)
+    try {
+      await moodAPI.update(String(editingRecord.id), {
+        date: editDate,
+        mood_type: editMood,
+        intensity: editIntensity,
+        tags: JSON.stringify(tags),
+        note: editNote,
+      })
+      setRecords((current) => current.map((record) => (record.id === editingRecord.id ? nextRecord : record)))
+      setEditingRecord(null)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  async function deleteRecord(record: MoodRecord) {
+    const confirmed = window.confirm(`确定删除 ${formatReadableDate(record.date)} 的情绪记录吗？`)
+    if (!confirmed) return
+    setSavingId(record.id)
+    try {
+      await moodAPI.delete(String(record.id))
+      setRecords((current) => current.filter((item) => item.id !== record.id))
+      if (editingRecord?.id === record.id) setEditingRecord(null)
+    } finally {
+      setSavingId(null)
+    }
+  }
 
   return (
     <MoodWaveShell
       title="我的情绪趋势"
       rightSlot={
-        <button className="hidden items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(255,205,216,0.18)] md:inline-flex">
-          {visibleMonth}
-          <CalendarDays className="h-4 w-4 text-[#ff7f96]" />
-        </button>
+        <div className="relative hidden md:block">
+          <button
+            type="button"
+            onClick={() => setShowMonthPicker((value) => !value)}
+            className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm text-slate-600 shadow-[0_10px_24px_rgba(255,205,216,0.18)]"
+          >
+            {visibleMonth}
+            <CalendarDays className="h-4 w-4 text-[#ff7f96]" />
+          </button>
+          {showMonthPicker ? (
+            <div className="absolute right-0 top-12 z-30 w-72 rounded-[28px] border border-white/80 bg-white/95 p-4 shadow-[0_18px_44px_rgba(255,181,194,0.22)]">
+              <div className="mb-3 flex items-center justify-between text-sm font-semibold text-slate-700">
+                <button type="button" onClick={() => setSelectedMonth((current) => new Date(current.getFullYear() - 1, current.getMonth(), 1))} className="rounded-full px-3 py-1 hover:bg-[#fff4f7]">上一年</button>
+                <span>{selectedMonth.getFullYear()}</span>
+                <button type="button" onClick={() => setSelectedMonth((current) => new Date(current.getFullYear() + 1, current.getMonth(), 1))} className="rounded-full px-3 py-1 hover:bg-[#fff4f7]">下一年</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {monthOptions.map((date) => {
+                  const active = date.getMonth() === selectedMonth.getMonth()
+                  return (
+                    <button
+                      key={date.toISOString()}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMonth(date)
+                        setShowMonthPicker(false)
+                        setActiveDay(1)
+                        setSelectedShareMood(null)
+                      }}
+                      className={cn("rounded-full px-3 py-2 text-sm transition", active ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white" : "bg-[#fff8fb] text-slate-600 hover:bg-[#fff1f5]")}
+                    >
+                      {date.getMonth() + 1}月
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
       }
     >
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="mx-auto grid max-w-6xl gap-5">
         <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-7">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setMonthOffset((value) => value - 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm"
-              aria-label="上个月"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="text-center">
-              <h2 className="text-xl font-semibold">{visibleMonth}</h2>
-              <p className="mt-1 text-xs text-slate-400">按日期回看每一次情绪波动</p>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">月度情绪概览</h2>
+              <p className="mt-1 text-sm text-slate-500">30 天趋势和月度分布合并在这里，先看整体，再筛记录。</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setMonthOffset((value) => value + 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm"
-              aria-label="下个月"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mt-6 grid grid-cols-7 text-center text-xs font-medium text-slate-400">
-            {["一", "二", "三", "四", "五", "六", "日"].map((item) => (
-              <span key={item} className={cn((item === "六" || item === "日") && "text-[#ff7894]")}>
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-3 grid grid-cols-7 gap-2">
-            {calendarDays.previous.map((day) => (
-              <div key={`p-${day}`} className="aspect-square rounded-2xl text-center text-sm leading-[3.1rem] text-slate-300">
-                {day}
-              </div>
-            ))}
-            {calendarDays.current.map((day) => {
-              const mood = calendarData[day]
-              const active = activeDay === day
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => setActiveDay(day)}
-                  className={cn(
-                    "relative aspect-square rounded-2xl bg-white/70 text-sm text-slate-700 transition hover:-translate-y-0.5",
-                    active && "ring-2 ring-[#ff7f96] shadow-[0_10px_24px_rgba(255,127,150,0.16)]",
-                    day % 7 === 6 || day % 7 === 0 ? "text-[#ff7894]" : "",
-                  )}
-                >
-                  <span className="absolute left-2 top-1.5">{day}</span>
-                  {mood ? <span className="absolute inset-x-0 bottom-2 text-xl">{getMoodOption(mood).emoji}</span> : null}
-                </button>
-              )
-            })}
-            {calendarDays.next.map((day) => (
-              <div key={`n-${day}`} className="aspect-square rounded-2xl text-center text-sm leading-[3.1rem] text-slate-300">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-5 rounded-[28px] bg-gradient-to-br from-[#fff8f1] to-[#fff1f5] p-5 shadow-inner">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold">4月{activeDay}日</p>
-                <p className="mt-2 flex items-center gap-2 text-lg font-semibold">
-                  <span className="text-3xl">{selectedMood.emoji}</span>
-                  {selectedMood.label}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-500">今天把情绪安放下来，和清晨保持了一点开心。</p>
-              </div>
-              <div className="flex gap-2">
-                <span className="rounded-full bg-[#ffeef3] px-3 py-1 text-xs text-[#ff6f8c]">社交</span>
-                <span className="rounded-full bg-[#fff6dd] px-3 py-1 text-xs text-[#d89b22]">娱乐</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => moveMonth(-1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm" aria-label="上个月">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-24 text-center text-sm font-semibold text-slate-700">{visibleMonth}</span>
+              <button type="button" onClick={() => moveMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm" aria-label="下个月">
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
+          </div>
+
+          <div className="mt-5 h-56 md:h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="intensityLine" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ff7f96" stopOpacity={0.32} />
+                    <stop offset="95%" stopColor="#ff7f96" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#94a3b8" }} />
+                <YAxis domain={[0, 10]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#94a3b8" }} width={28} />
+                <Tooltip content={<TrendTooltip />} />
+                <Area type="monotone" dataKey="intensity" name="情绪强度" stroke="#ff7f96" fill="url(#intensityLine)" strokeWidth={3} dot={{ r: 3, fill: "#ff7f96", strokeWidth: 0 }} activeDot={{ r: 5, fill: "#ff7f96" }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {shareData.length > 0 ? shareData.map((item) => (
+              <button
+                key={item.mood}
+                type="button"
+                onClick={() => setSelectedShareMood((current) => (current === item.mood ? null : item.mood))}
+                className={cn(
+                  "rounded-[22px] bg-[#fffafb] p-4 text-left ring-1 ring-[#f6e4e9] transition hover:-translate-y-0.5",
+                  selectedShareMood === item.mood && "ring-2 ring-[#ff9caf]",
+                )}
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-700">{getMoodOption(item.mood).emoji} {item.label}</span>
+                  <span className="text-slate-400">{item.value}%</span>
+                </div>
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#f5edf0]">
+                  <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} />
+                </div>
+                <p className="mt-2 text-xs text-slate-400">{item.count || Math.round(item.value / 10)} 条记录</p>
+              </button>
+            )) : (
+              <div className="rounded-[22px] bg-[#fffafb] p-4 text-sm text-slate-500 ring-1 ring-[#f6e4e9]">这个月还没有足够的趋势数据。</div>
+            )}
           </div>
         </section>
 
-        <div className="grid gap-5">
-          <section className="rounded-[30px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75">
-            <h3 className="font-semibold">本周情绪分布</h3>
-            <div className="mt-4 space-y-3">
-              {shareData.map((item) => (
-                <div key={item.mood} className="grid grid-cols-[52px_1fr_40px] items-center gap-3 text-sm">
-                  <span className="text-slate-600">{item.label}</span>
-                  <div className="h-3 overflow-hidden rounded-full bg-[#f5edf0]">
-                    <div className="h-full rounded-full" style={{ width: `${item.value * 2}%`, backgroundColor: item.color }} />
-                  </div>
-                  <span className="text-right text-slate-400">{item.value}%</span>
-                </div>
-              ))}
+        <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-7">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800">年度热力日历</h2>
+              <p className="mt-1 text-sm text-slate-500">颜色深度代表情绪强度。</p>
             </div>
-          </section>
-
-          <div className="grid gap-5 md:grid-cols-[0.8fr_1.2fr]">
-            <section className="rounded-[30px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75">
-              <h3 className="font-semibold">月度情绪分布</h3>
-              <div className="mt-3 h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={shareData} innerRadius={42} outerRadius={70} paddingAngle={4} dataKey="value">
-                      {shareData.map((item) => (
-                        <Cell key={item.mood} fill={item.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-
-            <section className="rounded-[30px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75">
-              <h3 className="font-semibold">30天趋势</h3>
-              <div className="mt-3 h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData}>
-                    <defs>
-                      <linearGradient id="happyLine" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ff7f96" stopOpacity={0.28} />
-                        <stop offset="95%" stopColor="#ff7f96" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} />
-                    <YAxis hide domain={[0, 10]} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="happy" stroke="#ff7f96" fill="url(#happyLine)" strokeWidth={3} />
-                    <Area type="monotone" dataKey="calm" stroke="#70d8c9" fill="transparent" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => moveMonth(-1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm" aria-label="上个月">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-24 text-center text-sm font-semibold text-slate-700">{visibleMonth}</span>
+              <button type="button" onClick={() => moveMonth(1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm" aria-label="下个月">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
-          <section className="rounded-[30px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75">
+          <div className="mt-6 overflow-x-auto pb-2">
+            <div className="min-w-[560px]">
+              <div className="grid grid-cols-7 gap-2 text-center text-xs font-medium text-slate-400">
+                {["周一", "周二", "周三", "周四", "周五", "周六", "周日"].map((day) => (
+                  <span key={day} className={cn((day === "周六" || day === "周日") && "text-[#ff7894]")}>{day}</span>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-2">
+                {heatmapWeeks.map((week, weekIndex) => (
+                  <div key={weekIndex} className="grid grid-cols-7 gap-2">
+                    {week.map((cell, dayIndex) => {
+                      if (!cell) return <div key={`${weekIndex}-${dayIndex}`} className="h-16 rounded-[16px] bg-transparent" />
+                      const mood = getMoodOption(cell.mood)
+                      const alpha = cell.hasRecord ? 0.22 + cell.intensity * 0.07 : 0.12
+                      const detail = cell.hasRecord
+                        ? `${formatReadableDate(cell.date)} ${mood.label} · 强度 ${cell.intensity}/10${cell.note ? ` · ${cell.note}` : ""}`
+                        : `${formatReadableDate(cell.date)} 暂无记录`
+                      return (
+                        <button
+                          key={cell.date}
+                          type="button"
+                          title={detail}
+                          onClick={() => setActiveDay(cell.day)}
+                          onMouseEnter={() => setActiveDay(cell.day)}
+                          onFocus={() => setActiveDay(cell.day)}
+                          className={cn(
+                            "group relative h-16 rounded-[16px] p-2 text-left text-xs text-slate-700 ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-[#ffb5c2]",
+                            activeDay === cell.day && "ring-2 ring-[#ff8fa3]",
+                          )}
+                          style={{ backgroundColor: cell.hasRecord ? withAlpha(mood.accent, alpha) : "#f7f1f4" }}
+                        >
+                          <span className="font-semibold">{cell.day}</span>
+                          {cell.hasRecord ? <span className="absolute bottom-2 right-2 text-lg">{mood.emoji}</span> : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {activeCell ? (
+            <div className="mt-5 rounded-[28px] bg-gradient-to-br from-[#fff8f1] to-[#fff1f5] p-5 shadow-inner">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">{formatReadableDate(activeCell.date)}</p>
+                  <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-800">
+                    <span className="text-3xl">{getMoodOption(activeCell.mood).emoji}</span>
+                    {activeCell.hasRecord ? `${getMoodOption(activeCell.mood).label} · 强度 ${activeCell.intensity}/10` : "暂无记录"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-500">{activeCell.note || "这一天还没有写下心情，可以从情绪录入页补一条。"}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(activeCell.tags || []).map((tag) => (
+                    <span key={tag} className="rounded-full bg-white/80 px-3 py-1 text-xs text-[#ff6f8c]">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+          <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="font-semibold">AI 月度洞察</h3>
+              <h2 className="text-lg font-semibold text-slate-800">AI 月度洞察</h2>
               <Sparkles className="h-5 w-5 text-[#ff8fa3]" />
             </div>
             <div className="mt-4 rounded-[24px] bg-gradient-to-r from-[#fff5d8] via-[#fff0f5] to-[#effdfa] p-4 text-sm leading-7 text-slate-600">
@@ -332,30 +590,126 @@ export default function AnalyticsPage() {
             </div>
           </section>
 
-          <section className="rounded-[30px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75">
-            <div className="flex items-center gap-3">
-              <Medal className="h-9 w-9 rounded-2xl bg-[#fff4da] p-2 text-[#f6b94f]" />
+          <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="font-semibold">年度热力日历</h3>
-                <p className="text-xs text-slate-400">最近 30 天情绪浓度</p>
+                <h2 className="text-lg font-semibold text-slate-800">全部记录</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedShareMood ? `正在查看「${getMoodOption(selectedShareMood).label}」记录` : "支持编辑和删除任意一天的记录"}
+                </p>
               </div>
+              {selectedShareMood ? (
+                <button type="button" onClick={() => setSelectedShareMood(null)} className="inline-flex items-center gap-1 rounded-full bg-[#fff1f5] px-3 py-2 text-sm text-[#ff6f8c]">
+                  <X className="h-4 w-4" />
+                  清除筛选
+                </button>
+              ) : null}
             </div>
-            <div className="mt-4 grid grid-cols-10 gap-2">
-              {heatmapData.map((cell) => {
-                const mood = getMoodOption(cell.mood)
+
+            <div className="mt-4 max-h-[430px] space-y-3 overflow-y-auto pr-1">
+              {monthRecords.length > 0 ? monthRecords.map((record) => {
+                const mood = getMoodOption(record.mood)
                 return (
-                  <div
-                    key={cell.date}
-                    title={`${cell.date}日 ${mood.label}`}
-                    className="aspect-square rounded-lg"
-                    style={{ backgroundColor: mood.accent, opacity: 0.25 + cell.intensity / 14 }}
-                  />
+                  <article key={record.id} className="rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f6e4e9]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xl">{mood.emoji}</span>
+                          <h3 className="truncate font-semibold text-slate-800">{recordTitle(record)}</h3>
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-500">{formatReadableDate(record.date)}</span>
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-500">强度 {record.intensity}/10</span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{record.note || "这条记录还没有文字描述。"}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {record.tags.map((tag) => (
+                            <span key={tag} className="rounded-full bg-white px-2.5 py-1 text-xs text-[#ff6f8c]">{tag}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={() => startEdit(record)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-[#ff7f96]" aria-label="编辑记录">
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => deleteRecord(record)} disabled={savingId === record.id} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-[#ef8d7b] disabled:opacity-50" aria-label="删除记录">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
                 )
-              })}
+              }) : (
+                <div className="rounded-[24px] bg-[#fffafb] p-6 text-center text-sm text-slate-500 ring-1 ring-[#f6e4e9]">这个筛选下暂时没有记录。</div>
+              )}
             </div>
           </section>
         </div>
       </div>
+
+      {editingRecord ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[34px] bg-white p-5 shadow-[0_24px_70px_rgba(255,181,194,0.3)] ring-1 ring-white/80 md:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-800">编辑情绪记录</h2>
+                <p className="mt-1 text-sm text-slate-500">可以修改日期、情绪、强度、标签和文字内容。</p>
+              </div>
+              <button type="button" onClick={() => setEditingRecord(null)} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#fff1f5] text-slate-500">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                日期
+                <input value={editDate} onChange={(event) => setEditDate(event.target.value)} type="date" className="h-11 rounded-[18px] border border-[#f6dfe6] bg-[#fffafb] px-4 text-sm outline-none focus:ring-2 focus:ring-[#ffb5c2]" />
+              </label>
+
+              <div className="grid gap-2">
+                <span className="text-sm font-medium text-slate-700">情绪</span>
+                <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+                  {moodOptions.map((mood) => (
+                    <button
+                      key={mood.value}
+                      type="button"
+                      onClick={() => setEditMood(mood.value)}
+                      className={cn(
+                        "rounded-[18px] bg-[#fffafb] px-3 py-3 text-sm ring-1 ring-[#f6e4e9] transition",
+                        editMood === mood.value && "ring-2 ring-[#ff9caf]",
+                      )}
+                    >
+                      <span className="block text-xl">{mood.emoji}</span>
+                      <span>{mood.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                强度：{editIntensity}/10
+                <input value={editIntensity} onChange={(event) => setEditIntensity(Number(event.target.value))} min={1} max={10} type="range" className="accent-[#ff8fa3]" />
+              </label>
+
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                标签
+                <input value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="用顿号或逗号分隔" className="h-11 rounded-[18px] border border-[#f6dfe6] bg-[#fffafb] px-4 text-sm outline-none focus:ring-2 focus:ring-[#ffb5c2]" />
+              </label>
+
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                内容
+                <textarea value={editNote} onChange={(event) => setEditNote(event.target.value)} rows={4} className="resize-none rounded-[18px] border border-[#f6dfe6] bg-[#fffafb] px-4 py-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-[#ffb5c2]" />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setEditingRecord(null)} className="rounded-full bg-[#f7f1f4] px-5 py-2.5 text-sm font-semibold text-slate-500">取消</button>
+              <button type="button" onClick={saveEdit} disabled={savingId === editingRecord.id} className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(255,151,173,0.24)] disabled:opacity-60">
+                <Save className="h-4 w-4" />
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </MoodWaveShell>
   )
 }

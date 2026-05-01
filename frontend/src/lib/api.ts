@@ -1,6 +1,12 @@
 import axios from 'axios'
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+export function resolveAssetUrl(url?: string | null) {
+  if (!url) return ''
+  if (/^https?:\/\//.test(url) || url.startsWith('blob:') || url.startsWith('data:')) return url
+  return `${API_URL}${url.startsWith('/') ? url : `/${url}`}`
+}
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -38,8 +44,8 @@ export const moodAPI = {
 
 // 情绪分析接口
 export const analyticsAPI = {
-  weekly: () => apiClient.get('/api/analytics/weekly'),
-  summary: () => apiClient.get('/api/analytics/summary'),
+  weekly: (params?: any) => apiClient.get('/api/analytics/weekly', { params }),
+  summary: (params?: any) => apiClient.get('/api/analytics/summary', { params }),
   analyze: (data: any) => apiClient.post('/api/analytics/analyze', data),
 }
 
@@ -56,11 +62,39 @@ export const postsAPI = {
 export const musicAPI = {
   recommend: (moodType?: string) =>
     apiClient.get('/api/music/recommend', { params: { mood_type: moodType } }),
+  favorite: (data: any) => apiClient.post('/api/music/favorite', data),
+  favorites: () => apiClient.get('/api/music/favorites'),
 }
 
 // AI 对话接口
 export const aiAPI = {
   chatUrl: () => `${API_URL}/api/ai/chat`,
+  analyzeMood: (data: any) => apiClient.post('/api/ai/analyze-mood', data),
+}
+
+// 文件上传接口
+export const uploadAPI = {
+  images: (files: File[]) => {
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files', file))
+    return apiClient.post('/api/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  voice: (file: File | Blob) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post('/api/upload/voice', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  avatar: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post('/api/upload/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 // 健康检查

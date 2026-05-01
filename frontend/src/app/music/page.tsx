@@ -10,6 +10,7 @@ import {
   Pause,
   Play,
   RefreshCw,
+  Share2,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -191,6 +192,21 @@ function normalizeRecommendations(payload: unknown, mood: MoodType): MusicRecomm
   })
 }
 
+function normalizeFavoriteIds(payload: unknown) {
+  const maybeWrapped = payload as { data?: unknown }
+  const source = Array.isArray(payload) ? payload : Array.isArray(maybeWrapped?.data) ? maybeWrapped.data : []
+  if (!Array.isArray(source)) return new Set<string>()
+
+  return new Set(
+    source
+      .map((item) => {
+        const record = item as { music_id?: string | number; id?: string | number }
+        return String(record.music_id ?? record.id ?? "")
+      })
+      .filter(Boolean),
+  )
+}
+
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60)
   const rest = String(seconds % 60).padStart(2, "0")
@@ -220,13 +236,18 @@ function MusicPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [recommendations, setRecommendations] = useState<MusicRecommendation[]>(fallbackRecommendations[mood])
   const [selectedTrack, setSelectedTrack] = useState(0)
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [liked, setLiked] = useState(false)
+  const [elapsedTime, setElapsedTime] = useState(0)
   const [aiInsight, setAiInsight] = useState(profile.insight)
   const [isInsightLoading, setIsInsightLoading] = useState(false)
   const [insightError, setInsightError] = useState("")
 
   const selectedRecommendation = recommendations[selectedTrack] ?? fallbackRecommendations[mood][0]
-  const progress = useMemo(() => Math.min(92, 18 + intensity * 6 + (isPlaying ? 8 : 0)), [intensity, isPlaying])
+  const progress = useMemo(
+    () => Math.min(100, (elapsedTime / Math.max(1, selectedRecommendation.duration)) * 100),
+    [elapsedTime, selectedRecommendation.duration],
+  )
 
   const loadAIInsight = useCallback(async (signal?: AbortSignal) => {
     setIsInsightLoading(true)
@@ -368,6 +389,7 @@ function MusicPageContent() {
 
       Tone.Transport.start()
       setIsPlaying(true)
+      setElapsedTime(0)
     } finally {
       setIsLoading(false)
     }
@@ -377,23 +399,49 @@ function MusicPageContent() {
     setRecommendations(fallbackRecommendations[mood])
     setSelectedTrack(0)
     setLiked(false)
+    setElapsedTime(0)
 
     let active = true
-    musicAPI
-      .recommend(mood)
-      .then((response) => {
-        if (!active) return
-        setRecommendations(normalizeRecommendations(response.data, mood))
-      })
-      .catch(() => {
-        if (!active) return
+    Promise.allSettled([musicAPI.recommend(mood), musicAPI.favorites()]).then((results) => {
+      if (!active) return
+
+      const [recommendResult, favoritesResult] = results
+      if (recommendResult.status === "fulfilled") {
+        setRecommendations(normalizeRecommendations(recommendResult.value.data, mood))
+      } else {
         setRecommendations(fallbackRecommendations[mood])
-      })
+      }
+
+      if (favoritesResult.status === "fulfilled") {
+        setFavoriteIds(normalizeFavoriteIds(favoritesResult.value.data))
+      } else {
+        setFavoriteIds(new Set())
+      }
+    })
 
     return () => {
       active = false
     }
   }, [mood])
+
+  useEffect(() => {
+    setLiked(favoriteIds.has(selectedRecommendation.id))
+  }, [favoriteIds, selectedRecommendation.id])
+
+  useEffect(() => {
+    if (!isPlaying) return
+    const timer = window.setInterval(() => {
+      setElapsedTime((current) => {
+        if (current + 1 >= selectedRecommendation.duration) {
+          setSelectedTrack((trackIndex) => (trackIndex + 1) % recommendations.length)
+          return 0
+        }
+        return current + 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [isPlaying, recommendations.length, selectedRecommendation.duration])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -517,10 +565,75 @@ function MusicPageContent() {
 
   function nextTrack() {
     setSelectedTrack((current) => (current + 1) % recommendations.length)
+    setElapsedTime(0)
   }
 
   function prevTrack() {
     setSelectedTrack((current) => (current - 1 + recommendations.length) % recommendations.length)
+    setElapsedTime(0)
+  }
+
+  function shuffleTracks() {
+    setRecommendations((current) => {
+      const shuffled = [...current]
+      for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1))
+        ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
+      }
+      return shuffled
+    })
+    setSelectedTrack(0)
+    setElapsedTime(0)
+  }
+
+  async function toggleFavorite() {
+    const nextLiked = !liked
+    setLiked(nextLiked)
+    setFavoriteIds((current) => {
+      const next = new Set(current)
+      if (nextLiked) next.add(selectedRecommendation.id)
+      else next.delete(selectedRecommendation.id)
+      return next
+    })
+
+    try {
+      const response = await musicAPI.favorite({
+        music_id: selectedRecommendation.id,
+        title: selectedRecommendation.title,
+        artist: selectedRecommendation.artist,
+        mood_type: selectedRecommendation.mood_type,
+      })
+      const action = response.data?.data?.action
+      setFavoriteIds((current) => {
+        const next = new Set(current)
+        if (action === "added") next.add(selectedRecommendation.id)
+        if (action === "removed") next.delete(selectedRecommendation.id)
+        return next
+      })
+      if (action === "added") setLiked(true)
+      if (action === "removed") setLiked(false)
+    } catch {
+      setLiked(!nextLiked)
+      setFavoriteIds((current) => {
+        const next = new Set(current)
+        if (nextLiked) next.delete(selectedRecommendation.id)
+        else next.add(selectedRecommendation.id)
+        return next
+      })
+    }
+  }
+
+  async function shareTrack() {
+    const shareText = `${selectedRecommendation.title} - ${selectedRecommendation.artist}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "MoodWave 治愈音乐", text: shareText })
+      } else {
+        await navigator.clipboard.writeText(shareText)
+      }
+    } catch {
+      // 用户取消分享时不打断播放。
+    }
   }
 
   return (
@@ -534,139 +647,135 @@ function MusicPageContent() {
       }
     >
       <div className="mx-auto max-w-7xl">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="overflow-hidden rounded-[34px] bg-white/82 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75">
-            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="p-4 md:p-6">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="inline-flex items-center gap-2 rounded-full bg-white/88 px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm">
-                      <span>{moodMeta.emoji}</span>
-                      {moodMeta.label}
-                    </div>
-                    <h2 className="mt-4 text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <Volume2 className="h-4 w-4 text-[#8bded4]" />
-                    {profile.bpm + intensity * 2} BPM
-                  </div>
-                </div>
+        <section className="relative isolate overflow-hidden rounded-[34px] bg-white/86 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 sm:p-5 lg:p-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#fff3f6] px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm">
+              <span>{moodMeta.emoji}</span>
+              {moodMeta.label}
+            </div>
+            <button
+              type="button"
+              onClick={toggleFavorite}
+              className={cn("grid h-11 w-11 place-items-center rounded-full bg-white text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.16)] transition hover:text-[#ff8fa3]", liked && "text-[#ff6f88]")}
+              aria-label="收藏"
+              title={liked ? "已收藏" : "添加到收藏"}
+            >
+              <Heart className={cn("h-5 w-5", liked && "fill-current")} />
+            </button>
+          </div>
 
-                <div className="relative min-h-[360px] overflow-hidden rounded-[30px] border border-white/80 bg-white md:min-h-[500px]">
-                  <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-                  <div className="pointer-events-none absolute inset-x-5 top-5 flex items-start justify-between">
-                    <div className="rounded-[24px] bg-white/68 px-4 py-3 text-sm text-slate-600 backdrop-blur-md">
-                      <p className="font-semibold text-slate-800">{profile.texture}</p>
-                      <p className="mt-1 text-xs">跟随此刻心情缓慢流动</p>
-                    </div>
-                    <AnimatePresence mode="wait">
-                      <motion.div
-                        key={isPlaying ? "playing" : "paused"}
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        className="rounded-full bg-white/72 px-3 py-2 text-xs font-semibold text-slate-600 backdrop-blur-md"
-                      >
-                        {isPlaying ? "正在播放" : "等待播放"}
-                      </motion.div>
-                    </AnimatePresence>
-                  </div>
+          <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(330px,0.42fr)] xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.42fr)]">
+            <div className="min-w-0 overflow-hidden">
+              <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
+                  <p className="mt-2 text-sm text-slate-500">{profile.texture}</p>
+                </div>
+                <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm text-slate-500 shadow-sm">
+                  <Volume2 className="h-4 w-4 text-[#8bded4]" />
+                  {profile.bpm + intensity * 2} BPM
                 </div>
               </div>
 
-              <aside className="border-t border-[#f5e4e9] bg-white/76 p-5 lg:border-l lg:border-t-0">
-                <div className="mx-auto max-w-sm">
-                  <div className={cn("flex aspect-square items-center justify-center rounded-[30px] bg-gradient-to-br shadow-[0_18px_50px_rgba(255,181,194,0.24)]", profile.album)}>
+              <div className="relative z-0 aspect-[1.02/1] max-w-full overflow-hidden rounded-[30px] border border-white/80 bg-white sm:aspect-[16/11] lg:min-h-[420px]">
+                <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full max-w-full" />
+                <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3 sm:inset-x-5 sm:top-5">
+                  <div className="hidden rounded-[24px] bg-white/68 px-4 py-3 text-sm text-slate-600 backdrop-blur-md sm:block">
+                    <p className="font-semibold text-slate-800">{profile.texture}</p>
+                    <p className="mt-1 text-xs">跟随此刻心情缓慢流动</p>
+                  </div>
+                  <AnimatePresence mode="wait">
                     <motion.div
-                      animate={{ scale: isPlaying ? [1, 1.06, 1] : 1, rotate: isPlaying ? [0, 2, -2, 0] : 0 }}
-                      transition={{ repeat: isPlaying ? Infinity : 0, duration: 3.2, ease: "easeInOut" }}
-                      className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-white/68 text-5xl text-[#ff8fa3] shadow-[0_12px_30px_rgba(255,255,255,0.55)] backdrop-blur-md"
+                      key={isPlaying ? "playing" : "paused"}
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      className="ml-auto rounded-full bg-white/72 px-3 py-2 text-xs font-semibold text-slate-600 backdrop-blur-md"
                     >
-                      ♪
+                      {isPlaying ? "正在播放" : "等待播放"}
                     </motion.div>
-                  </div>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
 
-                  <div className="mt-5 text-center">
-                    <p className="text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
-                    <p className="mt-1 text-sm text-slate-500">{selectedRecommendation.artist}</p>
+            <aside className="relative z-10 min-w-0 lg:pt-[74px]">
+              <div className="mx-auto max-w-sm lg:max-w-none">
+                <div className="flex items-center gap-4">
+                  <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br text-3xl text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]", profile.album)}>
+                    ♪
                   </div>
-
-                  <div className="mt-5">
-                    <div className="h-2 rounded-full bg-[#f0edf0]">
-                      <motion.div
-                        animate={{ width: `${progress}%` }}
-                        className="h-full rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5]"
-                      />
-                    </div>
-                    <div className="mt-2 flex justify-between text-xs text-slate-500">
-                      <span>01:{String(intensity * 5).padStart(2, "0")}</span>
-                      <span>{formatDuration(selectedRecommendation.duration)}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-center gap-4">
-                    <button
-                      type="button"
-                      onClick={prevTrack}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-[0_10px_24px_rgba(255,181,194,0.18)] transition hover:-translate-y-0.5"
-                      aria-label="上一首"
-                    >
-                      <SkipBack className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={togglePlay}
-                      disabled={isLoading}
-                      className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5] text-white shadow-[0_16px_34px_rgba(255,143,163,0.3)] transition hover:-translate-y-0.5 disabled:cursor-wait"
-                      aria-label={isPlaying ? "暂停" : "播放"}
-                    >
-                      {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : isPlaying ? <Pause className="h-7 w-7" /> : <Play className="ml-1 h-7 w-7" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={nextTrack}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-600 shadow-[0_10px_24px_rgba(255,181,194,0.18)] transition hover:-translate-y-0.5"
-                      aria-label="下一首"
-                    >
-                      <SkipForward className="h-5 w-5" />
-                    </button>
-                  </div>
-
-                  <div className="mt-5 flex items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-[#ff8fa3]"
-                      aria-label="随机播放"
-                    >
-                      <Shuffle className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLiked((value) => !value)}
-                      className={cn("flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm transition", liked ? "text-[#ff6f88]" : "text-slate-500 hover:text-[#ff8fa3]")}
-                      aria-label="收藏"
-                    >
-                      <Heart className={cn("h-4 w-4", liked && "fill-current")} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        stopMusic()
-                        void startMusic()
-                      }}
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-[#5fcfc2]"
-                      aria-label="重新生成"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </button>
+                  <div className="min-w-0">
+                    <p className="truncate text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
+                    <p className="mt-1 truncate text-sm text-slate-500">{selectedRecommendation.artist}</p>
                   </div>
                 </div>
-              </aside>
-            </div>
-          </section>
 
-          <aside className="space-y-5">
-            <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
+                <div className="mt-7">
+                  <div className="h-2 rounded-full bg-[#f0edf0]">
+                    <motion.div
+                      animate={{ width: `${progress}%` }}
+                      className="h-full rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5]"
+                    />
+                  </div>
+                  <div className="mt-2 flex justify-between text-xs text-slate-500">
+                    <span>{formatDuration(elapsedTime)}</span>
+                    <span>{formatDuration(selectedRecommendation.duration)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-7 flex items-center justify-center gap-6">
+                  <button
+                    type="button"
+                    onClick={prevTrack}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-[0_10px_24px_rgba(255,181,194,0.18)] transition hover:-translate-y-0.5"
+                    aria-label="上一首"
+                    title="上一首"
+                  >
+                    <SkipBack className="h-5 w-5 fill-current" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    disabled={isLoading}
+                    className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5] text-white shadow-[0_16px_34px_rgba(255,143,163,0.3)] transition hover:-translate-y-0.5 disabled:cursor-wait"
+                    aria-label={isPlaying ? "暂停" : "播放"}
+                    title={isPlaying ? "暂停" : "播放"}
+                  >
+                    {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : isPlaying ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={nextTrack}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-[0_10px_24px_rgba(255,181,194,0.18)] transition hover:-translate-y-0.5"
+                    aria-label="下一首"
+                    title="下一首"
+                  >
+                    <SkipForward className="h-5 w-5 fill-current" />
+                  </button>
+                </div>
+
+                <div className="mt-7 grid grid-cols-3 gap-3 text-center">
+                  <button type="button" onClick={shuffleTracks} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]" aria-label="随机播放" title="随机播放">
+                    <Shuffle className="mx-auto h-5 w-5" />
+                    <span className="mt-1 block">随机</span>
+                  </button>
+                  <button type="button" onClick={() => { stopMusic(); void startMusic() }} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#5fcfc2]" aria-label="重新生成" title="重新生成音乐">
+                    <RefreshCw className="mx-auto h-5 w-5" />
+                    <span className="mt-1 block">循环</span>
+                  </button>
+                  <button type="button" onClick={shareTrack} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]" aria-label="分享" title="分享音乐">
+                    <Share2 className="mx-auto h-5 w-5" />
+                    <span className="mt-1 block">分享</span>
+                  </button>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+          <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-[20px] bg-[#fff1f5] text-[#ff7f96]">
                   {isInsightLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircleHeart className="h-5 w-5" />}
@@ -693,11 +802,11 @@ function MusicPageContent() {
                   重新生成陪伴语
                 </button>
               </div>
-            </section>
+          </section>
 
-            <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
+          <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
               <h3 className="font-semibold text-slate-900">推荐歌曲</h3>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {recommendations.map((track, index) => (
                   <button
                     key={track.id}
@@ -719,8 +828,7 @@ function MusicPageContent() {
                   </button>
                 ))}
               </div>
-            </section>
-          </aside>
+          </section>
         </div>
       </div>
     </MoodWaveShell>

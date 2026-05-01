@@ -4,11 +4,12 @@
 提供情绪数据分析和统计功能
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from datetime import datetime, timedelta
 from collections import Counter
 import json
+from typing import Optional, List
 
 from src.core.models import (
     MoodEntry,
@@ -103,6 +104,7 @@ def calculate_mood_score(mood_type: str, intensity: int) -> float:
 @router.get("/analytics/weekly")
 async def get_weekly_analytics(
     session: Session = Depends(get_session),
+    month: Optional[str] = Query(None, description="筛选月份，格式 YYYY-MM"),
 ):
     """
     获取近7天情绪趋势数据（Codex 前端折线图用）
@@ -118,7 +120,19 @@ async def get_weekly_analytics(
         }
     """
     seven_days_ago = (datetime.utcnow() - timedelta(days=7)).date()
-    statement = select(MoodEntry).where(MoodEntry.date >= str(seven_days_ago))
+    statement = select(MoodEntry)
+
+    # 月份筛选
+    if month:
+        try:
+            year, m = month.split("-")
+            month_prefix = f"{year}-{m}"
+            statement = statement.where(MoodEntry.date.startswith(month_prefix))
+        except ValueError:
+            pass  # 无效格式，忽略筛选
+    else:
+        statement = statement.where(MoodEntry.date >= str(seven_days_ago))
+
     moods = session.exec(statement).all()
 
     if not moods:
@@ -193,6 +207,7 @@ async def get_weekly_analytics(
 @router.get("/analytics/summary")
 async def get_mood_summary(
     session: Session = Depends(get_session),
+    month: Optional[str] = Query(None, description="筛选月份，格式 YYYY-MM"),
 ):
     """
     获取情绪汇总（Codex 前端饼图+热力日历+AI洞察+Profile页用）
@@ -217,6 +232,16 @@ async def get_mood_summary(
     from collections import defaultdict
 
     statement = select(MoodEntry)
+
+    # 月份筛选
+    if month:
+        try:
+            year, m = month.split("-")
+            month_prefix = f"{year}-{m}"
+            statement = statement.where(MoodEntry.date.startswith(month_prefix))
+        except ValueError:
+            pass
+
     moods = session.exec(statement).all()
 
     if not moods:

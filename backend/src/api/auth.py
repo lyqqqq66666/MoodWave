@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
-from passlib.context import CryptContext
+from passlib.hash import bcrypt, pbkdf2_sha256
 
 from src.core.models import (
     User, UserCreate, UserLogin, Token, TokenData, UserResponse,
@@ -21,9 +21,6 @@ from src.db.database import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# 密码哈希
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # OAuth2 方案（从请求中提取 token）
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
@@ -32,12 +29,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 def verify_password(plain: str, hashed: str) -> bool:
     """校验密码"""
-    return pwd_context.verify(plain, hashed)
+    try:
+        if hashed.startswith("$pbkdf2-sha256$"):
+            return pbkdf2_sha256.verify(plain, hashed)
+        return bcrypt.verify(plain, hashed)
+    except Exception:
+        return False
 
 
 def hash_password(password: str) -> str:
     """哈希密码"""
-    return pwd_context.hash(password)
+    return pbkdf2_sha256.hash(password)
 
 
 def create_access_token(user_id: int) -> str:

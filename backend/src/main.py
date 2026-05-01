@@ -6,7 +6,9 @@ MoodWave Backend - FastAPI 应用入口
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+import os
 
 from src.db.database import create_db_and_tables
 from src.api import moods, analytics, music, upload, ai, posts, auth
@@ -77,6 +79,11 @@ async def root():
         "docs": "/docs",
         "openapi": "/openapi.json",
     }
+
+# 托管上传的静态文件（本地开发用，生产环境由 Nginx 接管）
+uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 if __name__ == "__main__":
     import uvicorn

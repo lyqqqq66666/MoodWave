@@ -1,51 +1,199 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ImagePlus, Mic, PenLine, Sparkles, UploadCloud } from "lucide-react"
-import { moodAPI } from "@/lib/api"
+import { ChevronDown, ChevronUp, Play, Plus, Sparkles, Trash2 } from "lucide-react"
+import { aiAPI, moodAPI, uploadAPI } from "@/lib/api"
 import { getMoodOption, moodOptions, moodTagOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mood-analysis-report"
+import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
+import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
 import { cn } from "@/lib/utils"
 
 const steps = ["情绪", "强度", "内容", "标签", "完成"]
 
-type InputMode = "text" | "image" | "voice"
+const fallbackRadar = [
+  { mood: "开心", score: 58 },
+  { mood: "平静", score: 72 },
+  { mood: "焦虑", score: 28 },
+  { mood: "愤怒", score: 12 },
+  { mood: "悲伤", score: 18 },
+  { mood: "平淡", score: 42 },
+]
 
 export default function MoodPage() {
   const [step, setStep] = useState(1)
   const [selectedMood, setSelectedMood] = useState<MoodType>("calm")
   const [intensity, setIntensity] = useState(6)
   const [note, setNote] = useState("")
-  const [selectedTags, setSelectedTags] = useState<string[]>(["relationship"])
-  const [inputMode, setInputMode] = useState<InputMode>("text")
-  const [uploadedImageName, setUploadedImageName] = useState("")
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [images, setImages] = useState<MoodImageAttachment[]>([])
+  const [voiceFile, setVoiceFile] = useState<File | null>(null)
+  const [voiceDuration, setVoiceDuration] = useState(0)
+  const [voicePreviewUrl, setVoicePreviewUrl] = useState("")
+  const [voiceUploadUrl, setVoiceUploadUrl] = useState("")
+  const [voiceText, setVoiceText] = useState("")
+  const [voiceStatus, setVoiceStatus] = useState<"idle" | "uploading" | "ready" | "failed">("idle")
+  const [showVoiceText, setShowVoiceText] = useState(false)
+  const [voiceResetKey, setVoiceResetKey] = useState(0)
+  const [customTag, setCustomTag] = useState("")
+  const [showCustomTag, setShowCustomTag] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [analysisReport, setAnalysisReport] = useState<MoodAnalysisReportData | null>(null)
+  const [submitNotice, setSubmitNotice] = useState("")
+  const voiceUploadTokenRef = useRef(0)
 
   const selectedMoodMeta = getMoodOption(selectedMood)
   const canContinue = useMemo(() => {
     if (step === 1) return Boolean(selectedMood)
     if (step === 2) return intensity >= 1
     if (step === 3) return true
-    if (step === 4) return selectedTags.length > 0
+    if (step === 4) return true
     return true
-  }, [intensity, selectedMood, selectedTags, step])
+  }, [intensity, selectedMood, step])
+
+  function buildFallbackReport(): MoodAnalysisReportData {
+    return {
+      summary: `你此刻更接近「${selectedMoodMeta.label}」，强度大约在 ${intensity}/10。`,
+      insight: selectedMoodMeta.insight,
+      suggestion: "先把今天最具体的一件小事写下来，再给自己留十分钟缓冲。情绪已经被看见，就会轻一点。",
+      music_recommendation: {
+        mood: selectedMood,
+        bpm: selectedMood === "happy" ? 104 : selectedMood === "sad" ? 62 : 76,
+        title: selectedMood === "happy" ? "晴朗的午后" : selectedMood === "sad" ? "给低落一条毯子" : "宁静的午后",
+        texture: "柔和和弦 + 慢速波纹",
+      },
+      radar_data: fallbackRadar.map((point) => ({
+        ...point,
+        score: point.mood === selectedMoodMeta.label ? Math.min(96, intensity * 10) : point.score,
+      })),
+    }
+  }
+
+  function addCustomTag() {
+    const tag = customTag.trim()
+    if (!tag) return
+    setSelectedTags((current) => (current.includes(tag) ? current : [...current, tag]))
+    setCustomTag("")
+    setShowCustomTag(false)
+  }
+
+  function clearVoiceRecording() {
+    voiceUploadTokenRef.current += 1
+    if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl)
+    setVoiceFile(null)
+    setVoiceDuration(0)
+    setVoicePreviewUrl("")
+    setVoiceUploadUrl("")
+    setVoiceText("")
+    setVoiceStatus("idle")
+    setShowVoiceText(false)
+    setVoiceResetKey((value) => value + 1)
+  }
+
+  async function handleVoiceRecording(file: File | null, duration: number) {
+    if (!file) {
+      clearVoiceRecording()
+      return
+    }
+
+    const uploadToken = voiceUploadTokenRef.current + 1
+    voiceUploadTokenRef.current = uploadToken
+    if (voicePreviewUrl) URL.revokeObjectURL(voicePreviewUrl)
+
+    setVoiceFile(file)
+    setVoiceDuration(duration)
+    setVoicePreviewUrl(URL.createObjectURL(file))
+    setVoiceUploadUrl("")
+    setVoiceText("")
+    setVoiceStatus("uploading")
+    setShowVoiceText(false)
+
+    try {
+      const voiceResponse = await uploadAPI.voice(file)
+      if (voiceUploadTokenRef.current !== uploadToken) return
+      const payload = voiceResponse.data?.data ?? voiceResponse.data
+      setVoiceUploadUrl(payload?.url || payload?.voice_url || "")
+      setVoiceText(payload?.voice_text || payload?.text || "")
+      if (payload?.duration) setVoiceDuration(Math.max(1, Math.round(Number(payload.duration))))
+      setVoiceStatus("ready")
+    } catch {
+      if (voiceUploadTokenRef.current !== uploadToken) return
+      setVoiceStatus("failed")
+      setSubmitNotice((current) => current || "语音转写暂时不可用，已保留本地录音。")
+    }
+  }
 
   async function handleSubmit() {
     setIsSubmitting(true)
+    setSubmitNotice("")
 
     try {
+      let imageUrls = images.map((image) => image.previewUrl)
+      if (images.length > 0) {
+        try {
+          const uploadResponse = await uploadAPI.images(images.map((image) => image.file))
+          const payload = uploadResponse.data?.data ?? uploadResponse.data
+          imageUrls = Array.isArray(payload?.urls) ? payload.urls : Array.isArray(payload) ? payload : imageUrls
+        } catch {
+          setSubmitNotice("图片接口暂时不可用，已先使用本地预览完成本次分析。")
+        }
+      }
+
+      let submittedVoiceText = voiceText
+      let submittedVoiceUrl = voiceUploadUrl
+      if (voiceFile && !submittedVoiceUrl) {
+        try {
+          const voiceResponse = await uploadAPI.voice(voiceFile)
+          const payload = voiceResponse.data?.data ?? voiceResponse.data
+          submittedVoiceUrl = payload?.url || payload?.voice_url || ""
+          submittedVoiceText = payload?.voice_text || payload?.text || ""
+          setVoiceUploadUrl(submittedVoiceUrl)
+          setVoiceText(submittedVoiceText)
+          setVoiceStatus("ready")
+        } catch {
+          setSubmitNotice((current) => current || "语音转写接口暂时不可用，本次先保留文字和图片内容。")
+        }
+      }
+
+      const imageAnalysis =
+        imageUrls.length > 0
+          ? `用户上传了 ${imageUrls.length} 张与本次心情相关的图片，图片地址：${imageUrls.join("，")}`
+          : ""
+
+      const report = await aiAPI
+        .analyzeMood({
+          mood_type: selectedMood,
+          intensity,
+          note,
+          tags: selectedTags,
+          image_analysis: imageAnalysis,
+          voice_text: submittedVoiceText,
+        })
+        .then((response) => {
+          const payload = response.data?.data ?? response.data
+          return payload as MoodAnalysisReportData
+        })
+        .catch(() => buildFallbackReport())
+
+      setAnalysisReport(report)
       await moodAPI.create({
         date: new Date().toISOString().slice(0, 10),
         mood_type: selectedMood,
         intensity,
         tags: selectedTags,
         note,
+        images: imageUrls,
+        image_analysis: imageAnalysis,
+        voice_url: submittedVoiceUrl,
+        voice_text: submittedVoiceText,
       })
     } catch {
       // 网络波动时仍允许用户看到本次记录的分析反馈。
+      setAnalysisReport(buildFallbackReport())
     } finally {
       setIsSubmitting(false)
       setSubmitted(true)
@@ -154,76 +302,85 @@ export default function MoodPage() {
               {step === 3 && (
                 <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
                   <h2 className="text-xl font-semibold">记录心情</h2>
-                  <p className="mt-2 text-sm text-slate-500">用文字、图片或语音记录此刻，轻轻把感受放下来。</p>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    {[
-                      { key: "text", label: "文字", icon: PenLine },
-                      { key: "image", label: "图片", icon: ImagePlus },
-                      { key: "voice", label: "语音", icon: Mic },
-                    ].map((item) => {
-                      const Icon = item.icon
-                      const active = inputMode === item.key
-                      return (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => setInputMode(item.key as InputMode)}
-                          className={cn(
-                            "inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm transition",
-                            active
-                              ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_30px_rgba(255,181,194,0.22)]"
-                              : "border border-[#f3dfe5] bg-white text-slate-600",
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {item.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <p className="mt-2 text-sm text-slate-500">一个输入框就够了：文字、图片和语音可以一起留下。</p>
 
-                  <div className="mt-5">
-                    {inputMode === "text" && (
-                      <div className="rounded-[24px] border border-[#f6e4e9] bg-white p-4">
-                        <textarea
-                          value={note}
-                          onChange={(event) => setNote(event.target.value.slice(0, 500))}
-                          placeholder="此刻我在想什么..."
-                          rows={10}
-                          className="w-full resize-none bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400"
-                        />
-                        <div className="mt-3 text-right text-xs text-slate-400">{note.length}/500</div>
-                      </div>
-                    )}
-
-                    {inputMode === "image" && (
-                      <label className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-[#f4d7e0] bg-[#fffafb] px-5 py-10 text-center">
-                        <UploadCloud className="h-10 w-10 text-[#ff87a0]" />
-                        <p className="mt-4 text-sm font-medium text-slate-700">点击上传图片</p>
-                        <p className="mt-2 text-xs text-slate-400">最多选择 3 张，让画面帮你记住此刻</p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) => setUploadedImageName(event.target.files?.[0]?.name ?? "")}
-                        />
-                        {uploadedImageName ? (
-                          <p className="mt-4 rounded-full bg-white px-4 py-2 text-xs text-slate-500">
-                            已选择：{uploadedImageName}
-                          </p>
+                  <div className="mt-5 rounded-[28px] border border-[#f6e4e9] bg-white p-4 shadow-[0_10px_28px_rgba(255,216,225,0.12)]">
+                    <textarea
+                      value={note}
+                      onChange={(event) => setNote(event.target.value.slice(0, 700))}
+                      placeholder="此刻发生了什么？身体有什么感觉？也可以只写一句话。"
+                      rows={8}
+                      className="w-full resize-none bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                    <div className="mt-3 flex items-center justify-between border-t border-[#f7e6eb] pt-4">
+                      <p className="text-xs text-slate-400">附件区</p>
+                      <p className="text-xs text-slate-400">{note.length}/700</p>
+                    </div>
+                    {voiceFile ? (
+                      <div className="mt-4 rounded-[24px] border border-[#f0dde4] bg-gradient-to-br from-white to-[#fff7fa] p-4 shadow-[0_12px_28px_rgba(255,181,194,0.12)]">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#eefdfa] text-xl">
+                            🎤
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-700">语音记录 ({voiceDuration || 1}秒)</p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              {voiceStatus === "uploading"
+                                ? "AI 正在识别中..."
+                                : voiceStatus === "ready"
+                                  ? voiceText
+                                    ? "已识别，可展开查看"
+                                    : "已保存录音，暂未识别出文字"
+                                  : voiceStatus === "failed"
+                                    ? "转写失败，录音已保留"
+                                    : "已录制"}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowVoiceText((value) => !value)}
+                              className="inline-flex min-h-9 items-center gap-1 rounded-full bg-[#fff1f5] px-3 text-xs font-semibold text-[#ff7894] transition hover:-translate-y-0.5"
+                            >
+                              {showVoiceText ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                              {showVoiceText ? "收起转写" : "查看转写"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={clearVoiceRecording}
+                              className="inline-flex min-h-9 items-center gap-1 rounded-full bg-white px-3 text-xs font-semibold text-slate-400 transition hover:text-[#ef8d7b]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              删除
+                            </button>
+                          </div>
+                        </div>
+                        {voicePreviewUrl ? (
+                          <div className="mt-3 flex items-center gap-3 rounded-[18px] bg-white/82 px-3 py-2 ring-1 ring-[#f6e4e9]">
+                            <Play className="h-4 w-4 shrink-0 text-[#8de1d5]" />
+                            <audio src={voicePreviewUrl} controls className="h-9 w-full min-w-0" />
+                          </div>
                         ) : null}
-                      </label>
-                    )}
-
-                    {inputMode === "voice" && (
-                      <div className="rounded-[24px] border border-dashed border-[#f4d7e0] bg-[#fffafb] px-5 py-10 text-center">
-                        <Mic className="mx-auto h-10 w-10 text-[#85dfd4]" />
-                        <p className="mt-4 text-sm font-medium text-slate-700">语音功能即将上线</p>
-                        <p className="mt-2 text-xs leading-6 text-slate-400">
-                          现在可以先用文字记录，稍后再把声音也放进日记里。
-                        </p>
+                        {showVoiceText ? (
+                          voiceText ? (
+                            <p className="mt-3 rounded-[18px] bg-[#f9f6f8] p-3 text-sm leading-6 text-slate-600">
+                              {voiceText}
+                            </p>
+                          ) : (
+                            <p className="mt-3 rounded-[18px] bg-[#f9f6f8] p-3 text-xs leading-6 text-slate-400">
+                              {voiceStatus === "uploading" ? "AI 正在识别中，请稍候..." : "这段录音暂时还没有可展示的转写文字。"}
+                            </p>
+                          )
+                        ) : null}
                       </div>
-                    )}
+                    ) : null}
+                    <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1.05fr]">
+                      <MoodMediaUpload images={images} onImagesChange={setImages} />
+                      <MoodVoiceRecorder
+                        onRecordingChange={handleVoiceRecording}
+                        resetKey={voiceResetKey}
+                      />
+                    </div>
                   </div>
                 </section>
               )}
@@ -231,7 +388,7 @@ export default function MoodPage() {
               {step === 4 && (
                 <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
                   <h2 className="text-xl font-semibold">选择标签</h2>
-                  <p className="mt-2 text-sm text-slate-500">可多选，先把情绪的来源圈出来。</p>
+                  <p className="mt-2 text-sm text-slate-500">标签是可选的，也可以用自己的词描述来源。</p>
                   <div className="mt-5 flex flex-wrap gap-3">
                     {moodTagOptions.map((tag) => {
                       const active = selectedTags.includes(tag.value)
@@ -239,11 +396,15 @@ export default function MoodPage() {
                         <button
                           key={tag.value}
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            if (tag.value === "other") {
+                              setShowCustomTag(true)
+                              return
+                            }
                             setSelectedTags((current) =>
                               active ? current.filter((item) => item !== tag.value) : [...current, tag.value],
                             )
-                          }
+                          }}
                           className={cn(
                             "min-h-10 rounded-full px-4 py-2 text-sm transition",
                             active
@@ -256,6 +417,44 @@ export default function MoodPage() {
                       )
                     })}
                   </div>
+                  {showCustomTag ? (
+                    <div className="mt-5 flex flex-col gap-3 rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f6dfe6] sm:flex-row">
+                      <input
+                        value={customTag}
+                        onChange={(event) => setCustomTag(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") addCustomTag()
+                        }}
+                        placeholder="输入自定义标签，比如：比赛 / 宿舍 / 创作"
+                        className="min-h-11 flex-1 rounded-full border border-[#f0dbe2] bg-white px-4 text-sm outline-none focus:border-[#ff9fb4]"
+                      />
+                      <button
+                        type="button"
+                        onClick={addCustomTag}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white"
+                      >
+                        <Plus className="h-4 w-4" />
+                        添加
+                      </button>
+                    </div>
+                  ) : null}
+                  {selectedTags.length > 0 ? (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {selectedTags.map((tag) => {
+                        const label = moodTagOptions.find((item) => item.value === tag)?.label ?? tag
+                        return (
+                          <button
+                            type="button"
+                            key={tag}
+                            onClick={() => setSelectedTags((current) => current.filter((item) => item !== tag))}
+                            className="rounded-full bg-[#fff3f6] px-3 py-1.5 text-xs text-[#ff7894] ring-1 ring-[#ffd9e2]"
+                          >
+                            {label} ×
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                 </section>
               )}
 
@@ -270,11 +469,11 @@ export default function MoodPage() {
                       ? "情绪分析完成，下面是为你整理出的温柔反馈。"
                       : "正在分析你的情绪波纹，马上给你一段轻轻的回应。"}
                   </p>
-                  <div className="mx-auto mt-6 max-w-xl rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-6 text-left">
-                    <p className="text-sm leading-7 text-slate-700">
-                      你此刻更接近「{selectedMoodMeta.label}」，强度大约在 {intensity}/10。
-                      {selectedMoodMeta.insight}
-                    </p>
+                  {submitNotice ? (
+                    <p className="mx-auto mt-4 max-w-xl rounded-full bg-[#fff7d8] px-4 py-2 text-xs text-[#b67820]">{submitNotice}</p>
+                  ) : null}
+                  <div className="mx-auto mt-6 max-w-3xl">
+                    <MoodAnalysisReport report={analysisReport ?? buildFallbackReport()} />
                   </div>
                   <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
                     <Link

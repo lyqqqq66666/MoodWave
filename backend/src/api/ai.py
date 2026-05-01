@@ -2,15 +2,16 @@
 AI 对话 API 路由
 
 提供：
-- POST /api/ai/chat  情绪对话（SSE 流式响应）
+- POST /api/ai/chat          情绪对话（SSE 流式响应）
+- POST /api/ai/analyze-mood  多模态情绪分析（图片+语音+文字）
 """
 
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 
-from src.services.ai_service import stream_chat
+from src.services.ai_service import stream_chat, analyze_mood_multi_modal
 
 router = APIRouter()
 
@@ -81,3 +82,65 @@ async def ai_chat(request: AIChatRequest):
             "Connection": "keep-alive",
         },
     )
+
+
+# ==================== 多模态情绪分析模型 ====================
+
+class AnalyzeMoodRequest(BaseModel):
+    """多模态情绪分析请求"""
+    mood_type: str = "neutral"
+    intensity: int = 5
+    note: str = ""
+    tags: Optional[List[str]] = None
+    image_analysis: Optional[str] = None   # qwen3-vl-plus 图片分析结果
+    voice_text: Optional[str] = None       # qwen3-asr-flash 语音转写结果
+    history_moods: Optional[List[dict]] = None  # 近期情绪历史
+
+
+@router.post("/ai/analyze-mood")
+async def analyze_mood_endpoint(request: AnalyzeMoodRequest):
+    """
+    多模态情绪分析（综合文字+图片+语音）
+
+    请求体：
+    ```json
+    {
+      "mood_type": "anxious",
+      "intensity": 7,
+      "note": "今天有点焦虑",
+      "tags": ["study", "work"],
+      "image_analysis": "{\"description\":\"书桌上堆满资料\"}",
+      "voice_text": "我好累啊今天",
+      "history_moods": [{"date":"2026-04-30","mood_type":"happy","intensity":8}]
+    }
+    ```
+
+    Returns:
+        { code, msg, data }
+        data = {
+            summary, insight, suggestion,
+            music_recommendation: {mood, bpm, title, texture},
+            radar_data: [{mood, score}]
+        }
+    """
+    try:
+        result = await analyze_mood_multi_modal(
+            mood_type=request.mood_type,
+            intensity=request.intensity,
+            note=request.note,
+            tags=request.tags,
+            image_analysis=request.image_analysis or "",
+            voice_text=request.voice_text or "",
+            history_moods=request.history_moods,
+        )
+        return JSONResponse({
+            "code": 0,
+            "msg": "ok",
+            "data": result,
+        })
+    except Exception as e:
+        return JSONResponse({
+            "code": 500,
+            "msg": f"AI 分析异常: {str(e)}",
+            "data": None,
+        }, status_code=200)

@@ -45,6 +45,8 @@ async def create_mood(
         import json
         # 将 tags 数组转成 JSON 字符串存入数据库
         tags_str = json.dumps(mood.tags, ensure_ascii=False) if isinstance(mood.tags, list) else "[]"
+        # 图片 URL 数组 → JSON 字符串
+        images_str = json.dumps(mood.images, ensure_ascii=False) if mood.images else "[]"
 
         db_mood = MoodEntry(
             date=mood.date,
@@ -52,6 +54,10 @@ async def create_mood(
             intensity=mood.intensity,
             tags=tags_str,  # 存 JSON 字符串
             note=mood.note,
+            images=images_str,
+            image_analysis=mood.image_analysis or "",
+            voice_url=mood.voice_url or "",
+            voice_text=mood.voice_text or "",
             user_id=current_user.id  # 从 JWT token 解析
         )
         session.add(db_mood)
@@ -60,7 +66,8 @@ async def create_mood(
         
         # 返回时，将 JSON 字符串转成数组
         tags_list = json.loads(db_mood.tags) if db_mood.tags else []
-        
+        images_list = json.loads(db_mood.images) if db_mood.images else []
+
         # 返回统一格式
         return {
             "code": 0,
@@ -72,6 +79,10 @@ async def create_mood(
                 "intensity": db_mood.intensity,
                 "tags": tags_list,  # 返回数组给前端
                 "note": db_mood.note,
+                "images": images_list,
+                "image_analysis": db_mood.image_analysis,
+                "voice_url": db_mood.voice_url,
+                "voice_text": db_mood.voice_text,
                 "created_at": db_mood.created_at.isoformat() if db_mood.created_at else None,
                 "updated_at": db_mood.updated_at.isoformat() if db_mood.updated_at else None,
             }
@@ -115,13 +126,19 @@ async def list_moods(
     for mood in moods:
         # 将 tags 从 JSON 字符串转成数组
         tags_list = json.loads(mood.tags) if mood.tags else []
-        
+        images_list = json.loads(mood.images) if mood.images else []
+
         mood_dict = {
             "id": mood.id,
+            "date": mood.date,  # 记录日期（用户指定的"哪一天"）
             "mood_type": mood.mood_type,
             "intensity": mood.intensity,
             "tags": tags_list,  # 返回数组给前端
             "note": mood.note,
+            "images": images_list,
+            "image_analysis": mood.image_analysis,
+            "voice_url": mood.voice_url,
+            "voice_text": mood.voice_text,
             "created_at": mood.created_at.isoformat() if mood.created_at else None,
             "updated_at": mood.updated_at.isoformat() if mood.updated_at else None,
         }
@@ -159,6 +176,7 @@ async def get_mood(
         raise HTTPException(status_code=404, detail="情绪记录不存在")
 
     tags_list = json.loads(mood.tags) if mood.tags else []
+    images_list = json.loads(mood.images) if mood.images else []
 
     return {
         "code": 0,
@@ -170,6 +188,10 @@ async def get_mood(
             "intensity": mood.intensity,
             "tags": tags_list,  # 返回数组给前端
             "note": mood.note,
+            "images": images_list,
+            "image_analysis": mood.image_analysis,
+            "voice_url": mood.voice_url,
+            "voice_text": mood.voice_text,
             "user_id": mood.user_id,
             "created_at": mood.created_at.isoformat() if mood.created_at else None,
             "updated_at": mood.updated_at.isoformat() if mood.updated_at else None,
@@ -220,7 +242,8 @@ async def update_mood(
     
     # 将 tags 从 JSON 字符串转成数组返回
     tags_list = json.loads(mood.tags) if mood.tags else []
-    
+    images_list = json.loads(mood.images) if mood.images else []
+
     return {
         "code": 0,
         "msg": "ok",
@@ -231,6 +254,10 @@ async def update_mood(
             "intensity": mood.intensity,
             "tags": tags_list,  # 返回数组给前端
             "note": mood.note,
+            "images": images_list,
+            "image_analysis": mood.image_analysis,
+            "voice_url": mood.voice_url,
+            "voice_text": mood.voice_text,
             "user_id": mood.user_id,
             "created_at": mood.created_at.isoformat() if mood.created_at else None,
             "updated_at": mood.updated_at.isoformat() if mood.updated_at else None,
@@ -263,4 +290,8 @@ async def delete_mood(
 
     session.delete(mood)
     session.commit()
-    return {"message": "情绪记录已删除"}
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {"deleted": mood_id},
+    }
