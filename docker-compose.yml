@@ -28,6 +28,9 @@ services:
     environment:
       - DATABASE_URL=postgresql://moodwave:${DB_PASSWORD:-moodwave123}@db:5432/moodwave
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - QWEN_VL_MODEL=qwen3-vl-plus
+      - QWEN_ASR_MODEL=qwen3-asr-flash-2026-02-10
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - PYTHONUNBUFFERED=1
     depends_on:
@@ -35,6 +38,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/uploads:/app/uploads
+      - ./backend/src:/app/src
 
 volumes:
   pgdata:
