@@ -2,7 +2,7 @@
   "name": "MoodWave 灵音",
   "short_name": "灵音",
   "description": "记录情绪的潮汐，遇见内心的风景",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#FF97AD",
