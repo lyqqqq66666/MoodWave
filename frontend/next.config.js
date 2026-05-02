@@ -4,6 +4,41 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  runtimeCaching: [
+    // 缓存 HTML 页面导航请求（网络优先，离线回退缓存）
+    {
+      urlPattern: ({ request }) => request.mode === 'navigate',
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'pages-cache',
+        networkTimeoutSeconds: 5,
+        expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
+      },
+    },
+    // 静态资源：缓存优先
+    {
+      urlPattern: /\.(?:js|css|woff2?|ttf|eot)$/,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'static-assets',
+        expiration: { maxEntries: 200, maxAgeSeconds: 604800 },
+      },
+    },
+    // 图片：过期优先（后台更新）
+    {
+      urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'images-cache',
+        expiration: { maxEntries: 100, maxAgeSeconds: 2592000 },
+      },
+    },
+    // API 请求：不缓存（始终走网络）
+    {
+      urlPattern: /\/api\/.*/,
+      handler: 'NetworkOnly',
+    },
+  ],
 })
 
 const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || ''
