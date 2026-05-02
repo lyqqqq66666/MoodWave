@@ -32,7 +32,7 @@ const previewLinks = [
 export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,197,211,0.8),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.8),_transparent_26%),radial-gradient(circle_at_bottom_center,_rgba(199,193,255,0.45),_transparent_24%),linear-gradient(180deg,#fffdfb_0%,#fff7ef_100%)] text-slate-900">
-      <section className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-5 pb-10 pt-6 md:px-8 lg:px-10">
+      <section className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-5 pb-16 pt-6 md:px-8 lg:px-10">
         <header className="flex items-center justify-between">
           <MoodWaveLogo href="/" />
           <div className="flex items-center gap-3">
@@ -41,26 +41,32 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/login"
-              className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-slate-700 shadow-[0_10px_30px_rgba(255,205,215,0.25)] ring-1 ring-white/70"
+              className="inline-flex min-h-11 items-center rounded-full bg-white/90 px-5 py-2 text-sm font-medium text-slate-700 shadow-[0_10px_30px_rgba(255,205,215,0.25)] ring-1 ring-white/70"
             >
               登录
             </Link>
           </div>
         </header>
 
-        <div className="grid flex-1 items-center gap-12 pb-6 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pt-14">
-          <div className="space-y-8">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm text-[#ff6f8c] ring-1 ring-white/70">
+        <div className="grid min-w-0 flex-1 items-start gap-10 pb-6 pt-10 sm:pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:pt-14">
+          <div className="min-w-0 space-y-7 md:space-y-8">
+            <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm text-[#ff6f8c] ring-1 ring-white/70">
               <HeartHandshake className="h-4 w-4" />
-              78.1% 的大学生每周都会经历负面情绪
+              <span className="min-w-0 leading-6 sm:whitespace-nowrap">78.1% 的大学生每周都会经历负面情绪</span>
             </div>
 
             <div className="space-y-5">
-              <p className="font-display whitespace-nowrap text-5xl font-semibold leading-tight tracking-tight md:text-6xl lg:text-7xl">
-                让情绪不只是<span className="bg-gradient-to-r from-[#ff879f] via-[#ffb9c7] to-[#70d6cb] bg-clip-text text-transparent">忍过去</span>
-              </p>
+              <h1 className="whitespace-nowrap font-display text-[clamp(2.35rem,9.1vw,4.5rem)] font-semibold leading-[1.08] tracking-tight text-[#121b33] sm:text-6xl lg:text-7xl">
+                让情绪不只是
+                <span className="bg-gradient-to-r from-[#ff879f] via-[#ffb9c7] to-[#70d6cb] bg-clip-text text-transparent">
+                  忍过去
+                </span>
+              </h1>
               <p className="max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
-                MoodWave 把情绪记录、温柔分析和治愈音乐放进一个移动优先的轻量空间里。
+                MoodWave 把情绪记录、温柔分析和治愈音乐放进移动优先的轻量空间里。
+                <span className="hidden sm:inline">67.7% 的受访者愿意尝试音乐治愈，我们想让它真的落地。</span>
+              </p>
+              <p className="text-sm leading-7 text-slate-500 sm:hidden">
                 67.7% 的受访者愿意尝试音乐治愈，我们想让它真的落地。
               </p>
             </div>
@@ -68,7 +74,7 @@ export default function LandingPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/login"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-8 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,180,194,0.3)]"
+                className="inline-flex min-h-12 w-full max-w-sm items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-8 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,180,194,0.3)] sm:w-auto"
               >
                 立即体验
                 <ArrowRight className="h-4 w-4" />
@@ -95,7 +101,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative hidden lg:block">
             <div className="absolute inset-x-8 top-3 h-24 rounded-full bg-[#ffd4de]/70 blur-3xl" />
             <div className="relative rounded-[40px] border border-white/70 bg-white/72 p-4 shadow-[0_24px_80px_rgba(255,205,215,0.32)] backdrop-blur-2xl md:p-6">
               <div className="rounded-[34px] bg-gradient-to-br from-[#fff7f9] via-[#fffdfa] to-[#eefdfa] p-6">
