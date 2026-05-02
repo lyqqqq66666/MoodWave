@@ -56,11 +56,8 @@ export default function LandingPage() {
             </div>
 
             <div className="space-y-5">
-              <p className="font-display text-5xl font-semibold leading-tight tracking-tight md:text-6xl lg:text-7xl">
-                让情绪不只是
-                <span className="bg-gradient-to-r from-[#ff879f] via-[#ffb9c7] to-[#70d6cb] bg-clip-text text-transparent">
-                  忍过去
-                </span>
+              <p className="font-display whitespace-nowrap text-5xl font-semibold leading-tight tracking-tight md:text-6xl lg:text-7xl">
+                让情绪不只是<span className="bg-gradient-to-r from-[#ff879f] via-[#ffb9c7] to-[#70d6cb] bg-clip-text text-transparent">忍过去</span>
               </p>
               <p className="max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
                 MoodWave 把情绪记录、温柔分析和治愈音乐放进一个移动优先的轻量空间里。
@@ -71,16 +68,10 @@ export default function LandingPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/login"
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,180,194,0.3)]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-8 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,180,194,0.3)]"
               >
                 立即体验
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/login"
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#ffe0e8] bg-white/80 px-6 py-3 text-sm font-semibold text-slate-700"
-              >
-                立即开始
               </Link>
             </div>
 
