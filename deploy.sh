@@ -6,17 +6,17 @@
 
 set -e
 
-PROJECT_DIR="/root/MoodWave"  # ← 改成你服务器上的实际路径
+PROJECT_DIR="/home/ubuntu/MoodWave"
 BRANCH="main"
 
-echo "🔄 [1/4] 拉取最新代码..."
+echo "🔄 [1/5] 拉取最新代码..."
 cd "$PROJECT_DIR"
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
 
 echo ""
-echo "📦 [2/4] 检查 .env 文件..."
+echo "📦 [2/5] 检查 .env 文件..."
 if [ ! -f .env ]; then
     echo "⚠️  未找到 .env，请创建并填入以下变量："
     echo "   DB_PASSWORD=你的数据库密码"
@@ -27,28 +27,25 @@ if [ ! -f .env ]; then
 fi
 
 echo ""
-echo "🐳 [3/4] 重新构建并启动后端..."
-# 停止旧容器 → 重新构建镜像 → 后台启动
-docker compose down backend
-docker compose build --no-cache backend
-docker compose up -d backend
+echo "🐳 [3/5] 重启后端..."
+docker compose restart backend
+sleep 3
 
 echo ""
-echo "⏳ [4/4] 等待后端启动..."
-sleep 5
-
-# 健康检查
-if curl -s http://localhost:8000/api/health | grep -q "healthy"; then
-    echo ""
-    echo "✅ 后端部署成功！"
-    echo "   API:  http://106.52.8.176:8000/api/health"
-else
-    echo ""
-    echo "⚠️  后端可能启动异常，请检查日志："
-    echo "   docker compose logs backend --tail 30"
-fi
+echo "⚡ [4/5] 构建前端..."
+cd "$PROJECT_DIR/frontend"
+echo "NEXT_PUBLIC_API_URL=http://106.52.8.176:8000" > .env.local
+npm install --silent
+npm run build
 
 echo ""
-echo "📌 前端部署提示："
-echo "   Vercel 已绑定 GitHub，push 后自动部署。"
-echo "   或者手动: cd frontend && npm run build && vercel --prod"
+echo "🚀 [5/5] 重启前端..."
+pm2 restart moodwave-frontend 2>/dev/null || pm2 start npm --name moodwave-frontend -- run start
+pm2 save
+
+echo ""
+echo "========================================"
+echo "  部署完成！"
+echo "  前端: http://106.52.8.176"
+echo "  API:  http://106.52.8.176/api/health"
+echo "========================================"
