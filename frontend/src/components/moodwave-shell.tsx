@@ -6,6 +6,7 @@ import { BarChart3, Bell, HeartHandshake, Home, LogOut, Music2, PenLine, Sparkle
 import { ReactNode, useState } from "react"
 import { appNavItems } from "@/lib/moodwave"
 import { cn } from "@/lib/utils"
+import { resolveAssetUrl } from "@/lib/api"
 import { MoodWaveLogo } from "./moodwave-logo"
 import { useAuthStore } from "@/store/auth"
 
@@ -44,6 +45,7 @@ export function MoodWaveShell({
 
   const displayName = user?.username || "MoodWave 用户"
   const avatarChar = displayName.charAt(0).toUpperCase()
+  const avatarUrl = user?.avatar_url || null
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800 lg:h-screen lg:overflow-hidden">
@@ -73,8 +75,12 @@ export function MoodWaveShell({
           </nav>
           <div className="mt-auto rounded-[28px] bg-white/80 p-4 shadow-[0_12px_30px_rgba(255,214,224,0.24)]">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-white text-sm font-semibold">
-                {avatarChar}
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-white text-sm font-semibold overflow-hidden">
+                {avatarUrl ? (
+                  <img src={resolveAssetUrl(avatarUrl)} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  avatarChar
+                )}
               </div>
               <div>
                 <p className="text-sm font-medium">{displayName}</p>
@@ -113,10 +119,14 @@ export function MoodWaveShell({
               </button>
               <Link
                 href="/profile"
-                className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-sm font-semibold text-white shadow-[0_8px_24px_rgba(255,192,203,0.18)] lg:hidden"
+                className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-sm font-semibold text-white shadow-[0_8px_24px_rgba(255,192,203,0.18)] overflow-hidden lg:hidden"
                 aria-label="个人主页"
               >
-                {avatarChar}
+                {avatarUrl ? (
+                  <img src={resolveAssetUrl(avatarUrl)} alt={displayName} className="h-full w-full object-cover" />
+                ) : (
+                  avatarChar
+                )}
               </Link>
             </div>
           </header>
