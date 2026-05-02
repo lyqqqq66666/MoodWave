@@ -26,6 +26,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - PORT=8000
       - DATABASE_URL=postgresql://moodwave:${DB_PASSWORD:-moodwave123}@db:5432/moodwave
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}

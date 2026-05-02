@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# CloudRun 注入 PORT 环境变量，docker-compose 默认用 8000
-ENV PORT=8000
+# CloudRun 健康检查默认 80 端口，docker-compose 通过环境变量覆盖为 8000
+ENV PORT=80
 
 EXPOSE ${PORT}
 
