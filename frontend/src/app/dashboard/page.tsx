@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { ArrowRight, Mic } from "lucide-react"
+import { AnimatePresence, motion } from "framer-motion"
+import { ArrowRight, ChevronLeft, ChevronRight, Mic } from "lucide-react"
 import { aiAPI, moodAPI } from "@/lib/api"
 import { buildDailyMessage, dashboardFeatureCards, getGreetingForHour, getMoodOption, moodOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
@@ -49,9 +50,15 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [dailyMessage, setDailyMessage] = useState("")
   const [isDailyMessageLoading, setIsDailyMessageLoading] = useState(false)
+  const [moodDirection, setMoodDirection] = useState(1)
 
   const mood = moodOptions[currentMoodIndex]
   const greeting = getGreetingForHour()
+
+  function shiftMood(direction: 1 | -1) {
+    setMoodDirection(direction)
+    setCurrentMoodIndex((value) => (value + direction + moodOptions.length) % moodOptions.length)
+  }
 
   useEffect(() => {
     let active = true
@@ -176,21 +183,45 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setCurrentMoodIndex((value) => (value + 1) % moodOptions.length)}
-              className="rounded-[36px] bg-gradient-to-br from-white via-[#fff9fb] to-[#eefdfa] p-6 text-center shadow-[0_20px_50px_rgba(255,213,223,0.2)] transition hover:-translate-y-1"
-            >
+            <div className="relative rounded-[36px] bg-gradient-to-br from-white via-[#fff9fb] to-[#eefdfa] p-6 text-center shadow-[0_20px_50px_rgba(255,213,223,0.2)] transition hover:-translate-y-1">
               <p className="text-sm text-slate-500">今日心情</p>
-              <div
-                className="mx-auto mt-5 flex h-36 w-36 items-center justify-center rounded-full text-7xl shadow-[0_16px_34px_rgba(255,214,153,0.22)]"
-                style={{ backgroundColor: mood.softAccent }}
-              >
-                {mood.emoji}
+              <div className="mt-5 flex items-center justify-center gap-3 sm:gap-5">
+                <button
+                  type="button"
+                  onClick={() => shiftMood(-1)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)] backdrop-blur-sm transition hover:scale-105 hover:text-[#ff7894]"
+                  aria-label="切换到上一个情绪"
+                  title="上一个情绪"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <AnimatePresence mode="wait" custom={moodDirection}>
+                  <motion.div
+                    key={mood.value}
+                    custom={moodDirection}
+                    initial={{ opacity: 0, x: moodDirection > 0 ? 28 : -28 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: moodDirection > 0 ? -28 : 28 }}
+                    transition={{ duration: 0.32, ease: [0.34, 1.56, 0.64, 1] }}
+                    className="flex h-36 w-36 items-center justify-center rounded-full text-7xl shadow-[0_16px_34px_rgba(255,214,153,0.22)]"
+                    style={{ backgroundColor: mood.softAccent }}
+                  >
+                    {mood.emoji}
+                  </motion.div>
+                </AnimatePresence>
+                <button
+                  type="button"
+                  onClick={() => shiftMood(1)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)] backdrop-blur-sm transition hover:scale-105 hover:text-[#62bda9]"
+                  aria-label="切换到下一个情绪"
+                  title="下一个情绪"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               </div>
               <p className="mt-5 text-2xl font-semibold">{mood.label}</p>
-              <p className="mt-2 text-sm text-slate-500">点击切换情绪预览</p>
-            </button>
+              <p className="mt-2 text-sm text-slate-500">左右切换情绪预览</p>
+            </div>
           </div>
         </section>
 

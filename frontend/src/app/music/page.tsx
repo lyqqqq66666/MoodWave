@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react"
 import { useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import {
@@ -257,6 +257,7 @@ function MusicPageContent() {
   const filterRef = useRef<InstanceType<ToneModule["Filter"]> | null>(null)
   const loopRef = useRef<{ dispose: () => void } | null>(null)
   const bassLoopRef = useRef<{ dispose: () => void } | null>(null)
+  const progressRef = useRef<HTMLDivElement | null>(null)
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -269,6 +270,9 @@ function MusicPageContent() {
   const [isInsightLoading, setIsInsightLoading] = useState(false)
   const [insightStatus, setInsightStatus] = useState<InsightStatus>("idle")
   const [insightError, setInsightError] = useState("")
+  const [isSeeking, setIsSeeking] = useState(false)
+  const [seekPreview, setSeekPreview] = useState<number | null>(null)
+  const [musicToast, setMusicToast] = useState("")
   // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
   const insightRef = useRef(profile.insight)
 
@@ -599,6 +603,47 @@ function MusicPageContent() {
     setElapsedTime(0)
   }
 
+  const seekTo = useCallback((percent: number) => {
+    const safePercent = Math.min(1, Math.max(0, percent))
+    const targetTime = Math.round(selectedRecommendation.duration * safePercent)
+    setElapsedTime(targetTime)
+    const Tone = toneRef.current
+    if (Tone?.Transport) {
+      ;(Tone.Transport as unknown as { seconds: number }).seconds = targetTime
+    }
+  }, [selectedRecommendation.duration])
+
+  const getSeekPercent = useCallback((clientX: number) => {
+    const rect = progressRef.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0) return progress / 100
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+  }, [progress])
+
+  function updateSeekFromPointer(event: PointerEvent<HTMLDivElement>) {
+    const percent = getSeekPercent(event.clientX)
+    setSeekPreview(Math.round(selectedRecommendation.duration * percent))
+    seekTo(percent)
+  }
+
+  function beginSeek(event: PointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setIsSeeking(true)
+    updateSeekFromPointer(event)
+  }
+
+  function moveSeek(event: PointerEvent<HTMLDivElement>) {
+    if (!isSeeking) return
+    updateSeekFromPointer(event)
+  }
+
+  function endSeek(event: PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setIsSeeking(false)
+    setSeekPreview(null)
+  }
+
   async function toggleFavorite() {
     const nextLiked = !liked
     setLiked(nextLiked)
@@ -636,17 +681,10 @@ function MusicPageContent() {
     }
   }
 
-  async function shareTrack() {
-    const shareText = `${selectedRecommendation.title} - ${selectedRecommendation.artist}`
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "MoodWave 治愈音乐", text: shareText })
-      } else {
-        await navigator.clipboard.writeText(shareText)
-      }
-    } catch {
-      // 用户取消分享时不打断播放。
-    }
+  function shareTrack() {
+    // TODO: 后期接入通讯录好友分享
+    setMusicToast("分享功能即将上线，先把这段旋律悄悄收藏起来吧。")
+    window.setTimeout(() => setMusicToast(""), 2500)
   }
 
   return (
@@ -725,11 +763,46 @@ function MusicPageContent() {
                 </div>
 
                 <div className="mt-7">
-                  <div className="h-2 rounded-full bg-[#f0edf0]">
-                    <motion.div
-                      animate={{ width: `${progress}%` }}
-                      className="h-full rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5]"
-                    />
+                  <div
+                    ref={progressRef}
+                    role="slider"
+                    tabIndex={0}
+                    aria-label="播放进度"
+                    aria-valuemin={0}
+                    aria-valuemax={selectedRecommendation.duration}
+                    aria-valuenow={elapsedTime}
+                    onPointerDown={beginSeek}
+                    onPointerMove={moveSeek}
+                    onPointerUp={endSeek}
+                    onPointerCancel={endSeek}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowLeft") seekTo((elapsedTime - 5) / selectedRecommendation.duration)
+                      if (event.key === "ArrowRight") seekTo((elapsedTime + 5) / selectedRecommendation.duration)
+                    }}
+                    className="group relative -my-3 cursor-pointer touch-none py-3 outline-none"
+                  >
+                    {isSeeking ? (
+                      <div
+                        className="pointer-events-none absolute -top-8 rounded-full bg-slate-900/78 px-3 py-1 text-xs font-semibold text-white shadow-lg"
+                        style={{ left: `${progress}%`, transform: "translateX(-50%)" }}
+                      >
+                        {formatDuration(seekPreview ?? elapsedTime)} / {formatDuration(selectedRecommendation.duration)}
+                      </div>
+                    ) : null}
+                    <div className={cn("rounded-full bg-[#f0edf0] transition-all", isSeeking ? "h-3" : "h-2")}>
+                      <motion.div
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: isSeeking ? 0 : 0.24 }}
+                        className="h-full rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5]"
+                      />
+                    </div>
+                    <motion.span
+                      animate={{ left: `${progress}%`, scale: isSeeking ? 1.25 : 1 }}
+                      transition={{ duration: isSeeking ? 0 : 0.24 }}
+                      className="absolute top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-[0_8px_20px_rgba(255,143,163,0.34)] ring-2 ring-[#ff9fb4]"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-[#8de1d5]" />
+                    </motion.span>
                   </div>
                   <div className="mt-2 flex justify-between text-xs text-slate-500">
                     <span>{formatDuration(elapsedTime)}</span>
@@ -861,6 +934,18 @@ function MusicPageContent() {
           </section>
         </div>
       </div>
+      <AnimatePresence>
+        {musicToast ? (
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            className="fixed bottom-6 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 py-3 text-center text-sm font-semibold text-white shadow-[0_18px_44px_rgba(255,143,163,0.32)]"
+          >
+            {musicToast}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </MoodWaveShell>
   )
 }

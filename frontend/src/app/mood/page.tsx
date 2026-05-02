@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, ChevronUp, Play, Plus, Sparkles, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Mic, Play, Plus, Sparkles, Trash2 } from "lucide-react"
 import { aiAPI, moodAPI, uploadAPI } from "@/lib/api"
 import { getMoodOption, moodOptions, moodTagOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
@@ -315,6 +315,10 @@ export default function MoodPage() {
                 <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
                   <h2 className="text-xl font-semibold">记录心情</h2>
                   <p className="mt-2 text-sm text-slate-500">一个输入框就够了：文字、图片和语音可以一起留下。</p>
+                  <div className="mt-4 flex gap-3 rounded-[24px] bg-gradient-to-r from-[#fff7fa] to-[#effdfa] p-4 text-sm leading-6 text-slate-600 ring-1 ring-white">
+                    <Mic className="mt-0.5 h-4 w-4 shrink-0 text-[#ff7894]" />
+                    <p>语音功能需要麦克风权限，你也可以直接用文字记录。录制后会自动转为文字，权限不可用时文字和图片仍然可以正常提交。</p>
+                  </div>
 
                   <div className="mt-5 rounded-[28px] border border-[#f6e4e9] bg-white p-4 shadow-[0_10px_28px_rgba(255,216,225,0.12)]">
                     <textarea

@@ -47,6 +47,19 @@ const settingItems = [
   { icon: Info, label: "关于我们", helper: "了解 MoodWave 信息" },
 ]
 
+const exportScopes = [
+  { value: "7d", label: "最近 7 天" },
+  { value: "30d", label: "最近 30 天" },
+  { value: "all", label: "全部记录" },
+]
+
+const exportIncludeOptions = [
+  { value: "records", label: "情绪记录", helper: "日记、强度、标签和多媒体线索" },
+  { value: "summary", label: "分析汇总", helper: "主导情绪、趋势和高频标签" },
+  { value: "profile", label: "个人资料", helper: "昵称、MBTI、星座和头像设置" },
+  { value: "favorites", label: "收藏音乐", helper: "已收藏的治愈旋律" },
+]
+
 function normalizeFavoriteMusic(payload: unknown): MusicRecommendation[] {
   const maybeWrapped = payload as { data?: unknown }
   const source = Array.isArray(payload) ? payload : Array.isArray(maybeWrapped?.data) ? maybeWrapped.data : []
@@ -90,6 +103,8 @@ export default function ProfilePage() {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [exportFormat, setExportFormat] = useState<"json" | "csv">("json")
+  const [exportScope, setExportScope] = useState("all")
+  const [exportInclude, setExportInclude] = useState(["records", "summary", "profile", "favorites"])
 
   useEffect(() => {
     let active = true
@@ -198,26 +213,82 @@ export default function ProfilePage() {
     URL.revokeObjectURL(url)
   }
 
+  function getLocalExportPayload() {
+    return {
+      profile: {
+        username,
+        email: user?.email ?? "",
+        mbti: user?.mbti ?? "",
+        zodiac: user?.zodiac ?? "",
+        avatar_url: user?.avatar_url ?? "",
+        avatar_character: user?.avatar_character ?? "",
+        character_color: user?.character_color ?? "",
+      },
+      summary,
+      records: records.map((record) => ({
+        id: record.id,
+        date: record.date,
+        mood: record.mood,
+        tag: record.tag,
+        title: record.title,
+        note: record.note,
+      })),
+      favorites: favoriteMusic.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        mood_type: track.mood_type,
+        duration: track.duration,
+      })),
+      checklist: checklistItems,
+      exported_at: new Date().toISOString(),
+      scope: exportScope,
+    }
+  }
+
+  function csvCell(value: unknown) {
+    const text = Array.isArray(value) || (typeof value === "object" && value !== null)
+      ? JSON.stringify(value)
+      : String(value ?? "")
+    return `"${text.replace(/"/g, '""')}"`
+  }
+
+  function appendCsvSection(lines: string[], title: string, rows: Record<string, unknown>[]) {
+    if (rows.length === 0) return
+    const headers = Object.keys(rows[0])
+    lines.push(`# --- ${title} ---`)
+    lines.push(headers.join(","))
+    rows.forEach((row) => {
+      lines.push(headers.map((header) => csvCell(row[header])).join(","))
+    })
+    lines.push("")
+  }
+
   function exportLocalData(format: "json" | "csv") {
-    const rows = records.map((record) => ({
-      id: record.id,
-      date: record.date,
-      mood: record.mood,
-      tag: record.tag,
-      title: record.title,
-      note: record.note,
-    }))
+    const payload = getLocalExportPayload()
+    const selectedPayload = exportInclude.reduce<Record<string, unknown>>((data, key) => {
+      data[key] = payload[key as keyof typeof payload]
+      return data
+    }, { exported_at: payload.exported_at, scope: payload.scope })
+
+    const csvLines = ["\ufeff"]
+    if (exportInclude.includes("profile")) {
+      appendCsvSection(csvLines, "个人资料", [payload.profile])
+    }
+    if (exportInclude.includes("records")) {
+      appendCsvSection(csvLines, "情绪记录", payload.records)
+    }
+    if (exportInclude.includes("favorites")) {
+      appendCsvSection(csvLines, "收藏音乐", payload.favorites)
+    }
+    if (exportInclude.includes("summary")) {
+      appendCsvSection(csvLines, "分析汇总", [payload.summary as unknown as Record<string, unknown>])
+    }
+
     const content =
       format === "json"
-        ? JSON.stringify(rows, null, 2)
-        : [
-            "id,date,mood,tag,title,note",
-            ...rows.map((row) =>
-              [row.id, row.date, row.mood, row.tag, row.title, row.note]
-                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-                .join(","),
-            ),
-          ].join("\n")
+        ? JSON.stringify(selectedPayload, null, 2)
+        : csvLines.join("\n")
     downloadBlob(
       new Blob([content], { type: format === "json" ? "application/json" : "text/csv;charset=utf-8" }),
       `moodwave-records.${format}`,
@@ -225,8 +296,9 @@ export default function ProfilePage() {
   }
 
   async function exportProfileData(format: "json" | "csv") {
+    const include = exportInclude.length > 0 ? exportInclude : ["records"]
     try {
-      const response = await profileAPI.export(format)
+      const response = await profileAPI.exportFull({ format, scope: exportScope, include })
       if (format === "csv") {
         downloadBlob(response.data as Blob, "moodwave-export.csv")
       } else {
@@ -258,7 +330,8 @@ export default function ProfilePage() {
             <Settings className="h-4 w-4" />
           </button>
           {showSettingsMenu ? (
-            <div className="absolute right-0 top-12 z-40 w-[min(340px,calc(100vw-2rem))] rounded-[28px] border border-white/80 bg-white/95 p-4 shadow-[0_20px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl">
+            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-hidden rounded-t-[34px] border border-white/80 bg-white/96 p-4 shadow-[0_-18px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-12 md:max-h-[calc(100vh-7rem)] md:w-[340px] md:rounded-[28px] md:shadow-[0_20px_50px_rgba(255,181,194,0.24)]">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[#f2d6de] md:hidden" />
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-[#7ed9cb]" />
@@ -277,7 +350,7 @@ export default function ProfilePage() {
                   {settingsNotice}
                 </div>
               ) : null}
-              <div className="grid gap-2">
+              <div className="grid max-h-[calc(72vh-112px)] gap-2.5 overflow-y-auto pb-[max(env(safe-area-inset-bottom),12px)] pr-1 md:max-h-[calc(100vh-14rem)]">
                 {settingItems.map((item) => {
                   const Icon = item.icon
                   return (
@@ -297,7 +370,7 @@ export default function ProfilePage() {
                         }
                         setSettingsNotice(`${item.label}即将上线，设置会逐步开放。`)
                       }}
-                      className="flex items-center gap-3 rounded-[20px] bg-[#fffafb] p-3 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5 hover:bg-white"
+                      className="flex min-h-[52px] items-center gap-3 rounded-[20px] bg-[#fffafb] p-3 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5 hover:bg-white"
                     >
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#fff4f7]">
                         <Icon className="h-4 w-4 text-[#62bda9]" />
@@ -318,8 +391,9 @@ export default function ProfilePage() {
     >
       <EditProfileDialog open={showEditProfile} onOpenChange={setShowEditProfile} />
       {showExportDialog ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/18 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[34px] bg-white/96 p-6 shadow-[0_28px_90px_rgba(255,181,194,0.3)] ring-1 ring-white">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/18 px-0 backdrop-blur-sm md:grid md:place-items-center md:px-4">
+          <div className="max-h-[88vh] w-full overflow-y-auto rounded-t-[34px] bg-white/96 p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-[0_28px_90px_rgba(255,181,194,0.3)] ring-1 ring-white md:max-w-md md:rounded-[34px] md:p-6">
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[#f2d6de] md:hidden" />
             <h2 className="text-2xl font-semibold text-slate-900">导出情绪数据</h2>
             <p className="mt-1 text-sm text-slate-500">将从后端导出你的完整情绪记录，接口异常时会自动保留当前页面数据。</p>
             <label className="mt-5 block">
@@ -336,14 +410,47 @@ export default function ProfilePage() {
             <label className="mt-4 block">
               <span className="text-sm font-medium text-slate-700">范围</span>
               <select
-                value="all"
-                disabled
-                className="mt-2 min-h-12 w-full rounded-[20px] border border-[#f0dbe2] bg-[#fffafb] px-4 text-sm text-slate-500 outline-none"
+                value={exportScope}
+                onChange={(event) => setExportScope(event.target.value)}
+                className="mt-2 min-h-12 w-full rounded-[20px] border border-[#f0dbe2] bg-white px-4 text-sm outline-none focus:border-[#ff9fb4]"
               >
-                <option value="all">全部情绪记录</option>
+                {exportScopes.map((scope) => (
+                  <option key={scope.value} value={scope.value}>
+                    {scope.label}
+                  </option>
+                ))}
               </select>
             </label>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-5">
+              <p className="text-sm font-medium text-slate-700">导出内容</p>
+              <div className="mt-3 grid gap-2.5">
+                {exportIncludeOptions.map((option) => {
+                  const checked = exportInclude.includes(option.value)
+                  return (
+                    <label
+                      key={option.value}
+                      className="flex min-h-[52px] cursor-pointer items-center gap-3 rounded-[20px] bg-[#fffafb] px-3 py-2 ring-1 ring-[#f8e7eb]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setExportInclude((current) =>
+                            checked ? current.filter((item) => item !== option.value) : [...current, option.value],
+                          )
+                        }}
+                        className="h-4 w-4 accent-[#ff8fa3]"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-slate-800">{option.label}</span>
+                        <span className="mt-0.5 block text-xs leading-5 text-slate-400">{option.helper}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setShowExportDialog(false)}
@@ -357,7 +464,8 @@ export default function ProfilePage() {
                   void exportProfileData(exportFormat)
                   setShowExportDialog(false)
                 }}
-                className="min-h-11 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white"
+                disabled={exportInclude.length === 0}
+                className="min-h-11 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 导出并下载
               </button>

@@ -80,10 +80,14 @@ export const companionAPI = {
 
 // 个人主页接口
 export const profileAPI = {
-  export: (format: 'json' | 'csv') =>
+  export: (format: 'json' | 'csv', scope = 'all', include = 'records,summary,profile,favorites') =>
     apiClient.get('/api/profile/export', {
-      params: { format },
+      params: { format, scope, include },
       responseType: format === 'csv' ? 'blob' : 'json',
+    }),
+  exportFull: (data: { format: 'json' | 'csv'; scope: string; include: string[] }) =>
+    apiClient.post('/api/profile/export', data, {
+      responseType: data.format === 'csv' ? 'blob' : 'json',
     }),
 }
 
