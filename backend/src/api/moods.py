@@ -295,3 +295,81 @@ async def delete_mood(
         "msg": "ok",
         "data": {"deleted": mood_id},
     }
+
+
+# ==================== 数据导出 ====================
+
+@router.get("/profile/export")
+async def export_data(
+    format: str = "json",
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    导出用户所有情绪记录
+
+    支持 JSON 和 CSV 两种格式。
+
+    Args:
+        format: 导出格式，可选 "json" 或 "csv"
+
+    Returns:
+        JSON 格式：返回统一格式 {code, msg, data}
+        CSV 格式：返回 text/csv 内容
+    """
+    import json
+    import csv
+    import io
+    from fastapi.responses import Response
+
+    statement = (
+        select(MoodEntry)
+        .where(MoodEntry.user_id == current_user.id)
+        .order_by(MoodEntry.created_at.desc())
+    )
+    moods = session.exec(statement).all()
+
+    mood_list = []
+    for mood in moods:
+        tags_list = json.loads(mood.tags) if mood.tags else []
+        images_list = json.loads(mood.images) if mood.images else []
+        mood_list.append({
+            "id": mood.id,
+            "date": mood.date,
+            "mood_type": mood.mood_type,
+            "intensity": mood.intensity,
+            "tags": tags_list,
+            "note": mood.note,
+            "images": images_list,
+            "image_analysis": mood.image_analysis,
+            "voice_text": mood.voice_text,
+            "created_at": mood.created_at.isoformat() if mood.created_at else None,
+        })
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=[
+            "id", "date", "mood_type", "intensity", "tags", "note",
+            "images", "image_analysis", "voice_text", "created_at"
+        ])
+        writer.writeheader()
+        for item in mood_list:
+            row = {**item}
+            row["tags"] = ",".join(item["tags"]) if isinstance(item["tags"], list) else item["tags"]
+            row["images"] = ",".join(item["images"]) if isinstance(item["images"], list) else item["images"]
+            writer.writerow(row)
+
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=moodwave-export.csv"},
+        )
+
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {
+            "total": len(mood_list),
+            "records": mood_list,
+        },
+    }

@@ -1,4 +1,4 @@
-import { Home, LineChart, Music2, UserRound } from "lucide-react"
+import { Home, Music2, PenLine, Sparkles } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MoodType } from "./types"
 
@@ -25,9 +25,9 @@ export type MoodTagOption = {
 
 export const appNavItems: AppNavItem[] = [
   { href: "/dashboard", label: "首页", shortLabel: "首页", icon: Home },
-  { href: "/analytics", label: "趋势", shortLabel: "趋势", icon: LineChart },
+  { href: "/mood", label: "情绪录入", shortLabel: "记录", icon: PenLine },
   { href: "/music", label: "音乐", shortLabel: "音乐", icon: Music2 },
-  { href: "/profile", label: "我的", shortLabel: "我的", icon: UserRound },
+  { href: "/companion", label: "灵音伙伴", shortLabel: "伙伴", icon: Sparkles },
 ]
 
 export const moodOptions: MoodOption[] = [
@@ -106,10 +106,10 @@ export const dashboardFeatureCards = [
     description: "把此刻的心情交给专属旋律",
   },
   {
-    href: "/discovery",
-    icon: "🤝",
-    title: "解忧角",
-    description: "匿名分享心情，互相接住一下",
+    href: "/companion",
+    icon: "✦",
+    title: "灵音伙伴",
+    description: "和可爱又懂你的 AI 伙伴聊聊",
   },
 ]
 

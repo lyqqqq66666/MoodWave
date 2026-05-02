@@ -32,6 +32,8 @@ class MoodAnalysisRequest(BaseModel):
     intensity: int
     tags: List[str] = []
     note: str = ""
+    mbti: str = ""
+    zodiac: str = ""
 
 
 class MoodAnalysisResponse(BaseModel):
@@ -61,6 +63,8 @@ async def analyze_mood(data: MoodAnalysisRequest):
             intensity=data.intensity,
             note=data.note,
             tags=data.tags,
+            mbti=data.mbti,
+            zodiac=data.zodiac,
         )
         return {
             "code": 0,

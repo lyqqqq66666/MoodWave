@@ -6,6 +6,7 @@ import {
   BookOpen,
   Camera,
   ChevronRight,
+  Download,
   Flame,
   HeartHandshake,
   Info,
@@ -20,8 +21,8 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react"
-import { analyticsAPI, moodAPI, musicAPI, resolveAssetUrl, uploadAPI } from "@/lib/api"
-import { getMoodOption } from "@/lib/moodwave"
+import { analyticsAPI, moodAPI, musicAPI, profileAPI, resolveAssetUrl, uploadAPI } from "@/lib/api"
+import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import {
   checklist as initialChecklist,
   fallbackRecords,
@@ -33,13 +34,15 @@ import {
   unwrapData,
 } from "@/lib/profile"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { EditProfileDialog, getMbtiTone, getZodiac } from "@/components/edit-profile-dialog"
 import { useAuthStore } from "@/store/auth"
 import type { MusicRecommendation, MoodType } from "@/lib/types"
 
 const settingItems = [
-  { icon: UserRound, label: "个人信息", helper: "编辑个人资料" },
+  { icon: UserRound, label: "个人信息", helper: "编辑个人资料", action: "profile" },
   { icon: Bell, label: "通知设置", helper: "管理提醒通知" },
   { icon: Palette, label: "主题设置", helper: "切换界面主题" },
+  { icon: Download, label: "数据导出", helper: "导出 JSON / CSV", action: "export" },
   { icon: BookOpen, label: "使用指南", helper: "新手使用帮助" },
   { icon: Info, label: "关于我们", helper: "了解 MoodWave 信息" },
 ]
@@ -64,6 +67,15 @@ function normalizeFavoriteMusic(payload: unknown): MusicRecommendation[] {
   })
 }
 
+function inferMoodFromText(text: string): MoodType {
+  if (/开心|顺利|高兴|快乐|兴奋/.test(text)) return "happy"
+  if (/焦虑|紧张|考试|deadline|来不及/.test(text)) return "anxious"
+  if (/生气|烦|火大|愤怒/.test(text)) return "angry"
+  if (/难过|失落|哭|低落|累|疲惫/.test(text)) return "sad"
+  if (/平静|放松|还好|安静/.test(text)) return "calm"
+  return "neutral"
+}
+
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore()
   const [summary, setSummary] = useState<SummaryState>(fallbackSummary)
@@ -75,6 +87,9 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [settingsNotice, setSettingsNotice] = useState("")
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [exportFormat, setExportFormat] = useState<"json" | "csv">("json")
 
   useEffect(() => {
     let active = true
@@ -119,8 +134,9 @@ export default function ProfilePage() {
   }, [])
 
   const dominant = getMoodOption(summary.dominantMood)
-  const username = user?.username || "小鱼"
-  const mbti = user?.mbti || "INFP"
+  const username = user?.username || "MoodWave 用户"
+  const mbti = user?.mbti || ""
+  const zodiac = getZodiac(user?.zodiac)
   const avatarInitial = username.slice(0, 1).toUpperCase()
   const energyStats = [
     {
@@ -169,8 +185,62 @@ export default function ProfilePage() {
   function addChecklistItem() {
     const text = newChecklistText.trim()
     if (!text) return
-    setChecklistItems((current) => [...current, { text, mood: dominant.value as MoodType, done: false }])
+    setChecklistItems((current) => [...current, { text, mood: inferMoodFromText(text), done: false }])
     setNewChecklistText("")
+  }
+
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function exportLocalData(format: "json" | "csv") {
+    const rows = records.map((record) => ({
+      id: record.id,
+      date: record.date,
+      mood: record.mood,
+      tag: record.tag,
+      title: record.title,
+      note: record.note,
+    }))
+    const content =
+      format === "json"
+        ? JSON.stringify(rows, null, 2)
+        : [
+            "id,date,mood,tag,title,note",
+            ...rows.map((row) =>
+              [row.id, row.date, row.mood, row.tag, row.title, row.note]
+                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+                .join(","),
+            ),
+          ].join("\n")
+    downloadBlob(
+      new Blob([content], { type: format === "json" ? "application/json" : "text/csv;charset=utf-8" }),
+      `moodwave-records.${format}`,
+    )
+  }
+
+  async function exportProfileData(format: "json" | "csv") {
+    try {
+      const response = await profileAPI.export(format)
+      if (format === "csv") {
+        downloadBlob(response.data as Blob, "moodwave-export.csv")
+      } else {
+        const payload = response.data?.data ?? response.data
+        downloadBlob(
+          new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+          "moodwave-export.json",
+        )
+      }
+      setSettingsNotice(`已从后端导出 ${format.toUpperCase()} 文件。`)
+    } catch {
+      exportLocalData(format)
+      setSettingsNotice(`后端导出暂时不可用，已导出当前页面加载的 ${format.toUpperCase()} 数据。`)
+    }
   }
 
   return (
@@ -214,7 +284,19 @@ export default function ProfilePage() {
                     <button
                       key={item.label}
                       type="button"
-                      onClick={() => setSettingsNotice(`${item.label}即将上线，设置会逐步开放。`)}
+                      onClick={() => {
+                        if (item.action === "profile") {
+                          setShowEditProfile(true)
+                          setShowSettingsMenu(false)
+                          return
+                        }
+                        if (item.action === "export") {
+                          setShowExportDialog(true)
+                          setShowSettingsMenu(false)
+                          return
+                        }
+                        setSettingsNotice(`${item.label}即将上线，设置会逐步开放。`)
+                      }}
                       className="flex items-center gap-3 rounded-[20px] bg-[#fffafb] p-3 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5 hover:bg-white"
                     >
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#fff4f7]">
@@ -234,6 +316,55 @@ export default function ProfilePage() {
         </div>
       }
     >
+      <EditProfileDialog open={showEditProfile} onOpenChange={setShowEditProfile} />
+      {showExportDialog ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/18 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[34px] bg-white/96 p-6 shadow-[0_28px_90px_rgba(255,181,194,0.3)] ring-1 ring-white">
+            <h2 className="text-2xl font-semibold text-slate-900">导出情绪数据</h2>
+            <p className="mt-1 text-sm text-slate-500">将从后端导出你的完整情绪记录，接口异常时会自动保留当前页面数据。</p>
+            <label className="mt-5 block">
+              <span className="text-sm font-medium text-slate-700">格式</span>
+              <select
+                value={exportFormat}
+                onChange={(event) => setExportFormat(event.target.value as "json" | "csv")}
+                className="mt-2 min-h-12 w-full rounded-[20px] border border-[#f0dbe2] bg-white px-4 text-sm outline-none focus:border-[#ff9fb4]"
+              >
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+              </select>
+            </label>
+            <label className="mt-4 block">
+              <span className="text-sm font-medium text-slate-700">范围</span>
+              <select
+                value="all"
+                disabled
+                className="mt-2 min-h-12 w-full rounded-[20px] border border-[#f0dbe2] bg-[#fffafb] px-4 text-sm text-slate-500 outline-none"
+              >
+                <option value="all">全部情绪记录</option>
+              </select>
+            </label>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowExportDialog(false)}
+                className="min-h-11 rounded-full bg-[#fff4f7] px-5 text-sm font-semibold text-slate-600"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void exportProfileData(exportFormat)
+                  setShowExportDialog(false)
+                }}
+                className="min-h-11 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white"
+              >
+                导出并下载
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mx-auto grid min-w-0 max-w-6xl gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-stretch">
           <section className="min-w-0 overflow-hidden rounded-[36px] bg-white/82 shadow-[0_24px_70px_rgba(255,206,216,0.24)] ring-1 ring-white/75 xl:col-start-1 xl:row-start-1 xl:h-full">
           <div className="relative min-h-[190px] bg-[radial-gradient(circle_at_20%_15%,rgba(255,181,194,0.6),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,230,207,0.72),transparent_34%),linear-gradient(135deg,#fff4f7,#f0fffb_48%,#fff8df)] px-6 pb-7 pt-8 md:px-9">
@@ -260,10 +391,26 @@ export default function ProfilePage() {
               <div className="mt-5 min-w-0 md:ml-6 md:mt-0">
                 <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
                   <h2 className="text-3xl font-semibold text-slate-900">{username}</h2>
-                  <span className="rounded-full bg-[#eafff7] px-3 py-1 text-xs font-medium text-[#2d8f78]">
-                    MBTI · {mbti}
-                  </span>
+                  {mbti ? (
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getMbtiTone(mbti)}`}>
+                      {mbti}
+                    </span>
+                  ) : null}
+                  {zodiac ? (
+                    <span className="rounded-full bg-white/82 px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-[#f8e7eb]">
+                      {zodiac.symbol} {zodiac.label}
+                    </span>
+                  ) : null}
                 </div>
+                {!mbti || !zodiac ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowEditProfile(true)}
+                    className="mt-3 rounded-full bg-white/86 px-4 py-2 text-xs font-semibold text-[#ff718b] ring-1 ring-[#ffd9e2]"
+                  >
+                    设置你的 MBTI + 星座 →
+                  </button>
+                ) : null}
                 <p className="mt-3 max-w-full break-words text-sm leading-6 text-slate-600 md:max-w-xl">
                   记录情绪的潮汐，遇见内心的风景。今天也在认真照顾自己的节奏。
                 </p>
@@ -409,10 +556,26 @@ export default function ProfilePage() {
                     >
                       {item.done ? "✓" : ""}
                     </button>
-                    <span className="flex-1 text-sm font-medium text-slate-700">{item.text}</span>
-                    <span className="rounded-full px-3 py-1 text-xs text-slate-600" style={{ backgroundColor: mood.softAccent }}>
-                      {mood.label}
-                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-medium text-slate-700">{item.text}</span>
+                    <label className="relative shrink-0">
+                      <span className="sr-only">调整情绪标签</span>
+                      <select
+                        value={item.mood}
+                        onChange={(event) => {
+                          const nextMood = event.target.value as MoodType
+                          setChecklistItems((current) => current.map((entry, entryIndex) => entryIndex === index ? { ...entry, mood: nextMood } : entry))
+                        }}
+                        className="appearance-none rounded-full border-0 px-3 py-1 pr-7 text-xs text-slate-600 outline-none ring-1 ring-white/70"
+                        style={{ backgroundColor: mood.softAccent }}
+                      >
+                        {moodOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronRight className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 rotate-90 text-slate-400" />
+                    </label>
                     <button
                       type="button"
                       onClick={() => setChecklistItems((current) => current.filter((_, entryIndex) => entryIndex !== index))}

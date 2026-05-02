@@ -11,6 +11,9 @@ export interface AuthUser {
   username: string
   avatar_url?: string | null
   mbti?: string | null
+  zodiac?: string | null
+  avatar_character?: string | null
+  character_color?: string | null
   created_at: string
 }
 

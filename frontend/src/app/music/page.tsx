@@ -22,6 +22,8 @@ import { aiAPI, musicAPI } from "@/lib/api"
 import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import type { MoodType, MusicRecommendation } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { CompanionAvatar } from "@/components/companion-avatar"
+import { useAuthStore } from "@/store/auth"
 import { cn } from "@/lib/utils"
 
 type MoodSoundProfile = {
@@ -48,10 +50,7 @@ type Particle = {
 }
 
 type ToneModule = typeof import("tone/build/esm/index")
-type SSEMessage = {
-  type?: "text" | "done" | "error"
-  content?: string
-}
+type InsightStatus = "idle" | "generating" | "retrying" | "error"
 
 const moodProfiles: Record<MoodType, MoodSoundProfile> = {
   happy: {
@@ -213,7 +212,34 @@ function formatDuration(seconds: number) {
   return `${minutes}:${rest}`
 }
 
+function getInsightErrorMessage(error: unknown) {
+  const maybeResponse = error as {
+    code?: string
+    message?: string
+    response?: { data?: { msg?: string; message?: string; detail?: string } }
+  }
+  const serverMessage =
+    maybeResponse.response?.data?.msg ||
+    maybeResponse.response?.data?.message ||
+    maybeResponse.response?.data?.detail ||
+    maybeResponse.message ||
+    ""
+  const lowerMessage = serverMessage.toLowerCase()
+
+  if (maybeResponse.code === "ECONNABORTED" || lowerMessage.includes("timeout") || lowerMessage.includes("timed out") || serverMessage.includes("超时")) {
+    return "生成有点超时，已先切换成本地陪伴语。可以点下方重新试一次。"
+  }
+  if (serverMessage.includes("fallback")) {
+    return "AI 正在使用备用结果，陪伴语可能会更简短一些。"
+  }
+  if (serverMessage.includes("AI") || serverMessage.includes("DeepSeek")) {
+    return "AI 服务暂时没有接住请求，已先保留一段本地听后感。"
+  }
+  return "网络有点不稳定，灵灵先送上一段本地陪伴建议。"
+}
+
 function MusicPageContent() {
+  const { user } = useAuthStore()
   const searchParams = useSearchParams()
   const mood = parseMood(searchParams.get("mood"))
   const intensity = parseIntensity(searchParams.get("intensity"))
@@ -241,7 +267,10 @@ function MusicPageContent() {
   const [elapsedTime, setElapsedTime] = useState(0)
   const [aiInsight, setAiInsight] = useState(profile.insight)
   const [isInsightLoading, setIsInsightLoading] = useState(false)
+  const [insightStatus, setInsightStatus] = useState<InsightStatus>("idle")
   const [insightError, setInsightError] = useState("")
+  // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
+  const insightRef = useRef(profile.insight)
 
   const selectedRecommendation = recommendations[selectedTrack] ?? fallbackRecommendations[mood][0]
   const progress = useMemo(
@@ -251,68 +280,52 @@ function MusicPageContent() {
 
   const loadAIInsight = useCallback(async (signal?: AbortSignal) => {
     setIsInsightLoading(true)
+    setInsightStatus(insightRef.current && insightRef.current !== profile.insight ? "retrying" : "generating")
     setInsightError("")
     setAiInsight("")
 
     try {
-      const response = await fetch(aiAPI.chatUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const response = await aiAPI.analyzeMood({
           mood_type: mood,
           intensity,
-          message: `请结合当前音乐房间，给我一段适合${moodMeta.label}情绪的温柔陪伴建议。`,
-        }),
-        signal,
-      })
-
-      if (!response.ok || !response.body) {
-        throw new Error(`AI insight request failed: ${response.status}`)
+          note: `当前正在治愈音乐房间收听「${selectedRecommendation.title || profile.title}」，请生成一段适合${moodMeta.label}情绪的听后感。`,
+          tags: ["music"],
+          image_analysis: "",
+          voice_text: "",
+          mbti: user?.mbti || "",
+          zodiac: user?.zodiac || "",
+        },
+        signal ? { signal } : undefined,
+      )
+      const envelope = response.data as { code?: number; msg?: string; message?: string; fallback?: boolean; data?: Record<string, unknown> | null }
+      if (envelope?.code && envelope.code !== 0) {
+        throw new Error(envelope.msg || envelope.message || "AI insight request failed")
       }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-      let streamedText = ""
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const events = buffer.split("\n\n")
-        buffer = events.pop() ?? ""
-
-        for (const event of events) {
-          const dataLine = event
-            .split("\n")
-            .map((line) => line.trim())
-            .find((line) => line.startsWith("data:"))
-
-          if (!dataLine) continue
-
-          const payload = JSON.parse(dataLine.replace(/^data:\s*/, "")) as SSEMessage
-          if (payload.type === "text" && payload.content) {
-            streamedText += payload.content
-            setAiInsight(streamedText)
-          }
-          if (payload.type === "error") {
-            throw new Error(payload.content || "AI insight stream error")
-          }
-          if (payload.type === "done") {
-            setIsInsightLoading(false)
-            return
-          }
-        }
+      const payload = (envelope?.data ?? response.data) as Record<string, unknown>
+      const isFallback = Boolean(envelope?.fallback || payload?.fallback)
+      const nextInsight =
+        (typeof payload?.insight === "string" && payload.insight) ||
+        (typeof payload?.suggestion === "string" && payload.suggestion) ||
+        (typeof payload?.summary === "string" && payload.summary) ||
+        profile.insight
+      insightRef.current = nextInsight
+      setAiInsight(nextInsight)
+      setInsightStatus(isFallback ? "error" : "idle")
+      if (isFallback) {
+        setInsightError("AI 暂时给了备用陪伴语，稍后重新生成可能会更贴近你。")
       }
     } catch (error) {
-      if ((error as Error).name === "AbortError") return
+      const errName = (error as Error).name
+      // axios AbortController 会抛 CanceledError，不是 AbortError
+      if (errName === "AbortError" || errName === "CanceledError") return
       setAiInsight(profile.insight)
-      setInsightError("灵灵先送上一段本地陪伴建议，稍后可以再试一次。")
+      insightRef.current = profile.insight
+      setInsightStatus("error")
+      setInsightError(getInsightErrorMessage(error))
     } finally {
       setIsInsightLoading(false)
     }
-  }, [intensity, mood, moodMeta.label, profile.insight])
+  }, [intensity, mood, moodMeta.label, profile.insight, profile.title, selectedRecommendation.title, user?.mbti, user?.zodiac])
 
   const disposeTone = useCallback(() => {
     loopRef.current?.dispose()
@@ -777,18 +790,35 @@ function MusicPageContent() {
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
           <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-[20px] bg-[#fff1f5] text-[#ff7f96]">
+                <div className="relative">
+                  <CompanionAvatar
+                    character={user?.avatar_character}
+                    color={user?.character_color}
+                    mood={mood}
+                    size="sm"
+                  />
+                  <div className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white text-[#ff7f96] shadow-sm">
+                    {isInsightLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircleHeart className="h-3.5 w-3.5" />}
+                  </div>
+                </div>
+                <div className="hidden h-12 w-12 items-center justify-center rounded-[20px] bg-[#fff1f5] text-[#ff7f96]">
                   {isInsightLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircleHeart className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">AI 陪伴建议</h3>
+                  <h3 className="font-semibold text-slate-900">灵音伙伴的听后感</h3>
                   <p className="text-xs text-slate-500">
-                    {isInsightLoading ? "灵灵正在生成陪伴语..." : "给此刻的你一段轻轻回应"}
+                    {insightStatus === "generating"
+                      ? "伙伴正在听这段旋律..."
+                      : insightStatus === "retrying"
+                        ? "正在重新生成更贴近的回应..."
+                        : insightStatus === "error"
+                          ? "当前展示备用陪伴语"
+                          : "角色会结合情绪与音乐给你回应"}
                   </p>
                 </div>
               </div>
               <p className="mt-4 min-h-[84px] whitespace-pre-wrap text-sm leading-7 text-slate-600">
-                {aiInsight || "正在把你的情绪调成一段温柔的文字..."}
+                {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把你的情绪调成一段温柔的文字...")}
               </p>
               {insightError ? <p className="mt-3 text-xs text-[#ef7b73]">{insightError}</p> : null}
               <div className="mt-4 rounded-[24px] bg-gradient-to-br from-[#fff6f8] to-[#effdfa] p-4 text-sm text-slate-600">

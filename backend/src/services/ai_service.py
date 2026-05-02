@@ -4,16 +4,22 @@ AI 服务层 - DeepSeek API 调用封装
 负责：
 1. 流式情绪对话 (SSE)
 2. 情绪分析（返回结构化结果）
+3. 灵音伙伴语义记忆生成
 """
 
 import os
 import json
-from typing import AsyncGenerator, Optional
+import asyncio
+import logging
+from typing import AsyncGenerator, Optional, List
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 # 加载 .env 文件
 load_dotenv()
+
+# 日志配置
+logger = logging.getLogger("moodwave.ai_service")
 
 # ==================== 客户端初始化 ====================
 
@@ -29,6 +35,80 @@ def _get_client() -> AsyncOpenAI:
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 
 # ==================== Prompt 模板 ====================
+
+CHARACTER_PERSONAS = {
+    "cat": {
+        "name": "小喵",
+        "style": "温柔软萌，喜欢用'喵~'结尾，像一只会安慰人的小猫",
+    },
+    "fox": {
+        "name": "小狐狸",
+        "style": "机灵调皮，偶尔毒舌但很关心人，像森林里的小精灵",
+    },
+    "star": {
+        "name": "小星球",
+        "style": "温暖治愈，像一个漂浮在宇宙中的小星球，用星空比喻人生",
+    },
+    "sunny": {
+        "name": "阳光少年",
+        "style": "元气满满，像清晨的阳光，给你的阴天带来温暖和希望",
+    },
+    "astronaut": {
+        "name": "小宇航员",
+        "style": "好奇探索，把情绪比喻成宇宙旅行，用冒险精神看困难",
+    },
+    "moon": {
+        "name": "月光伙伴",
+        "style": "安静温柔，像月光一样静静陪伴，用夜空的宁静安抚你",
+    },
+    "sakura": {
+        "name": "小樱",
+        "style": "清新自然，像春天樱花一样，带来生机和诗意",
+    },
+}
+
+def _build_character_prompt(avatar_character: str = "cat") -> str:
+    """根据角色形象构建个性描述"""
+    persona = CHARACTER_PERSONAS.get(avatar_character, CHARACTER_PERSONAS["cat"])
+    return f"你的角色是「{persona['name']}」，风格：{persona['style']}。"
+
+
+def _build_system_prompt_chat(
+    avatar_character: str = "cat",
+    mbti: str = "",
+    zodiac: str = "",
+) -> str:
+    """构建对话系统 prompt，注入角色人设 + 用户个性"""
+    character_prompt = _build_character_prompt(avatar_character)
+
+    personality_hint = ""
+    if mbti or zodiac:
+        parts = []
+        if mbti:
+            parts.append(f"MBTI 为 {mbti}")
+        if zodiac:
+            parts.append(f"星座为{zodiac}")
+        personality_hint = f"用户{'，'.join(parts)}，请根据此性格特点调整沟通方式。"
+
+    return f"""你是 MoodWave 灵音的 AI 情绪伙伴。
+
+{character_prompt}
+
+你的风格：
+- 温暖、有同理心，像一个关心你的朋友
+- 不说教、不评判，先理解再建议
+- 语言简洁，不超过 150 字/次
+- 适当使用 emoji 增加亲切感
+{personality_hint}
+
+你的任务：
+- 根据用户当前情绪给出个性化回应
+- 先共情用户的感受
+- 再给出 1-2 个简单可行的情绪调节建议
+- 最后推荐用音乐治愈
+
+重要：用中文回答，语气自然亲切。"""
+
 
 SYSTEM_PROMPT_CHAT = """你是 MoodWave 灵音的 AI 情绪伙伴，名字叫「灵灵」。
 
@@ -67,6 +147,9 @@ async def stream_chat(
     user_message: str,
     tags: list[str] | None = None,
     history: list[dict] | None = None,
+    avatar_character: str = "cat",
+    mbti: str = "",
+    zodiac: str = "",
 ) -> AsyncGenerator[str, None]:
     """
     流式情绪对话 (SSE)
@@ -77,11 +160,17 @@ async def stream_chat(
         user_message: 用户输入的文字
         tags: 情绪标签列表
         history: 历史对话记录 [{"role": "user/assistant", "content": "..."}]
+        avatar_character: 角色形象 (cat/fox/star/sunny/astronaut/moon/sakura)
+        mbti: 用户 MBTI 类型
+        zodiac: 用户星座
 
     Yields:
         str: SSE 格式的文本块，格式为 "data: {json}\n\n"
     """
     client = _get_client()
+
+    # 构建个性化 system prompt
+    system_prompt = _build_system_prompt_chat(avatar_character, mbti, zodiac)
 
     # 构建上下文消息
     context_parts = [
@@ -95,18 +184,21 @@ async def stream_chat(
     context_text = "\n".join(context_parts)
 
     # 构建消息列表
-    messages = [{"role": "system", "content": SYSTEM_PROMPT_CHAT}]
+    messages = [{"role": "system", "content": system_prompt}]
     if history:
         messages.extend(history[-6:])  # 最多保留最近 3 轮对话
     messages.append({"role": "user", "content": context_text})
 
     try:
-        stream = await client.chat.completions.create(
-            model=MODEL,
-            messages=messages,
-            stream=True,
-            max_tokens=300,
-            temperature=0.8,
+        stream = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                stream=True,
+                max_tokens=300,
+                temperature=0.8,
+            ),
+            timeout=20.0,  # SSE 流建立超时
         )
 
         async for chunk in stream:
@@ -118,7 +210,12 @@ async def stream_chat(
         # 流式结束标记
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
+    except asyncio.TimeoutError:
+        logger.warning("stream_chat timeout mood=%s", mood_type)
+        error_payload = json.dumps({"type": "error", "content": "AI 响应超时，请稍后重试"}, ensure_ascii=False)
+        yield f"data: {error_payload}\n\n"
     except Exception as e:
+        logger.error("stream_chat error: %s", str(e)[:200])
         error_payload = json.dumps({"type": "error", "content": str(e)}, ensure_ascii=False)
         yield f"data: {error_payload}\n\n"
 
@@ -128,6 +225,8 @@ async def analyze_mood_with_ai(
     intensity: int,
     note: str = "",
     tags: list[str] | None = None,
+    mbti: str = "",
+    zodiac: str = "",
 ) -> dict:
     """
     用 AI 分析情绪，返回结构化结果
@@ -137,6 +236,8 @@ async def analyze_mood_with_ai(
         intensity: 强度 1-10
         note: 用户文字描述
         tags: 情绪标签
+        mbti: 用户 MBTI 类型
+        zodiac: 用户星座
 
     Returns:
         dict: {summary, insight, suggestion, music_mood, energy_level}
@@ -147,6 +248,10 @@ async def analyze_mood_with_ai(
         f"情绪类型：{_mood_label(mood_type)}",
         f"情绪强度：{intensity}/10",
     ]
+    if mbti:
+        user_content_parts.append(f"用户 MBTI：{mbti}")
+    if zodiac:
+        user_content_parts.append(f"用户星座：{zodiac}")
     if tags:
         user_content_parts.append(f"标签：{', '.join(tags)}")
     if note.strip():
@@ -187,6 +292,38 @@ async def analyze_mood_with_ai(
 
 
 # ==================== 辅助函数 ====================
+
+def _repair_truncated_json(raw: str) -> str:
+    """尝试修复被截断的 JSON：闭合未闭合的括号和引号"""
+    # 去除尾部不完整的行
+    raw = raw.rstrip()
+    
+    # 统计未闭合
+    open_braces = raw.count("{") - raw.count("}")
+    open_brackets = raw.count("[") - raw.count("]")
+    
+    # 检查是否在字符串中间被截断（引号不成对）
+    in_string = False
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "\\" and i + 1 < len(raw):
+            i += 2
+            continue
+        if ch == '"':
+            in_string = not in_string
+        i += 1
+    
+    # 如果在字符串内被截断，补一个引号
+    if in_string:
+        raw += '"'
+    
+    # 闭合括号
+    raw += "]" * open_brackets
+    raw += "}" * open_braces
+    
+    return raw
+
 
 def _mood_label(mood_type: str) -> str:
     """情绪类型中文标签"""
@@ -399,11 +536,13 @@ async def analyze_mood_multi_modal(
     image_analysis: str = "",
     voice_text: str = "",
     history_moods: list[dict] | None = None,
+    mbti: str = "",
+    zodiac: str = "",
 ) -> dict:
     """
     综合多模态输入，生成完整情绪分析报告
 
-    使用 DeepSeek V4 综合文字 + 图片分析 + 语音转写 + 历史数据
+    使用 DeepSeek V4 综合文字 + 图片分析 + 语音转写 + 历史数据 + 用户画像
 
     Returns:
         dict: {
@@ -418,6 +557,10 @@ async def analyze_mood_multi_modal(
         f"情绪类型：{_mood_label(mood_type)}",
         f"情绪强度：{intensity}/10",
     ]
+    if mbti:
+        parts.append(f"用户 MBTI：{mbti}")
+    if zodiac:
+        parts.append(f"用户星座：{zodiac}")
     if tags:
         parts.append(f"标签：{', '.join(tags)}")
     if note.strip():
@@ -463,32 +606,66 @@ async def analyze_mood_multi_modal(
 
 注意：radar_data 中的 score 为 0-100 的整数，综合所有输入合理估算。"""
 
-    try:
-        response = await client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": user_content},
-            ],
-            stream=False,
-            max_tokens=600,
-            temperature=0.4,
-        )
+    max_retries = 1
+    last_error = None
 
-        raw = response.choices[0].message.content.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip()
+    for attempt in range(max_retries + 1):
+        try:
+            logger.info(
+                "analyze_mood_multi_modal attempt=%d/%d mood=%s intensity=%d note_len=%d",
+                attempt + 1, max_retries + 1, mood_type, intensity, len(note or ""),
+            )
 
-        import json
-        return json.loads(raw)
+            response = await asyncio.wait_for(
+                client.chat.completions.create(
+                    model=MODEL,
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                    stream=False,
+                    max_tokens=1000,  # 从 600 提升，防止复杂 JSON 被截断
+                    temperature=0.4,
+                ),
+                timeout=20.0,  # 20s 单次超时，重试后最多 40s，低于 axios 45s
+            )
 
-    except json.JSONDecodeError:
-        return _fallback_multi_modal(mood_type, intensity, note)
-    except Exception as e:
-        return _fallback_multi_modal(mood_type, intensity, note)
+            raw = response.choices[0].message.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            raw = raw.strip()
+
+            import json
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError:
+                # 尝试修复被截断的 JSON
+                repaired = _repair_truncated_json(raw)
+                logger.info("analyze_mood_multi_modal JSON repair attempt")
+                try:
+                    result = json.loads(repaired)
+                except json.JSONDecodeError:
+                    raise  # 修复失败，抛回外层异常处理
+            logger.info("analyze_mood_multi_modal success attempt=%d", attempt + 1)
+            return result
+
+        except asyncio.TimeoutError:
+            last_error = "timeout"
+            logger.warning("analyze_mood_multi_modal timeout attempt=%d", attempt + 1)
+
+        except json.JSONDecodeError:
+            last_error = "json_parse"
+            logger.warning("analyze_mood_multi_modal JSON parse error attempt=%d raw=%s", attempt + 1, raw[:200] if 'raw' in dir() else "N/A")
+
+        except Exception as e:
+            last_error = str(e)[:200]
+            logger.error("analyze_mood_multi_modal error attempt=%d: %s", attempt + 1, last_error)
+
+    # 所有重试均失败，降级到规则模板
+    logger.warning("analyze_mood_multi_modal fallback triggered last_error=%s", last_error)
+    return _fallback_multi_modal(mood_type, intensity, note)
 
 
 def _fallback_multi_modal(mood_type: str, intensity: int, note: str = "") -> dict:
@@ -513,3 +690,157 @@ def _fallback_multi_modal(mood_type: str, intensity: int, note: str = "") -> dic
             {"mood": "平淡", "score": 70 if mood_type == "neutral" else 40},
         ],
     }
+
+
+# ==================== 灵音伙伴语义记忆 ====================
+
+COMPANION_MEMORY_PROMPT = """你是 MoodWave 灵音的 AI 伙伴记忆系统。
+
+用户最近记录了以下情绪数据。请基于这些数据，生成 3-5 条「伙伴记忆」。
+每条记忆应该像是一个关心用户的朋友记住的关于 TA 的事情，语气温柔、个性化。
+
+记忆要求：
+- 每条 12-30 字
+- 基于数据模式而非编造
+- 语气温暖治愈，不说教
+- 可以引用具体数据（如"你最多的一天..."）
+- 可以给出温柔的观察（如"你似乎在学习日容易紧张"）
+
+严格按以下 JSON 格式返回，不要输出额外文字：
+{
+  "memories": [
+    "记忆内容 1",
+    "记忆内容 2",
+    "记忆内容 3"
+  ]
+}"""
+
+
+async def generate_companion_memories(
+    mood_entries: List[dict],
+    avatar_character: str = "cat",
+    mbti: str = "",
+    zodiac: str = "",
+) -> List[str]:
+    """
+    使用 AI 基于情绪历史生成个性化伙伴记忆
+
+    Args:
+        mood_entries: 情绪记录列表，每项含 mood_type, intensity, tags, note, date
+        avatar_character: 角色形象
+        mbti: 用户 MBTI
+        zodiac: 用户星座
+
+    Returns:
+        List[str]: 3-5 条个性化记忆点
+    """
+    if len(mood_entries) < 3:
+        return []
+
+    client = _get_client()
+
+    # 构建数据摘要
+    lines = ["以下为用户最近的情绪记录数据：", ""]
+    for i, entry in enumerate(mood_entries[:30], 1):
+        mood_label = _mood_label(entry.get("mood_type", ""))
+        intensity = entry.get("intensity", 0)
+        tags = entry.get("tags", [])
+        tags_str = ", ".join(tags) if tags else "无"
+        note = (entry.get("note") or "")[:40]
+        date = entry.get("date", "")
+        lines.append(
+            f"{i}. [{date}] 情绪={mood_label} 强度={intensity}/10 标签={tags_str}"
+            + (f' 笔记="{note}"' if note else "")
+        )
+
+    # 统计摘要
+    mood_counts = {}
+    all_tags = []
+    intensities = []
+    for entry in mood_entries:
+        mt = entry.get("mood_type", "")
+        mood_counts[mt] = mood_counts.get(mt, 0) + 1
+        if entry.get("tags"):
+            all_tags.extend(entry["tags"])
+        if entry.get("intensity"):
+            intensities.append(entry["intensity"])
+
+    dominant = max(mood_counts, key=mood_counts.get) if mood_counts else "neutral"
+    avg_intensity = sum(intensities) / len(intensities) if intensities else 5
+    from collections import Counter
+    top_tag = Counter(all_tags).most_common(1)[0][0] if all_tags else ""
+
+    lines.append("")
+    lines.append(f"数据摘要：共{len(mood_entries)}条记录，主导情绪={_mood_label(dominant)}，平均强度={avg_intensity:.1f}/10")
+    if top_tag:
+        lines.append(f"高频标签：{top_tag}")
+
+    user_content = "\n".join(lines)
+
+    personality_hint = ""
+    if avatar_character:
+        persona = CHARACTER_PERSONAS.get(avatar_character, CHARACTER_PERSONAS["cat"])
+        personality_hint = f"伙伴角色是「{persona['name']}」，风格：{persona['style']}。记忆语气应符合此角色。"
+    if mbti or zodiac:
+        parts = []
+        if mbti:
+            parts.append(f"MBTI={mbti}")
+        if zodiac:
+            parts.append(f"星座={zodiac}")
+        personality_hint += f" 用户{'，'.join(parts)}。"
+
+    try:
+        logger.info("generate_companion_memories entries=%d character=%s", len(mood_entries), avatar_character)
+
+        response = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": COMPANION_MEMORY_PROMPT + ("\n" + personality_hint if personality_hint else "")},
+                    {"role": "user", "content": user_content},
+                ],
+                stream=False,
+                max_tokens=400,
+                temperature=0.7,
+            ),
+            timeout=25.0,
+        )
+
+        raw = response.choices[0].message.content
+        if not raw or not raw.strip():
+            logger.warning("generate_companion_memories empty response from AI")
+            return []
+
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+
+        if not raw:
+            logger.warning("generate_companion_memories empty after stripping code blocks")
+            return []
+
+        import json
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("generate_companion_memories JSON parse failed raw=%s", raw[:200])
+            # 尝试从非 JSON 文本中逐行提取记忆
+            lines = [line.strip("- ").strip() for line in raw.split("\n") if line.strip() and len(line.strip()) > 4]
+            memories = lines[:5]
+            if memories:
+                logger.info("generate_companion_memories extracted %d memories from text fallback", len(memories))
+                return memories
+            return []
+        memories = result.get("memories", [])
+        logger.info("generate_companion_memories success count=%d", len(memories))
+        return memories if isinstance(memories, list) else []
+
+    except asyncio.TimeoutError:
+        logger.warning("generate_companion_memories timeout")
+        return []
+    except Exception as e:
+        logger.error("generate_companion_memories error: %s", str(e)[:200])
+        return []

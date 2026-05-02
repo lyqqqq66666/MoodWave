@@ -40,7 +40,7 @@ export function MoodMediaUpload({ images, onImagesChange, className }: MoodMedia
 
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
         {images.map((image) => (
           <div key={image.id} className="relative aspect-square overflow-hidden rounded-[22px] bg-[#fff4f7] ring-1 ring-[#f7dce4]">
             <Image src={image.previewUrl} alt="" fill sizes="140px" className="object-cover" />
@@ -55,7 +55,7 @@ export function MoodMediaUpload({ images, onImagesChange, className }: MoodMedia
           </div>
         ))}
         {images.length < 3 ? (
-          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-[22px] border border-dashed border-[#f4d7e0] bg-[#fffafb] text-center transition hover:-translate-y-0.5 hover:bg-white">
+          <label className="flex aspect-square min-h-[100px] min-w-[100px] cursor-pointer flex-col items-center justify-center rounded-[22px] border border-dashed border-[#f4d7e0] bg-[#fffafb] text-center transition hover:-translate-y-0.5 hover:bg-white">
             <ImagePlus className="h-6 w-6 text-[#ff87a0]" />
             <span className="mt-2 text-xs font-medium text-slate-500">添加图片</span>
             <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => handleFiles(event.target.files)} />

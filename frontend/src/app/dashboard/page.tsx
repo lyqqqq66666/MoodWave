@@ -2,11 +2,18 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { Mic } from "lucide-react"
-import { moodAPI } from "@/lib/api"
+import { ArrowRight, Mic } from "lucide-react"
+import { aiAPI, moodAPI } from "@/lib/api"
 import { buildDailyMessage, dashboardFeatureCards, getGreetingForHour, getMoodOption, moodOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { CompanionAvatar } from "@/components/companion-avatar"
+import { useAuthStore } from "@/store/auth"
+
+type SSEMessage = {
+  type?: "text" | "done" | "error"
+  content?: string
+}
 
 type RecentMood = {
   id: string
@@ -36,9 +43,12 @@ function unwrapData(payload: unknown) {
 }
 
 export default function DashboardPage() {
+  const { user, token } = useAuthStore()
   const [currentMoodIndex, setCurrentMoodIndex] = useState(1)
   const [recentMoods, setRecentMoods] = useState<RecentMood[]>(fallbackHistory)
   const [isLoading, setIsLoading] = useState(true)
+  const [dailyMessage, setDailyMessage] = useState("")
+  const [isDailyMessageLoading, setIsDailyMessageLoading] = useState(false)
 
   const mood = moodOptions[currentMoodIndex]
   const greeting = getGreetingForHour()
@@ -74,6 +84,74 @@ export default function DashboardPage() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadDailyMessage() {
+      setIsDailyMessageLoading(true)
+      setDailyMessage("")
+      try {
+        const response = await fetch(aiAPI.chatUrl(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            mood_type: mood.value,
+            intensity: 5,
+            message: `请用一句话给我今天适合${mood.label}状态的每日寄语。`,
+            tags: [],
+            history: [],
+            avatar_character: user?.avatar_character === "planet" ? "star" : user?.avatar_character || "cat",
+            mbti: user?.mbti || "",
+            zodiac: user?.zodiac || "",
+          }),
+          signal: controller.signal,
+        })
+
+        if (!response.ok || !response.body) throw new Error("daily message unavailable")
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+        let streamedText = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const events = buffer.split("\n\n")
+          buffer = events.pop() ?? ""
+
+          for (const eventChunk of events) {
+            const dataLine = eventChunk
+              .split("\n")
+              .map((line) => line.trim())
+              .find((line) => line.startsWith("data:"))
+            if (!dataLine) continue
+            const payload = JSON.parse(dataLine.replace(/^data:\s*/, "")) as SSEMessage
+            if (payload.type === "text" && payload.content) {
+              streamedText += payload.content
+              setDailyMessage(streamedText)
+            }
+            if (payload.type === "error") throw new Error(payload.content || "daily message stream error")
+            if (payload.type === "done") return
+          }
+        }
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setDailyMessage(buildDailyMessage(mood.value))
+        }
+      } finally {
+        setIsDailyMessageLoading(false)
+      }
+    }
+
+    void loadDailyMessage()
+    return () => controller.abort()
+  }, [mood.label, mood.value, token, user?.avatar_character, user?.mbti, user?.zodiac])
 
   return (
     <MoodWaveShell
@@ -173,9 +251,29 @@ export default function DashboardPage() {
           <div className="rounded-[32px] bg-white/80 p-6 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/70">
             <h3 className="text-xl font-semibold">AI 每日寄语</h3>
             <p className="mt-1 text-sm text-slate-500">一段适合今天的温柔提醒。</p>
-            <div className="mt-6 rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-6">
-              <p className="text-sm leading-7 text-slate-700">{buildDailyMessage(mood.value)}</p>
+            <div className="mt-5 flex items-center gap-3 rounded-[26px] bg-[#fff7f9] p-3 ring-1 ring-[#f8e7eb]">
+              <CompanionAvatar
+                character={user?.avatar_character}
+                color={user?.character_color}
+                mood={mood.value}
+                size="sm"
+              />
+              <div className="rounded-[22px] bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">
+                “{greeting.greeting.replace("，", "，")}我陪你把今天慢慢收好。”
+              </div>
             </div>
+            <div className="mt-6 rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-6">
+              <p className="text-sm leading-7 text-slate-700">
+                {dailyMessage || (isDailyMessageLoading ? "灵音伙伴正在准备今天的寄语..." : buildDailyMessage(mood.value))}
+              </p>
+            </div>
+            <Link
+              href="/companion"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#ff718b] transition hover:text-[#e95d78]"
+            >
+              和灵音伙伴聊聊
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </section>
       </div>

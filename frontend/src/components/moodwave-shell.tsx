@@ -37,11 +37,12 @@ export function MoodWaveShell({
     { href: "/mood", label: "情绪录入", icon: PenLine },
     { href: "/analytics", label: "情绪趋势", icon: BarChart3 },
     { href: "/music", label: "治愈音乐", icon: Music2 },
+    { href: "/companion", label: "灵音伙伴", icon: Sparkles },
     { href: "/discovery", label: "解忧角", icon: HeartHandshake },
     { href: "/profile", label: "个人主页", icon: UserRound },
   ]
 
-  const displayName = user?.username || "用户"
+  const displayName = user?.username || "MoodWave 用户"
   const avatarChar = displayName.charAt(0).toUpperCase()
 
   return (
@@ -110,6 +111,13 @@ export function MoodWaveShell({
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#ff7f96]" />
               </button>
+              <Link
+                href="/profile"
+                className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-sm font-semibold text-white shadow-[0_8px_24px_rgba(255,192,203,0.18)] lg:hidden"
+                aria-label="个人主页"
+              >
+                {avatarChar}
+              </Link>
             </div>
           </header>
           {notice ? (

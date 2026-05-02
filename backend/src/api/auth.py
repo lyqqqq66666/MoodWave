@@ -14,7 +14,7 @@ from sqlmodel import Session, select
 from passlib.hash import bcrypt, pbkdf2_sha256
 
 from src.core.models import (
-    User, UserCreate, UserLogin, Token, TokenData, UserResponse,
+    User, UserCreate, UserLogin, Token, TokenData, UserResponse, UserUpdate,
     JWT_SECRET_KEY, JWT_ALGORITHM, JWT_EXPIRE_DAYS,
 )
 from src.db.database import get_session
@@ -130,6 +130,8 @@ async def register(
                 "username": user.username,
                 "avatar_url": user.avatar_url,
                 "mbti": user.mbti,
+                "avatar_character": user.avatar_character,
+                "zodiac": user.zodiac,
                 "created_at": user.created_at.isoformat(),
             },
         },
@@ -173,6 +175,8 @@ async def login(
                 "username": user.username,
                 "avatar_url": user.avatar_url,
                 "mbti": user.mbti,
+                "avatar_character": user.avatar_character,
+                "zodiac": user.zodiac,
                 "created_at": user.created_at.isoformat(),
             },
         },
@@ -212,6 +216,44 @@ async def get_me(
             "username": current_user.username,
             "avatar_url": current_user.avatar_url,
             "mbti": current_user.mbti,
+            "avatar_character": current_user.avatar_character,
+            "zodiac": current_user.zodiac,
+            "created_at": current_user.created_at.isoformat(),
+        },
+    }
+
+
+@router.patch("/me", response_model=dict)
+async def update_me(
+    data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    更新当前用户信息
+
+    可更新字段：username, avatar_url, mbti, avatar_character, zodiac
+    只传需要修改的字段即可。
+    """
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(current_user, key, value)
+
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "username": current_user.username,
+            "avatar_url": current_user.avatar_url,
+            "mbti": current_user.mbti,
+            "avatar_character": current_user.avatar_character,
+            "zodiac": current_user.zodiac,
             "created_at": current_user.created_at.isoformat(),
         },
     }

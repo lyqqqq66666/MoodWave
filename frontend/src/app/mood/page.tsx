@@ -11,6 +11,7 @@ import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mo
 import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/store/auth"
 
 const steps = ["情绪", "强度", "内容", "标签", "完成"]
 
@@ -24,6 +25,7 @@ const fallbackRadar = [
 ]
 
 export default function MoodPage() {
+  const { user } = useAuthStore()
   const [step, setStep] = useState(1)
   const [selectedMood, setSelectedMood] = useState<MoodType>("calm")
   const [intensity, setIntensity] = useState(6)
@@ -172,9 +174,19 @@ export default function MoodPage() {
           tags: selectedTags,
           image_analysis: imageAnalysis,
           voice_text: submittedVoiceText,
+          mbti: user?.mbti || "",
+          zodiac: user?.zodiac || "",
         })
         .then((response) => {
-          const payload = response.data?.data ?? response.data
+          const envelope = response.data as { code?: number; msg?: string; fallback?: boolean; data?: MoodAnalysisReportData | null }
+          if (envelope?.code && envelope.code !== 0) {
+            throw new Error(envelope.msg || "AI analysis failed")
+          }
+          if (envelope?.fallback) {
+            setSubmitNotice((current) => current || "AI 暂时使用本地分析模板，记录已正常保存。")
+          }
+          const payload = envelope?.data ?? response.data
+          if (!payload) throw new Error("AI analysis empty")
           return payload as MoodAnalysisReportData
         })
         .catch(() => buildFallbackReport())
@@ -374,7 +386,7 @@ export default function MoodPage() {
                         ) : null}
                       </div>
                     ) : null}
-                    <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1.05fr]">
+                    <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(260px,1fr)_minmax(280px,1.05fr)]">
                       <MoodMediaUpload images={images} onImagesChange={setImages} />
                       <MoodVoiceRecorder
                         onRecordingChange={handleVoiceRecording}

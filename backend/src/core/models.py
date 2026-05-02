@@ -28,6 +28,8 @@ class User(SQLModel, table=True):
     hashed_password: str
     avatar_url: Optional[str] = Field(default=None)
     mbti: Optional[str] = Field(default=None)
+    avatar_character: str = Field(default="cat")  # 灵音伙伴角色形象
+    zodiac: str = Field(default="")  # 星座
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -62,10 +64,21 @@ class UserResponse(BaseModel):
     username: str
     avatar_url: Optional[str] = None
     mbti: Optional[str] = None
+    avatar_character: str = "cat"
+    zodiac: str = ""
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    """更新用户信息请求"""
+    username: Optional[str] = None
+    avatar_url: Optional[str] = None
+    mbti: Optional[str] = None
+    avatar_character: Optional[str] = None
+    zodiac: Optional[str] = None
 
 # ==================== 数据库模型 ====================
 

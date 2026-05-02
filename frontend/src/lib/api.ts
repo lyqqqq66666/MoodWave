@@ -10,6 +10,7 @@ export function resolveAssetUrl(url?: string | null) {
 
 const apiClient = axios.create({
   baseURL: API_URL,
+  timeout: 45000, // 45 秒超时（多模态分析可能较慢）
   headers: {
     'Content-Type': 'application/json',
   },
@@ -69,7 +70,21 @@ export const musicAPI = {
 // AI 对话接口
 export const aiAPI = {
   chatUrl: () => `${API_URL}/api/ai/chat`,
-  analyzeMood: (data: any) => apiClient.post('/api/ai/analyze-mood', data),
+  analyzeMood: (data: any, config?: any) => apiClient.post('/api/ai/analyze-mood', data, config),
+}
+
+// 灵音伙伴接口
+export const companionAPI = {
+  memories: () => apiClient.get('/api/companion/memories'),
+}
+
+// 个人主页接口
+export const profileAPI = {
+  export: (format: 'json' | 'csv') =>
+    apiClient.get('/api/profile/export', {
+      params: { format },
+      responseType: format === 'csv' ? 'blob' : 'json',
+    }),
 }
 
 // 文件上传接口
@@ -108,6 +123,10 @@ export const authAPI = {
     axios.post(`${API_URL}/api/auth/login`, data),
   me: (token: string) =>
     axios.get(`${API_URL}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  updateMe: (token: string, data: any) =>
+    axios.patch(`${API_URL}/api/auth/me`, data, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 }
