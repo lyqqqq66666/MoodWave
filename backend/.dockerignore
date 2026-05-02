@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+test_*.py
+
+# Local DB
+*.db
+*.db-journal
+
+# Uploads (生产环境用云存储)
+uploads/
+
+# Docker files
+Dockerfile
+.dockerignore
+
+# Env (部署时通过 CloudRun EnvParams 注入)
+.env
+.env.local
+
+# Mac
+.DS_Store
