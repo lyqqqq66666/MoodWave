@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import {
   Bell,
@@ -10,6 +11,7 @@ import {
   Flame,
   HeartHandshake,
   Info,
+  LogOut,
   Medal,
   Music2,
   Palette,
@@ -41,6 +43,7 @@ import type { MusicRecommendation, MoodType } from "@/lib/types"
 const settingItems = [
   { icon: UserRound, label: "个人信息", helper: "编辑个人资料", action: "profile" },
   { icon: Bell, label: "通知设置", helper: "管理提醒通知" },
+  { icon: ShieldCheck, label: "隐私安全", helper: "权限与数据保护" },
   { icon: Palette, label: "主题设置", helper: "切换界面主题" },
   { icon: Download, label: "数据导出", helper: "导出 JSON / CSV", action: "export" },
   { icon: BookOpen, label: "使用指南", helper: "新手使用帮助" },
@@ -90,7 +93,8 @@ function inferMoodFromText(text: string): MoodType {
 }
 
 export default function ProfilePage() {
-  const { user, updateUser } = useAuthStore()
+  const router = useRouter()
+  const { user, updateUser, logout } = useAuthStore()
   const [summary, setSummary] = useState<SummaryState>(fallbackSummary)
   const [records, setRecords] = useState<MoodRecord[]>(fallbackRecords)
   const [avatarPreview, setAvatarPreview] = useState("")
@@ -315,6 +319,14 @@ export default function ProfilePage() {
     }
   }
 
+  function handleLogout() {
+    const confirmed = window.confirm("确定要退出登录吗？")
+    if (!confirmed) return
+    logout()
+    setShowSettingsMenu(false)
+    router.push("/login")
+  }
+
   return (
     <MoodWaveShell
       title="个人主页"
@@ -330,9 +342,9 @@ export default function ProfilePage() {
             <Settings className="h-4 w-4" />
           </button>
           {showSettingsMenu ? (
-            <div className="fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-hidden rounded-t-[34px] border border-white/80 bg-white/96 p-4 shadow-[0_-18px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-12 md:max-h-[calc(100vh-7rem)] md:w-[340px] md:rounded-[28px] md:shadow-[0_20px_50px_rgba(255,181,194,0.24)]">
-              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[#f2d6de] md:hidden" />
-              <div className="mb-3 flex items-center justify-between">
+            <div className="fixed inset-x-0 bottom-0 z-[80] flex max-h-[86dvh] min-h-[360px] flex-col overflow-hidden rounded-t-[34px] border border-white/80 bg-white/96 p-4 shadow-[0_-18px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-12 md:max-h-[calc(100vh-7rem)] md:min-h-0 md:w-[340px] md:rounded-[28px] md:shadow-[0_20px_50px_rgba(255,181,194,0.24)]">
+              <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-[#f2d6de] md:hidden" />
+              <div className="mb-3 flex shrink-0 items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-[#7ed9cb]" />
                   <p className="font-semibold text-slate-900">功能与设置</p>
@@ -346,11 +358,11 @@ export default function ProfilePage() {
                 </button>
               </div>
               {settingsNotice ? (
-                <div className="mb-3 rounded-[18px] border border-[#d6f3ea] bg-[#effdfa] px-3 py-2 text-xs leading-5 text-slate-600">
+                <div className="mb-3 shrink-0 rounded-[18px] border border-[#d6f3ea] bg-[#effdfa] px-3 py-2 text-xs leading-5 text-slate-600">
                   {settingsNotice}
                 </div>
               ) : null}
-              <div className="grid max-h-[calc(72vh-112px)] gap-2.5 overflow-y-auto pb-[max(env(safe-area-inset-bottom),12px)] pr-1 md:max-h-[calc(100vh-14rem)]">
+              <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+12px)] pr-1 md:max-h-[calc(100vh-14rem)]">
                 {settingItems.map((item) => {
                   const Icon = item.icon
                   return (
@@ -383,6 +395,20 @@ export default function ProfilePage() {
                     </button>
                   )
                 })}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="mt-1 flex min-h-[52px] items-center gap-3 rounded-[20px] border border-[#ffd8df] bg-[#fff7f8] p-3 text-left text-[#ef6f7f] transition hover:-translate-y-0.5 hover:bg-white md:hidden"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white">
+                    <LogOut className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold">退出登录</span>
+                    <span className="mt-1 block text-xs text-[#e996a3]">回到登录页</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-[#ef9aaa]" />
+                </button>
               </div>
             </div>
           ) : null}
