@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, ChevronUp, Mic, Play, Plus, Sparkles, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Play, Plus, Sparkles, Trash2 } from "lucide-react"
 import { aiAPI, moodAPI, uploadAPI } from "@/lib/api"
 import { getMoodOption, moodOptions, moodTagOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
