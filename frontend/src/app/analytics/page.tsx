@@ -204,7 +204,7 @@ const intensityTicks = [0, 2, 4, 6, 8, 10]
 
 export default function AnalyticsPage() {
   const [activeDay, setActiveDay] = useState(() => new Date().getDate())
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date(2026, 3, 1))
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date())
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [selectedShareMood, setSelectedShareMood] = useState<MoodType | null>(null)
   const [aiInsight, setAiInsight] = useState("")
@@ -220,6 +220,7 @@ export default function AnalyticsPage() {
   const [editTags, setEditTags] = useState("")
   const [editNote, setEditNote] = useState("")
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -252,7 +253,9 @@ export default function AnalyticsPage() {
 
         if (loadedRecords.length > 0) {
           setRecords(loadedRecords)
-          setTrendData(buildTrendFromRecords(loadedRecords, selectedMonth))
+          const trend = buildTrendFromRecords(loadedRecords, selectedMonth)
+          console.log("[analytics] trendData:", JSON.stringify(trend))
+          setTrendData(trend)
           setShareData(buildShareFromRecords(loadedRecords, selectedMonth))
         } else if (Array.isArray(weekly.weekly_trend) && weekly.weekly_trend.length > 0) {
           setTrendData(
@@ -316,7 +319,7 @@ export default function AnalyticsPage() {
     return () => {
       active = false
     }
-  }, [selectedMonth])
+  }, [selectedMonth, reloadKey])
 
   const visibleMonth = useMemo(() => formatMonth(selectedMonth), [selectedMonth])
   const heatmapDays = useMemo(() => buildHeatmap(records, selectedMonth, apiHeatmapData), [apiHeatmapData, records, selectedMonth])
@@ -376,6 +379,7 @@ export default function AnalyticsPage() {
       })
       setRecords((current) => current.map((record) => (record.id === editingRecord.id ? nextRecord : record)))
       setEditingRecord(null)
+      setReloadKey((k) => k + 1)
     } finally {
       setSavingId(null)
     }
@@ -389,6 +393,7 @@ export default function AnalyticsPage() {
       await moodAPI.delete(String(record.id))
       setRecords((current) => current.filter((item) => item.id !== record.id))
       if (editingRecord?.id === record.id) setEditingRecord(null)
+      setReloadKey((k) => k + 1)
     } finally {
       setSavingId(null)
     }
@@ -458,7 +463,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="mt-5 min-h-[300px] min-w-0 overflow-hidden md:min-h-[256px]">
+          <div className="mt-5 h-[300px] min-w-0 overflow-hidden md:h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 16, right: 8, left: -12, bottom: 8 }}>
                 <defs>
