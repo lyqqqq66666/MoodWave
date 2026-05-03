@@ -341,81 +341,81 @@ export default function ProfilePage() {
           >
             <Settings className="h-4 w-4" />
           </button>
-          {showSettingsMenu ? (
-            <div className="fixed inset-x-0 bottom-0 z-[80] flex max-h-[86dvh] min-h-[360px] flex-col overflow-hidden rounded-t-[34px] border border-white/80 bg-white/96 p-4 shadow-[0_-18px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-12 md:max-h-[calc(100vh-7rem)] md:min-h-0 md:w-[340px] md:rounded-[28px] md:shadow-[0_20px_50px_rgba(255,181,194,0.24)]">
-              <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-[#f2d6de] md:hidden" />
-              <div className="mb-3 flex shrink-0 items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-[#7ed9cb]" />
-                  <p className="font-semibold text-slate-900">功能与设置</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsMenu(false)}
-                  className="rounded-full px-3 py-1 text-xs text-slate-400 transition hover:bg-[#fff4f7] hover:text-slate-700"
-                >
-                  收起
-                </button>
-              </div>
-              {settingsNotice ? (
-                <div className="mb-3 shrink-0 rounded-[18px] border border-[#d6f3ea] bg-[#effdfa] px-3 py-2 text-xs leading-5 text-slate-600">
-                  {settingsNotice}
-                </div>
-              ) : null}
-              <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+12px)] pr-1 md:max-h-[calc(100vh-14rem)]">
-                {settingItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => {
-                        if (item.action === "profile") {
-                          setShowEditProfile(true)
-                          setShowSettingsMenu(false)
-                          return
-                        }
-                        if (item.action === "export") {
-                          setShowExportDialog(true)
-                          setShowSettingsMenu(false)
-                          return
-                        }
-                        setSettingsNotice(`${item.label}即将上线，设置会逐步开放。`)
-                      }}
-                      className="flex min-h-[52px] items-center gap-3 rounded-[20px] bg-[#fffafb] p-3 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5 hover:bg-white"
-                    >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#fff4f7]">
-                        <Icon className="h-4 w-4 text-[#62bda9]" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-slate-800">{item.label}</span>
-                        <span className="mt-1 block text-xs text-slate-400">{item.helper}</span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-slate-300" />
-                    </button>
-                  )
-                })}
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="mt-1 flex min-h-[52px] items-center gap-3 rounded-[20px] border border-[#ffd8df] bg-[#fff7f8] p-3 text-left text-[#ef6f7f] transition hover:-translate-y-0.5 hover:bg-white md:hidden"
-                >
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white">
-                    <LogOut className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold">退出登录</span>
-                    <span className="mt-1 block text-xs text-[#e996a3]">回到登录页</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-[#ef9aaa]" />
-                </button>
-              </div>
-            </div>
-          ) : null}
         </div>
       }
     >
       <EditProfileDialog open={showEditProfile} onOpenChange={setShowEditProfile} />
+      {showSettingsMenu ? (
+        <div className="fixed inset-x-0 bottom-0 z-[80] flex max-h-[86dvh] min-h-[360px] flex-col overflow-hidden rounded-t-[34px] border border-white/80 bg-white/96 p-4 shadow-[0_-18px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl md:bottom-auto md:left-auto md:right-6 md:top-20 md:max-h-[calc(100vh-7rem)] md:min-h-0 md:w-[340px] md:rounded-[28px] md:shadow-[0_20px_50px_rgba(255,181,194,0.24)] lg:right-10">
+          <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-[#f2d6de] md:hidden" />
+          <div className="mb-3 flex shrink-0 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-[#7ed9cb]" />
+              <p className="font-semibold text-slate-900">功能与设置</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSettingsMenu(false)}
+              className="rounded-full px-3 py-1 text-xs text-slate-400 transition hover:bg-[#fff4f7] hover:text-slate-700"
+            >
+              收起
+            </button>
+          </div>
+          {settingsNotice ? (
+            <div className="mb-3 shrink-0 rounded-[18px] border border-[#d6f3ea] bg-[#effdfa] px-3 py-2 text-xs leading-5 text-slate-600">
+              {settingsNotice}
+            </div>
+          ) : null}
+          <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+12px)] pr-1 md:max-h-[calc(100vh-14rem)]">
+            {settingItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => {
+                    if (item.action === "profile") {
+                      setShowEditProfile(true)
+                      setShowSettingsMenu(false)
+                      return
+                    }
+                    if (item.action === "export") {
+                      setShowExportDialog(true)
+                      setShowSettingsMenu(false)
+                      return
+                    }
+                    setSettingsNotice(`${item.label}即将上线，设置会逐步开放。`)
+                  }}
+                  className="flex min-h-[52px] items-center gap-3 rounded-[20px] bg-[#fffafb] p-3 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5 hover:bg-white"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#fff4f7]">
+                    <Icon className="h-4 w-4 text-[#62bda9]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-slate-800">{item.label}</span>
+                    <span className="mt-1 block text-xs text-slate-400">{item.helper}</span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-1 flex min-h-[52px] items-center gap-3 rounded-[20px] border border-[#ffd8df] bg-[#fff7f8] p-3 text-left text-[#ef6f7f] transition hover:-translate-y-0.5 hover:bg-white md:hidden"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white">
+                <LogOut className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">退出登录</span>
+                <span className="mt-1 block text-xs text-[#e996a3]">回到登录页</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-[#ef9aaa]" />
+            </button>
+          </div>
+        </div>
+      ) : null}
       {showExportDialog ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/18 px-0 backdrop-blur-sm md:grid md:place-items-center md:px-4">
           <div className="max-h-[88vh] w-full overflow-y-auto rounded-t-[34px] bg-white/96 p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-[0_28px_90px_rgba(255,181,194,0.3)] ring-1 ring-white md:max-w-md md:rounded-[34px] md:p-6">
