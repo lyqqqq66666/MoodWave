@@ -28,52 +28,19 @@ type ApiMood = {
 }
 
 export const fallbackSummary: SummaryState = {
-  journalCount: 12,
-  musicCount: 8,
-  streakDays: 7,
-  monthCount: 12,
-  dominantMood: "happy",
-  favoriteTags: ["社交", "明亮", "自然音", "温柔", "治愈"],
+  journalCount: 0,
+  musicCount: 0,
+  streakDays: 0,
+  monthCount: 0,
+  dominantMood: "neutral",
+  favoriteTags: [],
 }
 
-export const fallbackRecords: MoodRecord[] = [
-  {
-    id: "story-1",
-    mood: "happy",
-    title: "和朋友散步",
-    note: "今天和朋友聊了很久，心情变得好多了。",
-    date: "4月29日",
-    tag: "社交",
-  },
-  {
-    id: "story-2",
-    mood: "calm",
-    title: "午后复盘",
-    note: "把任务拆成小块以后，压力没有那么满。",
-    date: "4月28日",
-    tag: "学习",
-  },
-  {
-    id: "story-3",
-    mood: "anxious",
-    title: "deadline 前夜",
-    note: "有点紧张，但我已经开始一点点推进。",
-    date: "4月27日",
-    tag: "工作",
-  },
-]
+export const fallbackRecords: MoodRecord[] = []
 
-export const energyMoments = [
-  { title: "连续记录", value: "7天", tone: "from-[#FFD166] to-[#FFB5C2]" },
-  { title: "最亮情绪", value: "开心", tone: "from-[#A8E6CF] to-[#90E0EF]" },
-  { title: "本周音乐", value: "8首", tone: "from-[#CBC3E3] to-[#FFB5C2]" },
-]
+export const energyMoments: Array<{ title: string; value: string; tone: string }> = []
 
-export const checklist = [
-  { text: "睡前写 3 句话", mood: "calm" as MoodType, done: true },
-  { text: "听一段专注音乐", mood: "happy" as MoodType, done: true },
-  { text: "把明天任务拆小", mood: "anxious" as MoodType, done: false },
-]
+export const checklist: Array<{ text: string; mood: MoodType; done: boolean }> = []
 
 export function unwrapData(payload: unknown) {
   const maybeWrapped = payload as { data?: unknown }

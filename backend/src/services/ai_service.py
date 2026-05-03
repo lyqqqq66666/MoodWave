@@ -396,6 +396,16 @@ def _fallback_analysis(mood_type: str, intensity: int) -> dict:
 def _get_dashscope_client() -> AsyncOpenAI:
     """获取阿里云百炼 DashScope 客户端（Qwen 模型）"""
     api_key = os.getenv("DASHSCOPE_API_KEY")
+    if not api_key:
+        # 手动读取 .env 兜底
+        import pathlib
+        env_path = pathlib.Path(__file__).resolve().parent.parent.parent / ".env"
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                if line.startswith("DASHSCOPE_API_KEY="):
+                    api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                    break
+    
     base_url = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
     if not api_key:
         raise ValueError("DASHSCOPE_API_KEY 未配置，请检查 backend/.env 文件")
@@ -516,12 +526,16 @@ async def transcribe_voice(audio_file_path: str) -> dict:
 
         content = response.choices[0].message.content
         annotations = getattr(response.choices[0].message, "annotations", [])
-        audio_info = annotations[0] if annotations else {}
+        audio_info = annotations[0] if annotations else None
+
+        # Pydantic 对象用 getattr，不是 .get()
+        lang = getattr(audio_info, "language", "zh") if audio_info else "zh"
+        emotion = getattr(audio_info, "emotion", "neutral") if audio_info else "neutral"
 
         return {
-            "text": content,
-            "language": audio_info.get("language", "zh"),
-            "emotion": audio_info.get("emotion", "neutral"),
+            "text": content or "",
+            "language": lang,
+            "emotion": emotion,
         }
 
     except Exception as e:

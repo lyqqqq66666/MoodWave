@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, Suspense } from "react"
 import { Eye, EyeOff, Lock, Mail, User } from "lucide-react"
 import { useAuthStore } from "@/store/auth"
+import { hasCompletedOnboarding } from "@/lib/onboarding"
 
 type Mode = "login" | "register"
 
@@ -55,7 +56,7 @@ function LoginForm() {
   // 已登录则跳走
   useEffect(() => {
     if (user) {
-      router.replace(redirectUrl)
+      router.replace(hasCompletedOnboarding() ? redirectUrl : "/onboarding")
     }
   }, [user, router, redirectUrl])
 
@@ -91,10 +92,10 @@ function LoginForm() {
     try {
       if (mode === "login") {
         await login(email, password)
-        router.push(redirectUrl)
+        // 跳转由 useEffect 监听 user 状态统一处理，避免双重重定向崩溃
       } else {
         await register(email, username, password)
-        router.push(redirectUrl)
+        // 跳转由 useEffect 监听 user 状态统一处理
       }
     } catch {
       // error 已由 store 持有，UI 靠 error 状态展示

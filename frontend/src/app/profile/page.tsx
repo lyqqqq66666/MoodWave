@@ -132,10 +132,7 @@ export default function ProfilePage() {
             setFavoriteMusic(normalizeFavoriteMusic(response.data))
           })
           .catch(() => {
-            setFavoriteMusic([
-              { id: "fav-1", title: "宁静的午后", artist: "MoodWave AI", mood_type: "calm", url: "", duration: 225 },
-              { id: "fav-2", title: "晴朗的午后", artist: "MoodWave AI", mood_type: "happy", url: "", duration: 214 },
-            ])
+            setFavoriteMusic([])
           })
       } catch {
         if (!active) return

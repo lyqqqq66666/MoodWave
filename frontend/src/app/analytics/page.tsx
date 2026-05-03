@@ -23,6 +23,7 @@ import { analyticsAPI, moodAPI } from "@/lib/api"
 import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import type { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { EmptyStateGuide } from "@/components/onboarding/empty-state-guide"
 import { cn } from "@/lib/utils"
 
 type TrendPoint = { day: string; date: string; intensity: number; mood: MoodType; moodLabel: string }
@@ -58,15 +59,6 @@ type MoodApiItem = {
   created_at?: string
   updated_at?: string
 }
-
-const fallbackInsight = "连续打卡 7 天，本月记录 12 篇，情绪以开心和平静为主。你正在慢慢形成稳定的自我观察节奏。"
-
-const fallbackRecords: MoodRecord[] = [
-  { id: 1001, mood: "happy", date: "2026-04-26", intensity: 8, tags: ["社交", "娱乐"], note: "和朋友散步，聊了很久，心情亮起来一点。" },
-  { id: 1002, mood: "calm", date: "2026-04-25", intensity: 6, tags: ["学习"], note: "把任务拆小以后，压力下降了。" },
-  { id: 1003, mood: "anxious", date: "2026-04-24", intensity: 7, tags: ["截止"], note: "有点紧张，但已经开始推进。" },
-  { id: 1004, mood: "happy", date: "2026-04-22", intensity: 7, tags: ["反馈"], note: "努力被看见的时候很开心。" },
-]
 
 function normalize(payload: unknown) {
   const wrapped = payload as { data?: unknown }
@@ -215,11 +207,12 @@ export default function AnalyticsPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date(2026, 3, 1))
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [selectedShareMood, setSelectedShareMood] = useState<MoodType | null>(null)
-  const [aiInsight, setAiInsight] = useState(fallbackInsight)
+  const [aiInsight, setAiInsight] = useState("")
   const [trendData, setTrendData] = useState<TrendPoint[]>([])
   const [shareData, setShareData] = useState<MoodShare[]>([])
   const [apiHeatmapData, setApiHeatmapData] = useState<HeatCell[]>([])
-  const [records, setRecords] = useState<MoodRecord[]>(fallbackRecords)
+  const [records, setRecords] = useState<MoodRecord[]>([])
+  const [hasRealData, setHasRealData] = useState(false)
   const [editingRecord, setEditingRecord] = useState<MoodRecord | null>(null)
   const [editMood, setEditMood] = useState<MoodType>("calm")
   const [editDate, setEditDate] = useState("")
@@ -250,6 +243,12 @@ export default function AnalyticsPage() {
         }
         const moodPayload = normalize(moodResponse.data)
         const loadedRecords = Array.isArray(moodPayload) ? (moodPayload as MoodApiItem[]).map(mapMoodRecord) : []
+        const hasApiAnalytics =
+          loadedRecords.length > 0 ||
+          Boolean(weekly.weekly_trend?.length) ||
+          Boolean(summary.mood_distribution?.length) ||
+          Boolean(summary.heatmap_data?.some((item) => item.intensity > 0))
+        setHasRealData(hasApiAnalytics)
 
         if (loadedRecords.length > 0) {
           setRecords(loadedRecords)
@@ -269,8 +268,8 @@ export default function AnalyticsPage() {
             }),
           )
         } else {
-          setTrendData(buildTrendFromRecords(fallbackRecords, selectedMonth))
-          setShareData(buildShareFromRecords(fallbackRecords, selectedMonth))
+          setTrendData([])
+          setShareData([])
         }
 
         if (loadedRecords.length === 0 && Array.isArray(summary.mood_distribution) && summary.mood_distribution.length > 0) {
@@ -302,13 +301,14 @@ export default function AnalyticsPage() {
             })),
           )
         }
-        setAiInsight(summary.insight || summary.suggestion || fallbackInsight)
+        setAiInsight(summary.insight || summary.suggestion || "")
       } catch {
         if (!active) return
-        setRecords(fallbackRecords)
-        setTrendData(buildTrendFromRecords(fallbackRecords, selectedMonth))
-        setShareData(buildShareFromRecords(fallbackRecords, selectedMonth))
-        setAiInsight(fallbackInsight)
+        setHasRealData(false)
+        setRecords([])
+        setTrendData([])
+        setShareData([])
+        setAiInsight("")
       }
     }
 
@@ -440,6 +440,7 @@ export default function AnalyticsPage() {
       }
     >
       <div className="mx-auto grid w-full max-w-6xl min-w-0 gap-5 overflow-hidden">
+        {!hasRealData ? <EmptyStateGuide variant="analytics" /> : null}
         <section className="min-w-0 overflow-hidden rounded-[34px] bg-white/82 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-7">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">

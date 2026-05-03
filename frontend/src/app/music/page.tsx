@@ -20,11 +20,12 @@ import {
   Volume2,
   Waves,
 } from "lucide-react"
-import { aiAPI, musicAPI } from "@/lib/api"
+import { aiAPI, moodAPI, musicAPI } from "@/lib/api"
 import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import type { MoodType, MusicRecommendation } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { CompanionAvatar } from "@/components/companion-avatar"
+import { EmptyStateGuide } from "@/components/onboarding/empty-state-guide"
 import { useAuthStore } from "@/store/auth"
 import { cn } from "@/lib/utils"
 
@@ -180,7 +181,7 @@ function normalizeRecommendations(payload: unknown, mood: MoodType): MusicRecomm
   const source = Array.isArray(payload) ? payload : Array.isArray(maybeWrapped?.data) ? maybeWrapped.data : []
 
   if (!Array.isArray(source) || source.length === 0) {
-    return fallbackRecommendations[mood]
+    return []
   }
 
   return source.slice(0, 5).map((item, index) => {
@@ -267,7 +268,7 @@ function MusicPageContent() {
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [recommendations, setRecommendations] = useState<MusicRecommendation[]>(fallbackRecommendations[mood])
+  const [recommendations, setRecommendations] = useState<MusicRecommendation[]>([])
   const [selectedTrack, setSelectedTrack] = useState(0)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [liked, setLiked] = useState(false)
@@ -281,10 +282,11 @@ function MusicPageContent() {
   const [musicToast, setMusicToast] = useState("")
   const [currentBpm, setCurrentBpm] = useState(baseBpm)
   const [isBpmPanelOpen, setIsBpmPanelOpen] = useState(false)
+  const [hasMoodRecord, setHasMoodRecord] = useState(true)
   // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
   const insightRef = useRef(profile.insight)
 
-  const selectedRecommendation = recommendations[selectedTrack] ?? fallbackRecommendations[mood][0]
+  const selectedRecommendation = recommendations[selectedTrack] ?? { id: "empty", title: "", artist: "", mood_type: mood, url: "", duration: 200 }
   const progress = useMemo(
     () => Math.min(100, (elapsedTime / Math.max(1, selectedRecommendation.duration)) * 100),
     [elapsedTime, selectedRecommendation.duration],
@@ -425,7 +427,7 @@ function MusicPageContent() {
   }, [baseBpm])
 
   useEffect(() => {
-    setRecommendations(fallbackRecommendations[mood])
+    setRecommendations([])
     setSelectedTrack(0)
     setLiked(false)
     setElapsedTime(0)
@@ -438,7 +440,7 @@ function MusicPageContent() {
       if (recommendResult.status === "fulfilled") {
         setRecommendations(normalizeRecommendations(recommendResult.value.data, mood))
       } else {
-        setRecommendations(fallbackRecommendations[mood])
+        setRecommendations([])
       }
 
       if (favoritesResult.status === "fulfilled") {
@@ -452,6 +454,23 @@ function MusicPageContent() {
       active = false
     }
   }, [mood])
+
+  useEffect(() => {
+    let active = true
+    moodAPI.list({ limit: 1 })
+      .then((response) => {
+        if (!active) return
+        const payload = response.data as { data?: unknown }
+        const rows = Array.isArray(response.data) ? response.data : Array.isArray(payload?.data) ? payload.data : []
+        setHasMoodRecord(rows.length > 0)
+      })
+      .catch(() => {
+        if (active) setHasMoodRecord(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     setLiked(favoriteIds.has(selectedRecommendation.id))
@@ -585,6 +604,7 @@ function MusicPageContent() {
   }, [stopMusic])
 
   function togglePlay() {
+    if (recommendations.length === 0) return
     if (isPlaying) {
       stopMusic()
       return
@@ -788,6 +808,7 @@ function MusicPageContent() {
       }
     >
       <div className="mx-auto max-w-7xl">
+        {!hasMoodRecord ? <EmptyStateGuide variant="music" className="mb-5" /> : null}
         <section className="relative isolate overflow-hidden rounded-[34px] bg-white/86 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 sm:p-5 lg:p-6">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-[#fff3f6] px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm">

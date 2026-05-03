@@ -1,0 +1,34 @@
+{
+  "version": "2.0",
+  "envId": "moodwave-d1goq3vwib5df0121",
+  "region": "ap-shanghai",
+  "framework": {
+    "name": "moodwave-backend",
+    "plugins": {
+      "container": {
+        "use": "@cloudbase/framework-plugin-container",
+        "inputs": {
+          "serviceName": "moodwave-backend",
+          "servicePath": ".",
+          "containerPort": 8000,
+          "dockerfile": "Dockerfile.cloudrun",
+          "cpu": 0.5,
+          "mem": 1,
+          "minNum": 1,
+          "maxNum": 3,
+          "envParams": {
+            "DEEPSEEK_API_KEY": "sk-ba819c097197479b9e4290e558b9cbfb",
+            "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+            "DEEPSEEK_MODEL": "deepseek-v4-pro",
+            "DASHSCOPE_API_KEY": "sk-53b5c18dfb554a6eb4533badc2efd6d0",
+            "DASHSCOPE_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "QWEN_VL_MODEL": "qwen3-vl-plus",
+            "QWEN_ASR_MODEL": "qwen3-asr-flash-2026-02-10",
+            "APP_ENV": "production",
+            "APP_SECRET_KEY": "moodwave-cloudrun-prod-2026"
+          }
+        }
+      }
+    }
+  }
+}

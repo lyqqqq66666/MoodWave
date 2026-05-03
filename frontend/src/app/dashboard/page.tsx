@@ -9,6 +9,7 @@ import { buildDailyMessage, dashboardFeatureCards, getGreetingForHour, getMoodOp
 import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { CompanionAvatar } from "@/components/companion-avatar"
+import { DashboardTooltip } from "@/components/onboarding/dashboard-tooltip"
 import { useAuthStore } from "@/store/auth"
 
 type SSEMessage = {
@@ -23,21 +24,6 @@ type RecentMood = {
   created_at: string
 }
 
-const fallbackHistory: RecentMood[] = [
-  {
-    id: "local-1",
-    mood_type: "calm",
-    note: "下午终于把任务拆开了，心里轻了一点。",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "local-2",
-    mood_type: "anxious",
-    note: "想到 deadline 还是会慌，但至少开始行动了。",
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-  },
-]
-
 function unwrapData(payload: unknown) {
   const wrapped = payload as { data?: unknown }
   return wrapped?.data ?? payload
@@ -46,7 +32,7 @@ function unwrapData(payload: unknown) {
 export default function DashboardPage() {
   const { user, token } = useAuthStore()
   const [currentMoodIndex, setCurrentMoodIndex] = useState(1)
-  const [recentMoods, setRecentMoods] = useState<RecentMood[]>(fallbackHistory)
+  const [recentMoods, setRecentMoods] = useState<RecentMood[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [dailyMessage, setDailyMessage] = useState("")
   const [isDailyMessageLoading, setIsDailyMessageLoading] = useState(false)
@@ -80,7 +66,7 @@ export default function DashboardPage() {
         }
       } catch {
         if (!active) return
-        setRecentMoods(fallbackHistory)
+        setRecentMoods([])
       } finally {
         if (active) setIsLoading(false)
       }
@@ -165,6 +151,7 @@ export default function DashboardPage() {
       title={greeting.greeting}
       rightSlot={null}
     >
+      <DashboardTooltip />
       <div className="mx-auto grid max-w-6xl gap-6">
         <section className="rounded-[36px] bg-white/80 p-6 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/70 md:p-8">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
@@ -251,7 +238,16 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="mt-5 space-y-3">
-              {(isLoading ? fallbackHistory : recentMoods).map((entry) => {
+              {isLoading ? (
+                <div className="rounded-[24px] bg-white/90 p-8 text-center text-sm text-slate-400">加载中...</div>
+              ) : recentMoods.length === 0 ? (
+                <Link href="/mood" className="block rounded-[24px] border border-dashed border-[#f9e5ea] bg-white/80 p-8 text-center transition hover:bg-white">
+                  <p className="text-3xl">📝</p>
+                  <p className="mt-3 text-sm font-medium text-slate-600">还没有情绪记录</p>
+                  <p className="mt-1 text-xs text-slate-400">记录你的第一条心情，开始情绪觉察之旅</p>
+                </Link>
+              ) : (
+                recentMoods.map((entry) => {
                 const option = getMoodOption(entry.mood_type)
                 return (
                   <article
@@ -275,7 +271,8 @@ export default function DashboardPage() {
                     </div>
                   </article>
                 )
-              })}
+              })
+            )}
             </div>
           </div>
 

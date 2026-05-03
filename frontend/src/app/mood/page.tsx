@@ -10,7 +10,7 @@ import { MoodWaveShell } from "@/components/moodwave-shell"
 import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mood-analysis-report"
 import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
-import { cn } from "@/lib/utils"
+import { cn, convertBlobToWav } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
 
 const steps = ["情绪", "强度", "内容", "标签", "完成"]
@@ -115,7 +115,9 @@ export default function MoodPage() {
     setShowVoiceText(false)
 
     try {
-      const voiceResponse = await uploadAPI.voice(file)
+      // 浏览器录音默认 webm/opus，Qwen ASR 稳定支持 WAV，先转换
+      const wavFile = file.type.includes("wav") ? file : new File([await convertBlobToWav(file)], file.name.replace(/\.[^.]+$/, ".wav"), { type: "audio/wav" })
+      const voiceResponse = await uploadAPI.voice(wavFile)
       if (voiceUploadTokenRef.current !== uploadToken) return
       const payload = voiceResponse.data?.data ?? voiceResponse.data
       setVoiceUploadUrl(payload?.url || payload?.voice_url || "")

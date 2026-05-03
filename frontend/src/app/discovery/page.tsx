@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { HeartHandshake, PenLine, Send, SmilePlus, Sparkles } from "lucide-react"
 import { postsAPI } from "@/lib/api"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { EmptyStateGuide } from "@/components/onboarding/empty-state-guide"
 import { cn } from "@/lib/utils"
 
 type Category = "all" | "study" | "emotion" | "vent"
@@ -35,75 +36,6 @@ const categories: Array<{ key: Category; label: string }> = [
   { key: "study", label: "学习" },
   { key: "emotion", label: "情感" },
   { key: "vent", label: "树洞" },
-]
-
-const seedPosts: Post[] = [
-  {
-    id: "p1",
-    category: "study",
-    emoji: "😊",
-    author: "匿名用户",
-    time: "5分钟前",
-    content: "今天和朋友聊了很久，心情变得好多了～",
-    hugs: 12,
-    comments: 5,
-    tone: "from-[#fff7d9] to-[#fff0f5]",
-  },
-  {
-    id: "p2",
-    category: "vent",
-    emoji: "😢",
-    author: "匿名用户",
-    time: "30分钟前",
-    content: "最近有点焦虑，希望一切都会慢慢变好。",
-    hugs: 8,
-    comments: 3,
-    tone: "from-[#eaf8ff] to-[#f8f0ff]",
-  },
-  {
-    id: "p3",
-    category: "emotion",
-    emoji: "😌",
-    author: "匿名用户",
-    time: "1小时前",
-    content: "在努力生活的路上，给自己一个拥抱。",
-    hugs: 15,
-    comments: 7,
-    tone: "from-[#effbea] to-[#fff8e8]",
-  },
-  {
-    id: "p4",
-    category: "emotion",
-    emoji: "🥰",
-    author: "匿名用户",
-    time: "2小时前",
-    content: "听着音乐，整理心情，突然觉得明天也会是一个温柔的人。",
-    hugs: 11,
-    comments: 4,
-    tone: "from-[#fff0f5] to-[#eefbf8]",
-  },
-  {
-    id: "p5",
-    category: "study",
-    emoji: "😟",
-    author: "匿名用户",
-    time: "3小时前",
-    content: "考试周真的很紧绷，但我今天终于把第一章复习完了。",
-    hugs: 18,
-    comments: 9,
-    tone: "from-[#eef6ff] to-[#fff7db]",
-  },
-  {
-    id: "p6",
-    category: "vent",
-    emoji: "🙂",
-    author: "匿名用户",
-    time: "4小时前",
-    content: "普通的一天也被认真记录了，感觉自己没有白白度过。",
-    hugs: 7,
-    comments: 2,
-    tone: "from-[#f8f4dc] to-[#edf7f3]",
-  },
 ]
 
 const moodEmojiMap: Record<string, string> = {
@@ -156,7 +88,7 @@ function mapApiPost(post: ApiPost, index: number): Post {
 
 export default function DiscoveryPage() {
   const [activeCategory, setActiveCategory] = useState<Category>("all")
-  const [posts, setPosts] = useState(seedPosts)
+  const [posts, setPosts] = useState<Post[]>([])
   const [composerText, setComposerText] = useState("")
   const [isApiConnected, setIsApiConnected] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
@@ -174,7 +106,7 @@ export default function DiscoveryPage() {
         setIsApiConnected(true)
       }
     } catch {
-      setPosts(category === "all" ? seedPosts : seedPosts.filter((post) => post.category === category))
+      setPosts([])
       setIsApiConnected(false)
     }
   }, [])
@@ -347,6 +279,9 @@ export default function DiscoveryPage() {
             </span>
           </div>
 
+          {visiblePosts.length === 0 ? (
+            <EmptyStateGuide variant="discovery" />
+          ) : (
           <div className="columns-1 gap-5 md:columns-2 xl:columns-3">
             {visiblePosts.map((post, index) => (
               <article
@@ -390,6 +325,7 @@ export default function DiscoveryPage() {
               </article>
             ))}
           </div>
+          )}
         </section>
       </div>
     </MoodWaveShell>

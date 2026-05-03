@@ -13,10 +13,12 @@ from typing import Optional, List
 
 from src.core.models import (
     MoodEntry,
+    User,
     WeeklyAnalyticsResponse,
     MoodSummaryResponse,
 )
 from src.db.database import get_session
+from src.api.auth import get_current_user
 from src.services.ai_service import analyze_mood_with_ai
 from pydantic import BaseModel
 from typing import List
@@ -108,6 +110,7 @@ def calculate_mood_score(mood_type: str, intensity: int) -> float:
 @router.get("/analytics/weekly")
 async def get_weekly_analytics(
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     month: Optional[str] = Query(None, description="筛选月份，格式 YYYY-MM"),
 ):
     """
@@ -124,7 +127,7 @@ async def get_weekly_analytics(
         }
     """
     seven_days_ago = (datetime.utcnow() - timedelta(days=7)).date()
-    statement = select(MoodEntry)
+    statement = select(MoodEntry).where(MoodEntry.user_id == current_user.id)
 
     # 月份筛选
     if month:
@@ -211,6 +214,7 @@ async def get_weekly_analytics(
 @router.get("/analytics/summary")
 async def get_mood_summary(
     session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     month: Optional[str] = Query(None, description="筛选月份，格式 YYYY-MM"),
 ):
     """
@@ -235,7 +239,7 @@ async def get_mood_summary(
     """
     from collections import defaultdict
 
-    statement = select(MoodEntry)
+    statement = select(MoodEntry).where(MoodEntry.user_id == current_user.id)
 
     # 月份筛选
     if month:

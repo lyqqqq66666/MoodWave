@@ -4,6 +4,11 @@ MoodWave Backend - FastAPI 应用入口
 这是 MoodWave 应用的后端服务，提供情绪日记、数据分析和音乐推荐的 API。
 """
 
+from dotenv import load_dotenv
+import os as _os
+_env_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", ".env")
+load_dotenv(_env_path)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
