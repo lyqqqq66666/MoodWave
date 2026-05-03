@@ -7,8 +7,10 @@ import {
   Heart,
   Loader2,
   MessageCircleHeart,
+  Minus,
   Pause,
   Play,
+  Plus,
   RefreshCw,
   Share2,
   Shuffle,
@@ -160,6 +162,9 @@ const fallbackRecommendations: Record<MoodType, MusicRecommendation[]> = {
   ],
 }
 
+const BPM_MIN = 40
+const BPM_MAX = 180
+
 function parseMood(value: string | null): MoodType {
   return moodOptions.some((item) => item.value === value) ? (value as MoodType) : "calm"
 }
@@ -245,6 +250,7 @@ function MusicPageContent() {
   const intensity = parseIntensity(searchParams.get("intensity"))
   const moodMeta = getMoodOption(mood)
   const profile = moodProfiles[mood]
+  const baseBpm = useMemo(() => Math.min(BPM_MAX, Math.max(BPM_MIN, profile.bpm + intensity * 2)), [intensity, profile.bpm])
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const particlesRef = useRef<Particle[]>([])
@@ -273,6 +279,8 @@ function MusicPageContent() {
   const [isSeeking, setIsSeeking] = useState(false)
   const [seekPreview, setSeekPreview] = useState<number | null>(null)
   const [musicToast, setMusicToast] = useState("")
+  const [currentBpm, setCurrentBpm] = useState(baseBpm)
+  const [isBpmPanelOpen, setIsBpmPanelOpen] = useState(false)
   // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
   const insightRef = useRef(profile.insight)
 
@@ -364,7 +372,7 @@ function MusicPageContent() {
       await Tone.start()
       stopMusic()
 
-      Tone.Transport.bpm.value = profile.bpm + intensity * 2
+      Tone.Transport.bpm.value = currentBpm
       reverbRef.current = new Tone.Reverb({ decay: 4.5, wet: 0.42 }).toDestination()
       filterRef.current = new Tone.Filter(420 + intensity * 70, "lowpass").connect(reverbRef.current)
       synthRef.current = new Tone.PolySynth(Tone.Synth, {
@@ -410,7 +418,11 @@ function MusicPageContent() {
     } finally {
       setIsLoading(false)
     }
-  }, [intensity, mood, profile, stopMusic])
+  }, [currentBpm, intensity, mood, profile, stopMusic])
+
+  useEffect(() => {
+    setCurrentBpm(baseBpm)
+  }, [baseBpm])
 
   useEffect(() => {
     setRecommendations(fallbackRecommendations[mood])
@@ -603,6 +615,24 @@ function MusicPageContent() {
     setElapsedTime(0)
   }
 
+  function updateBpm(value: number) {
+    const nextBpm = Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(value)))
+    setCurrentBpm(nextBpm)
+
+    const Tone = toneRef.current
+    if (Tone?.Transport) {
+      const bpmSignal = Tone.Transport.bpm as unknown as {
+        rampTo?: (value: number, rampTime: number) => void
+        value: number
+      }
+      if (bpmSignal.rampTo) {
+        bpmSignal.rampTo(nextBpm, 0.1)
+      } else {
+        bpmSignal.value = nextBpm
+      }
+    }
+  }
+
   const seekTo = useCallback((percent: number) => {
     const safePercent = Math.min(1, Math.max(0, percent))
     const targetTime = Math.round(selectedRecommendation.duration * safePercent)
@@ -687,6 +717,66 @@ function MusicPageContent() {
     window.setTimeout(() => setMusicToast(""), 2500)
   }
 
+  function BpmControl({ className = "" }: { className?: string }) {
+    return (
+      <div className={cn("relative", className)}>
+        <button
+          type="button"
+          onClick={() => setIsBpmPanelOpen((value) => !value)}
+          className="flex min-h-10 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:text-[#ff7894]"
+          aria-expanded={isBpmPanelOpen}
+          aria-label="调节 BPM"
+        >
+          <Volume2 className="h-4 w-4 text-[#8bded4]" />
+          <span>{currentBpm} BPM</span>
+        </button>
+        {isBpmPanelOpen ? (
+          <div className="absolute right-0 top-12 z-40 w-[min(280px,calc(100vw-2rem))] rounded-[26px] border border-white/80 bg-white/96 p-4 shadow-[0_18px_48px_rgba(255,181,194,0.24)] backdrop-blur-xl">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">节奏速度</p>
+              <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-[#ff7894]">{currentBpm}</span>
+            </div>
+            <input
+              type="range"
+              min={BPM_MIN}
+              max={BPM_MAX}
+              step={1}
+              value={currentBpm}
+              onChange={(event) => updateBpm(Number(event.target.value))}
+              className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5]"
+              style={{ accentColor: "#ff8fa3" }}
+              aria-label="BPM 滑块"
+            />
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+              <span>{BPM_MIN}</span>
+              <span>{BPM_MAX}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => updateBpm(currentBpm - 1)}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#fff4f7] text-sm font-semibold text-slate-600 transition hover:text-[#ff7894]"
+                aria-label="降低 BPM"
+              >
+                <Minus className="h-4 w-4" />
+                1
+              </button>
+              <button
+                type="button"
+                onClick={() => updateBpm(currentBpm + 1)}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#effdfa] text-sm font-semibold text-slate-600 transition hover:text-[#42b9aa]"
+                aria-label="提高 BPM"
+              >
+                <Plus className="h-4 w-4" />
+                1
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <MoodWaveShell
       title="治愈音乐"
@@ -722,10 +812,7 @@ function MusicPageContent() {
                   <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
                   <p className="mt-2 text-sm text-slate-500">{profile.texture}</p>
                 </div>
-                <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm text-slate-500 shadow-sm">
-                  <Volume2 className="h-4 w-4 text-[#8bded4]" />
-                  {profile.bpm + intensity * 2} BPM
-                </div>
+                <BpmControl />
               </div>
 
               <div className="relative z-0 aspect-[1.02/1] max-w-full overflow-hidden rounded-[30px] border border-white/80 bg-white sm:aspect-[16/11] lg:min-h-[420px]">
@@ -761,6 +848,7 @@ function MusicPageContent() {
                     <p className="mt-1 truncate text-sm text-slate-500">{selectedRecommendation.artist}</p>
                   </div>
                 </div>
+                <BpmControl className="mt-4 md:hidden" />
 
                 <div className="mt-7">
                   <div
