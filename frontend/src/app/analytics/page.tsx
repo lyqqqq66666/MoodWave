@@ -439,14 +439,14 @@ export default function AnalyticsPage() {
         </div>
       }
     >
-      <div className="mx-auto grid max-w-6xl gap-5">
-        <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-7">
+      <div className="mx-auto grid w-full max-w-6xl min-w-0 gap-5 overflow-hidden">
+        <section className="min-w-0 overflow-hidden rounded-[34px] bg-white/82 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-7">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl font-semibold text-slate-800">月度情绪概览</h2>
               <p className="mt-1 text-sm text-slate-500">30 天趋势和月度分布合并在这里，先看整体，再筛记录。</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button type="button" onClick={() => moveMonth(-1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm" aria-label="上个月">
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -457,7 +457,7 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="mt-5 min-h-[300px] md:min-h-[256px]">
+          <div className="mt-5 min-h-[300px] min-w-0 overflow-hidden md:min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 16, right: 8, left: -12, bottom: 8 }}>
                 <defs>
@@ -481,12 +481,12 @@ export default function AnalyticsPage() {
                 type="button"
                 onClick={() => setSelectedShareMood((current) => (current === item.mood ? null : item.mood))}
                 className={cn(
-                  "rounded-[22px] bg-[#fffafb] p-4 text-left ring-1 ring-[#f6e4e9] transition hover:-translate-y-0.5",
+                  "min-w-0 rounded-[22px] bg-[#fffafb] p-4 text-left ring-1 ring-[#f6e4e9] transition hover:-translate-y-0.5",
                   selectedShareMood === item.mood && "ring-2 ring-[#ff9caf]",
                 )}
               >
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-700">{getMoodOption(item.mood).emoji} {item.label}</span>
+                <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate font-semibold text-slate-700">{getMoodOption(item.mood).emoji} {item.label}</span>
                   <span className="text-slate-400">{item.value}%</span>
                 </div>
                 <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#f5edf0]">
@@ -500,13 +500,13 @@ export default function AnalyticsPage() {
           </div>
         </section>
 
-        <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-7">
+        <section className="min-w-0 overflow-hidden rounded-[34px] bg-white/82 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-7">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl font-semibold text-slate-800">年度热力日历</h2>
               <p className="mt-1 text-sm text-slate-500">颜色深度代表情绪强度。</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <button type="button" onClick={() => moveMonth(-1)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm" aria-label="上个月">
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -517,18 +517,18 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="mt-6 overflow-x-auto pb-2">
-            <div className="min-w-[560px]">
-              <div className="grid grid-cols-7 gap-2 text-center text-xs font-medium text-slate-400">
+          <div className="mt-6 max-w-full overflow-hidden pb-2">
+            <div className="w-full">
+              <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-medium text-slate-400 sm:gap-2 sm:text-xs">
                 {["周一", "周二", "周三", "周四", "周五", "周六", "周日"].map((day) => (
                   <span key={day} className={cn((day === "周六" || day === "周日") && "text-[#ff7894]")}>{day}</span>
                 ))}
               </div>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid gap-1.5 sm:gap-2">
                 {heatmapWeeks.map((week, weekIndex) => (
-                  <div key={weekIndex} className="grid grid-cols-7 gap-2">
+                  <div key={weekIndex} className="grid grid-cols-7 gap-1.5 sm:gap-2">
                     {week.map((cell, dayIndex) => {
-                      if (!cell) return <div key={`${weekIndex}-${dayIndex}`} className="h-16 rounded-[16px] bg-transparent" />
+                      if (!cell) return <div key={`${weekIndex}-${dayIndex}`} className="aspect-square rounded-[14px] bg-transparent sm:rounded-[16px]" />
                       const mood = getMoodOption(cell.mood)
                       const alpha = cell.hasRecord ? 0.22 + cell.intensity * 0.07 : 0.12
                       const detail = cell.hasRecord
@@ -543,13 +543,13 @@ export default function AnalyticsPage() {
                           onMouseEnter={() => setActiveDay(cell.day)}
                           onFocus={() => setActiveDay(cell.day)}
                           className={cn(
-                            "group relative h-16 rounded-[16px] p-2 text-left text-xs text-slate-700 ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-[#ffb5c2]",
+                            "group relative aspect-square min-w-0 rounded-[14px] p-1.5 text-left text-[11px] text-slate-700 ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:ring-2 hover:ring-[#ffb5c2] sm:rounded-[16px] sm:p-2 sm:text-xs",
                             activeDay === cell.day && "ring-2 ring-[#ff8fa3]",
                           )}
                           style={{ backgroundColor: cell.hasRecord ? withAlpha(mood.accent, alpha) : "#f7f1f4" }}
                         >
                           <span className="font-semibold">{cell.day}</span>
-                          {cell.hasRecord ? <span className="absolute bottom-2 right-2 text-lg">{mood.emoji}</span> : null}
+                          {cell.hasRecord ? <span className="absolute bottom-1 right-1 text-sm sm:bottom-2 sm:right-2 sm:text-lg">{mood.emoji}</span> : null}
                         </button>
                       )
                     })}
@@ -560,17 +560,17 @@ export default function AnalyticsPage() {
           </div>
 
           {activeCell ? (
-            <div className="mt-5 rounded-[28px] bg-gradient-to-br from-[#fff8f1] to-[#fff1f5] p-5 shadow-inner">
+            <div className="mt-5 min-w-0 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#fff8f1] to-[#fff1f5] p-4 shadow-inner md:p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-700">{formatReadableDate(activeCell.date)}</p>
-                  <p className="mt-2 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                    <span className="text-3xl">{getMoodOption(activeCell.mood).emoji}</span>
-                    {activeCell.hasRecord ? `${getMoodOption(activeCell.mood).label} · 强度 ${activeCell.intensity}/10` : "暂无记录"}
+                  <p className="mt-2 flex min-w-0 items-center gap-2 text-base font-semibold text-slate-800 md:text-lg">
+                    <span className="shrink-0 text-3xl">{getMoodOption(activeCell.mood).emoji}</span>
+                    <span className="min-w-0 break-words">{activeCell.hasRecord ? `${getMoodOption(activeCell.mood).label} · 强度 ${activeCell.intensity}/10` : "暂无记录"}</span>
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">{activeCell.note || "这一天还没有写下心情，可以从情绪录入页补一条。"}</p>
+                  <p className="mt-2 break-words text-sm leading-6 text-slate-500">{activeCell.note || "这一天还没有写下心情，可以从情绪录入页补一条。"}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   {(activeCell.tags || []).map((tag) => (
                     <span key={tag} className="rounded-full bg-white/80 px-3 py-1 text-xs text-[#ff6f8c]">{tag}</span>
                   ))}
@@ -580,21 +580,21 @@ export default function AnalyticsPage() {
           ) : null}
         </section>
 
-        <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6">
-            <div className="flex items-center justify-between gap-3">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+          <section className="min-w-0 overflow-hidden rounded-[34px] bg-white/82 p-4 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6">
+            <div className="flex min-w-0 items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-slate-800">AI 月度洞察</h2>
               <Sparkles className="h-5 w-5 text-[#ff8fa3]" />
             </div>
-            <div className="mt-4 rounded-[24px] bg-gradient-to-r from-[#fff5d8] via-[#fff0f5] to-[#effdfa] p-4 text-sm leading-7 text-slate-600">
+            <div className="mt-4 min-w-0 overflow-hidden break-words rounded-[24px] bg-gradient-to-r from-[#fff5d8] via-[#fff0f5] to-[#effdfa] p-4 text-sm leading-7 text-slate-600">
               <Sparkles className="mr-2 inline h-4 w-4 text-[#ff8fa3]" />
               {aiInsight}
             </div>
           </section>
 
-          <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6">
+          <section className="min-w-0 overflow-hidden rounded-[34px] bg-white/82 p-4 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-lg font-semibold text-slate-800">全部记录</h2>
                 <p className="mt-1 text-sm text-slate-500">
                   {selectedShareMood ? `正在查看「${getMoodOption(selectedShareMood).label}」记录` : "支持编辑和删除任意一天的记录"}
@@ -608,16 +608,16 @@ export default function AnalyticsPage() {
               ) : null}
             </div>
 
-            <div className="mt-4 max-h-[430px] space-y-3 overflow-y-auto pr-1">
+            <div className="mt-4 max-h-[430px] min-w-0 space-y-3 overflow-y-auto overflow-x-hidden pr-1">
               {monthRecords.length > 0 ? monthRecords.map((record) => {
                 const mood = getMoodOption(record.mood)
                 return (
-                  <article key={record.id} className="rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f6e4e9]">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                  <article key={record.id} className="min-w-0 overflow-hidden rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f6e4e9]">
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
                           <span className="text-xl">{mood.emoji}</span>
-                          <h3 className="truncate font-semibold text-slate-800">{recordTitle(record)}</h3>
+                          <h3 className="min-w-0 max-w-full break-words font-semibold text-slate-800 sm:truncate">{recordTitle(record)}</h3>
                           <span className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-500">{formatReadableDate(record.date)}</span>
                           <span className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-500">强度 {record.intensity}/10</span>
                         </div>
@@ -628,7 +628,7 @@ export default function AnalyticsPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="flex shrink-0 gap-2">
+                      <div className="flex shrink-0 gap-2 sm:justify-end">
                         <button type="button" onClick={() => startEdit(record)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm transition hover:text-[#ff7f96]" aria-label="编辑记录">
                           <Edit3 className="h-4 w-4" />
                         </button>
