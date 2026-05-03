@@ -208,6 +208,8 @@ function TrendTooltip({ active, payload }: { active?: boolean; payload?: Array<{
   )
 }
 
+const intensityTicks = [0, 2, 4, 6, 8, 10]
+
 export default function AnalyticsPage() {
   const [activeDay, setActiveDay] = useState(() => new Date().getDate())
   const [selectedMonth, setSelectedMonth] = useState(() => new Date(2026, 3, 1))
@@ -455,17 +457,17 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="mt-5 h-56 md:h-64">
+          <div className="mt-5 min-h-[300px] md:min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendData} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+              <AreaChart data={trendData} margin={{ top: 16, right: 8, left: -12, bottom: 8 }}>
                 <defs>
                   <linearGradient id="intensityLine" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#ff7f96" stopOpacity={0.32} />
                     <stop offset="95%" stopColor="#ff7f96" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#94a3b8" }} />
-                <YAxis domain={[0, 10]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#94a3b8" }} width={28} />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={10} tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                <YAxis domain={[0, 10]} ticks={intensityTicks} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94a3b8" }} width={34} />
                 <Tooltip content={<TrendTooltip />} />
                 <Area type="monotone" dataKey="intensity" name="情绪强度" stroke="#ff7f96" fill="url(#intensityLine)" strokeWidth={3} dot={{ r: 3, fill: "#ff7f96", strokeWidth: 0 }} activeDot={{ r: 5, fill: "#ff7f96" }} />
               </AreaChart>
