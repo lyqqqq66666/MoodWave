@@ -78,13 +78,6 @@ export function OnboardingStep5({ onComplete }: OnboardingStep5Props) {
           <p className="mt-1 text-sm text-slate-500">把还没说完的话慢慢交给它。</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onComplete}
-        className="mt-7 flex min-h-14 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffc2cf] to-[#8de1d5] px-8 font-semibold text-white shadow-[0_18px_38px_rgba(255,151,173,0.32)]"
-      >
-        进入 MoodWave
-      </button>
     </div>
   )
 }
