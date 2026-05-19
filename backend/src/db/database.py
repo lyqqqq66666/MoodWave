@@ -67,7 +67,10 @@ def create_db_and_tables():
     否则 SQLModel.metadata 不知道它们的存在。
     """
     # 导入所有数据库模型（让 SQLModel.metadata 扫描到它们）
-    from src.core.models import FavoriteMusic, MoodEntry, Post, User  # noqa: F401
+    from src.core.models import (
+        FavoriteMusic, MoodEntry, Post, User,
+        CompanionConversation, CompanionMessage, CompanionMemory  # 新增灵音伙伴会话模型
+    )  # noqa: F401
     SQLModel.metadata.create_all(engine)
     _ensure_runtime_columns()
 
@@ -83,3 +86,7 @@ def get_session():
     """
     with Session(engine) as session:
         yield session
+
+
+# 用于异步任务中直接创建会话（不走 FastAPI 依赖注入）
+SessionLocal = Session

@@ -45,6 +45,7 @@ backend/uploads/
 out/
 .nuxt/
 dist/
+*.tsbuildinfo
 
 # Logs
 logs/
@@ -77,3 +78,7 @@ tmp/
 memory-bank/
 .agents/
 .claude/
+
+# Local design/component PNG exports
+前端实际使用设计元素PNG/
+前端实际组件PNG导出/

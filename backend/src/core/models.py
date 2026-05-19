@@ -268,3 +268,79 @@ class FavoriteMusicResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==================== 灵音伙伴会话模型 ====================
+
+class CompanionConversation(SQLModel, table=True):
+    """灵音伙伴会话数据库模型"""
+    __tablename__ = "companion_conversations"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    title: str = Field(default="")  # 会话标题（自动生成或用户命名）
+    character: str = Field(default="cat")  # 伙伴形象 id
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CompanionMessage(SQLModel, table=True):
+    """灵音伙伴消息数据库模型"""
+    __tablename__ = "companion_messages"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    conversation_id: int = Field(index=True)
+    user_id: int = Field(index=True)
+    role: str = Field(default="user")  # user / assistant / system
+    content: str = Field(default="")
+    mood_type: Optional[str] = Field(default=None)  # 关联情绪类型
+    extra_data: str = Field(default="{}")  # JSON 字符串（存储额外信息）
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CompanionMemory(SQLModel, table=True):
+    """灵音伙伴记忆数据库模型"""
+    __tablename__ = "companion_memories"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    content: str = Field(default="")  # 记忆内容
+    source: str = Field(default="ai")  # 来源：ai / rules
+    memory_type: str = Field(default="personality")  # 记忆类型：personality / preference / habit / event
+    mood_context: Optional[str] = Field(default=None)  # 情绪上下文
+    tags: str = Field(default="[]")  # JSON 字符串，标签列表
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CompanionMemoryCreate(BaseModel):
+    """创建记忆请求模型"""
+    content: str
+    source: str = "ai"
+    memory_type: str = "personality"
+    mood_context: Optional[str] = None
+    tags: List[str] = []
+
+
+class CompanionMemoryUpdate(BaseModel):
+    """更新记忆请求模型"""
+    content: Optional[str] = None
+    source: Optional[str] = None
+    memory_type: Optional[str] = None
+    mood_context: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class CompanionMemoryResponse(BaseModel):
+    """记忆响应模型"""
+    id: int
+    content: str
+    source: str
+    memory_type: str
+    mood_context: Optional[str] = None
+    tags: List[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 import os
 
 from src.db.database import create_db_and_tables
-from src.api import moods, analytics, music, upload, ai, posts, auth, profile
+from src.api import moods, analytics, music, upload, ai, posts, auth, profile, companion
 
 # 应用生命周期管理
 @asynccontextmanager
@@ -55,6 +55,7 @@ app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(ai.router, prefix="/api", tags=["ai"])
 app.include_router(posts.router, prefix="/api", tags=["posts"])
 app.include_router(profile.router, prefix="/api", tags=["profile"])
+app.include_router(companion.router, prefix="/api", tags=["companion"])
 
 # 健康检查端点
 @app.get("/api/health")

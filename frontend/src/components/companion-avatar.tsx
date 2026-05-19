@@ -1,10 +1,10 @@
 "use client"
 
-import { Moon, Rocket, Sparkles, Star, Sun } from "lucide-react"
+import { Cat, Moon, PawPrint, Rocket, Sparkles, Star, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { MoodType } from "@/lib/types"
 
-export type CompanionCharacter = "sakura" | "planet" | "sunny" | "astronaut" | "moon"
+export type CompanionCharacter = "sakura" | "planet" | "sunny" | "astronaut" | "moon" | "cat" | "fox"
 export type CompanionColor = "pink" | "mint" | "blue" | "amber" | "purple"
 
 export const companionCharacters: {
@@ -19,6 +19,8 @@ export const companionCharacters: {
   { id: "sunny", name: "阳光少年", tagline: "清爽鼓励型", icon: "☀", personality: "活力但不吵，适合男生和喜欢直接鼓励的用户。" },
   { id: "astronaut", name: "小宇航员", tagline: "理性探索型", icon: "✦", personality: "一起拆问题、找出口，适合学习和 deadline 场景。" },
   { id: "moon", name: "月光伙伴", tagline: "深夜守候型", icon: "☾", personality: "低声量陪伴，把情绪慢慢放下来。" },
+  { id: "cat", name: "小喵", tagline: "软萌贴贴型", icon: "ฅ", personality: "轻轻接住委屈和疲惫，用软乎乎的话陪你慢慢缓过来。" },
+  { id: "fox", name: "小狐狸", tagline: "灵动拆解型", icon: "✧", personality: "机灵但不催促，帮你把焦虑拆成可以行动的小线索。" },
 ]
 
 export const companionColors: {
@@ -51,6 +53,8 @@ const IconByCharacter = {
   sunny: Sun,
   astronaut: Rocket,
   moon: Moon,
+  cat: Cat,
+  fox: PawPrint,
 }
 
 export function getCompanionCharacter(value?: string | null) {

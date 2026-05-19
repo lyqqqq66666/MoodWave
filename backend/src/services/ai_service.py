@@ -197,6 +197,7 @@ async def stream_chat(
                 stream=True,
                 max_tokens=300,
                 temperature=0.8,
+                extra_body={"thinking": {"type": "disabled"}},
             ),
             timeout=20.0,  # SSE 流建立超时
         )
@@ -269,6 +270,7 @@ async def analyze_mood_with_ai(
             stream=False,
             max_tokens=300,
             temperature=0.3,  # 结构化输出用低温度，更稳定
+            extra_body={"thinking": {"type": "disabled"}},
         )
 
         raw = response.choices[0].message.content.strip()
@@ -640,6 +642,7 @@ async def analyze_mood_multi_modal(
                     stream=False,
                     max_tokens=1000,  # 从 600 提升，防止复杂 JSON 被截断
                     temperature=0.4,
+                    extra_body={"thinking": {"type": "disabled"}},
                 ),
                 timeout=20.0,  # 20s 单次超时，重试后最多 40s，低于 axios 45s
             )
@@ -713,6 +716,12 @@ COMPANION_MEMORY_PROMPT = """你是 MoodWave 灵音的 AI 伙伴记忆系统。
 用户最近记录了以下情绪数据。请基于这些数据，生成 3-5 条「伙伴记忆」。
 每条记忆应该像是一个关心用户的朋友记住的关于 TA 的事情，语气温柔、个性化。
 
+记忆类型说明：
+- personality: 用户性格特征（如"你是个感性的人"）
+- preference: 用户偏好（如"你喜欢安静的音乐"）
+- habit: 用户习惯（如"你周一容易焦虑"）
+- event: 具体事件（如"你昨天提到考试压力"）
+
 记忆要求：
 - 每条 12-30 字
 - 基于数据模式而非编造
@@ -723,9 +732,18 @@ COMPANION_MEMORY_PROMPT = """你是 MoodWave 灵音的 AI 伙伴记忆系统。
 严格按以下 JSON 格式返回，不要输出额外文字：
 {
   "memories": [
-    "记忆内容 1",
-    "记忆内容 2",
-    "记忆内容 3"
+    {
+      "content": "记忆内容 1",
+      "memory_type": "personality",
+      "mood_context": "anxious",
+      "tags": ["study", "exam"]
+    },
+    {
+      "content": "记忆内容 2",
+      "memory_type": "habit",
+      "mood_context": null,
+      "tags": ["work"]
+    }
   ]
 }"""
 
@@ -735,7 +753,7 @@ async def generate_companion_memories(
     avatar_character: str = "cat",
     mbti: str = "",
     zodiac: str = "",
-) -> List[str]:
+) -> List[dict]:
     """
     使用 AI 基于情绪历史生成个性化伙伴记忆
 
@@ -746,7 +764,7 @@ async def generate_companion_memories(
         zodiac: 用户星座
 
     Returns:
-        List[str]: 3-5 条个性化记忆点
+        List[dict]: 3-5 条个性化记忆点，每条包含 content, memory_type, mood_context, tags
     """
     if len(mood_entries) < 3:
         return []
@@ -814,8 +832,9 @@ async def generate_companion_memories(
                     {"role": "user", "content": user_content},
                 ],
                 stream=False,
-                max_tokens=400,
+                max_tokens=600,  # 增加 token 以容纳结构化输出
                 temperature=0.7,
+                extra_body={"thinking": {"type": "disabled"}},
             ),
             timeout=25.0,
         )
@@ -839,18 +858,46 @@ async def generate_companion_memories(
         import json
         try:
             result = json.loads(raw)
+            memories = result.get("memories", [])
+            
+            # 验证并标准化返回格式
+            valid_memories = []
+            for mem in memories:
+                if isinstance(mem, dict) and "content" in mem:
+                    valid_memories.append({
+                        "content": mem["content"],
+                        "memory_type": mem.get("memory_type", "personality"),
+                        "mood_context": mem.get("mood_context"),
+                        "tags": mem.get("tags", []),
+                    })
+                elif isinstance(mem, str):
+                    # 兼容旧格式（纯字符串）
+                    valid_memories.append({
+                        "content": mem,
+                        "memory_type": "personality",
+                        "mood_context": None,
+                        "tags": [],
+                    })
+            
+            logger.info("generate_companion_memories success count=%d", len(valid_memories))
+            return valid_memories[:5]  # 最多 5 条
+
         except json.JSONDecodeError:
             logger.warning("generate_companion_memories JSON parse failed raw=%s", raw[:200])
-            # 尝试从非 JSON 文本中逐行提取记忆
+            # 尝试从非 JSON 文本中逐行提取记忆（降级处理）
             lines = [line.strip("- ").strip() for line in raw.split("\n") if line.strip() and len(line.strip()) > 4]
-            memories = lines[:5]
+            memories = []
+            for line in lines[:5]:
+                memories.append({
+                    "content": line,
+                    "memory_type": "personality",
+                    "mood_context": None,
+                    "tags": [],
+                })
             if memories:
                 logger.info("generate_companion_memories extracted %d memories from text fallback", len(memories))
                 return memories
             return []
-        memories = result.get("memories", [])
-        logger.info("generate_companion_memories success count=%d", len(memories))
-        return memories if isinstance(memories, list) else []
 
     except asyncio.TimeoutError:
         logger.warning("generate_companion_memories timeout")
@@ -858,3 +905,258 @@ async def generate_companion_memories(
     except Exception as e:
         logger.error("generate_companion_memories error: %s", str(e)[:200])
         return []
+
+
+# ==================== 动态欢迎语生成 ====================
+
+GREETING_PROMPT = """你是 MoodWave 灵音的 AI 情绪伙伴，负责生成个性化的欢迎语。
+
+你的任务：
+1. 根据用户当天的情绪记录，生成温暖、有同理心的欢迎语
+2. 欢迎语要符合当前角色形象的语气风格
+3. 生成 2-3 条开场白，引导用户继续对话
+4. 语言简洁，每条不超过 50 字
+
+请严格按照以下 JSON 格式返回，不要输出任何额外文字：
+{
+  "greeting": "主欢迎语，结合用户情绪和角色风格",
+  "starter_messages": ["开场白1", "开场白2", "开场白3"]
+}"""
+
+
+def _fallback_greeting(character: str, mood_type: str | None = None) -> dict:
+    """AI 调用失败时的降级欢迎语模板"""
+    # 角色特定的欢迎语模板
+    character_templates = {
+        "cat": {
+            "happy": "喵~ 看到你今天心情很好呢！有什么开心的事想分享吗？",
+            "calm": "喵~ 今天感觉很平静呢，小喵陪你一起享受这份宁静。",
+            "anxious": "喵~ 小喵感觉到你有点紧张，来，深呼吸，我在呢。",
+            "angry": "喵~ 看到你有点生气，小喵在这里陪你，想聊聊吗？",
+            "sad": "喵~ 小喵感觉到你有些难过，来，让我抱抱你。",
+            "neutral": "喵~ 欢迎回来！今天过得怎么样？",
+        },
+        "fox": {
+            "happy": "嘿！看到你今天状态不错嘛~ 有什么好事发生？",
+            "calm": "今天挺平静的嘛，不错不错，继续保持~",
+            "anxious": "哦？感觉你有点紧张？来，小狐狸帮你分析分析。",
+            "angry": "哎呀，谁惹你了？来，跟我说说，我帮你出主意。",
+            "sad": "怎么啦？看起来心情不太好，小狐狸陪你聊聊。",
+            "neutral": "嘿，回来啦~ 今天有什么想聊的？",
+        },
+        "star": {
+            "happy": "看到你今天闪闪发光呢！有什么开心的事想分享吗？",
+            "calm": "今天很平静呢，像星空一样宁静，真好。",
+            "anxious": "感觉到你有些不安，没关系，星星会陪着你。",
+            "angry": "情绪有些波动呢，没关系，让星星帮你平复一下。",
+            "sad": "看到你有些低落，星星在这里，静静陪你。",
+            "neutral": "欢迎回来，今天过得怎么样？",
+        },
+        "sunny": {
+            "happy": "哇！看到你今天心情超好！阳光都为你灿烂！",
+            "calm": "今天很平静呢，阳光温柔地照着，真舒服。",
+            "anxious": "感觉你有点紧张？来，深呼吸，阳光会给你力量。",
+            "angry": "哎呀，谁惹你了？来，阳光帮你驱散阴霾。",
+            "sad": "怎么啦？看起来心情不太好，阳光在这里陪你。",
+            "neutral": "嘿，回来啦！今天过得怎么样？",
+        },
+        "astronaut": {
+            "happy": "探测到你今天情绪指数飙升！有什么开心的事？",
+            "calm": "今天情绪轨道很平稳呢，继续航行~",
+            "anxious": "检测到情绪波动，别担心，宇航员陪你穿越。",
+            "angry": "情绪能量过高，启动稳定程序，深呼吸~",
+            "sad": "探测到低落信号，宇航员在这里，陪你度过。",
+            "neutral": "欢迎回到空间站，今天航行顺利吗？",
+        },
+        "moon": {
+            "happy": "看到你今天心情很好呢，月光都为你闪耀。",
+            "calm": "今天很平静呢，月光静静陪你。",
+            "anxious": "感觉到你有些不安，月光在这里，静静安抚你。",
+            "angry": "情绪有些波动呢，没关系，月光帮你平复。",
+            "sad": "看到你有些低落，月光在这里，静静陪你。",
+            "neutral": "欢迎回来，今天过得怎么样？",
+        },
+        "sakura": {
+            "happy": "看到你今天心情很好呢，樱花都为你绽放！",
+            "calm": "今天很平静呢，像春风拂过樱花，真舒服。",
+            "anxious": "感觉到你有些不安，没关系，樱花会陪着你。",
+            "angry": "情绪有些波动呢，没关系，让樱花帮你平复。",
+            "sad": "看到你有些低落，樱花在这里，静静陪你。",
+            "neutral": "欢迎回来，今天过得怎么样？",
+        },
+    }
+
+    # 获取角色模板，如果角色不存在则使用 cat
+    templates = character_templates.get(character, character_templates["cat"])
+
+    # 根据情绪类型选择模板
+    greeting = templates.get(mood_type, templates.get("neutral", "欢迎回来！今天过得怎么样？"))
+
+    # 生成开场白
+    starters = [
+        "想聊聊今天发生了什么吗？",
+        "有什么我可以帮你的吗？",
+        "来，跟我说说你的心事。",
+    ]
+
+    return {
+        "greeting": greeting,
+        "starter_messages": starters,
+    }
+
+
+async def generate_greeting(
+    character: str,
+    mood_type: str | None = None,
+    intensity: int | None = None,
+    note: str = "",
+    mbti: str = "",
+    zodiac: str = "",
+) -> dict:
+    """
+    生成动态欢迎语
+
+    Args:
+        character: 角色形象 (cat/fox/star/sunny/astronaut/moon/sakura)
+        mood_type: 当前情绪类型 (可选，None 表示今天没有记录)
+        intensity: 情绪强度 (可选)
+        note: 用户文字描述 (可选)
+        mbti: 用户 MBTI (可选)
+        zodiac: 用户星座 (可选)
+
+    Returns:
+        dict: {greeting, starter_messages, source, mood_type, character}
+    """
+    client = _get_client()
+
+    # 构建角色信息
+    persona = CHARACTER_PERSONAS.get(character, CHARACTER_PERSONAS["cat"])
+
+    # 构建上下文
+    if mood_type:
+        # 今天有情绪记录
+        context_parts = [
+            f"用户今天的情绪是：{_mood_label(mood_type)}",
+        ]
+        if intensity:
+            context_parts.append(f"情绪强度：{intensity}/10")
+        if note.strip():
+            context_parts.append(f"用户描述：{note[:100]}")
+        context_parts.append(f"你的角色是「{persona['name']}」，风格：{persona['style']}")
+
+        user_content = "\n".join(context_parts)
+        source = "today_mood"
+    else:
+        # 今天没有情绪记录
+        context_parts = [
+            "用户今天还没有记录情绪",
+            f"你的角色是「{persona['name']}」，风格：{persona['style']}",
+            "请生成一个温暖的欢迎语，引导用户开始记录或聊天。",
+        ]
+        user_content = "\n".join(context_parts)
+        source = "default"
+
+    # 添加个性信息
+    personality_hint = ""
+    if mbti or zodiac:
+        parts = []
+        if mbti:
+            parts.append(f"MBTI={mbti}")
+        if zodiac:
+            parts.append(f"星座={zodiac}")
+        personality_hint = f" 用户{'，'.join(parts)}。"
+
+    try:
+        logger.info("generate_greeting character=%s mood=%s", character, mood_type)
+
+        response = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": GREETING_PROMPT + ("\n" + personality_hint if personality_hint else "")},
+                    {"role": "user", "content": user_content},
+                ],
+                stream=False,
+                max_tokens=200,
+                temperature=0.8,
+                extra_body={"thinking": {"type": "disabled"}},
+            ),
+            timeout=10.0,  # 欢迎语生成超时 10 秒
+        )
+
+        raw = response.choices[0].message.content
+        if not raw or not raw.strip():
+            logger.warning("generate_greeting empty response from AI")
+            return {
+                **_fallback_greeting(character, mood_type),
+                "source": source,
+                "mood_type": mood_type,
+                "character": character,
+            }
+
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+
+        if not raw:
+            logger.warning("generate_greeting empty after stripping code blocks")
+            return {
+                **_fallback_greeting(character, mood_type),
+                "source": source,
+                "mood_type": mood_type,
+                "character": character,
+            }
+
+        import json
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("generate_greeting JSON parse failed raw=%s", raw[:200])
+            return {
+                **_fallback_greeting(character, mood_type),
+                "source": source,
+                "mood_type": mood_type,
+                "character": character,
+            }
+
+        # 验证必要字段
+        greeting = result.get("greeting", "")
+        starter_messages = result.get("starter_messages", [])
+
+        if not greeting or not starter_messages:
+            logger.warning("generate_greeting missing required fields")
+            return {
+                **_fallback_greeting(character, mood_type),
+                "source": source,
+                "mood_type": mood_type,
+                "character": character,
+            }
+
+        logger.info("generate_greeting success character=%s", character)
+        return {
+            "greeting": greeting,
+            "starter_messages": starter_messages[:3],  # 最多 3 条
+            "source": source,
+            "mood_type": mood_type,
+            "character": character,
+        }
+
+    except asyncio.TimeoutError:
+        logger.warning("generate_greeting timeout")
+        return {
+            **_fallback_greeting(character, mood_type),
+            "source": source,
+            "mood_type": mood_type,
+            "character": character,
+        }
+    except Exception as e:
+        logger.error("generate_greeting error: %s", str(e)[:200])
+        return {
+            **_fallback_greeting(character, mood_type),
+            "source": source,
+            "mood_type": mood_type,
+            "character": character,
+        }

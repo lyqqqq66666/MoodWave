@@ -75,7 +75,24 @@ export const aiAPI = {
 
 // 灵音伙伴接口
 export const companionAPI = {
-  memories: () => apiClient.get('/api/companion/memories'),
+  greeting: (params?: { character?: string }) => apiClient.get('/api/companion/greeting', { params }),
+  memories: (params?: { memory_type?: string; limit?: number }) => apiClient.get('/api/companion/memories', { params }),
+  createMemory: (data: { content: string; source?: string; memory_type?: string; mood_context?: string | null; tags?: string[] }) =>
+    apiClient.post('/api/companion/memories', data),
+  updateMemory: (id: number, data: { content?: string; source?: string; memory_type?: string; mood_context?: string | null; tags?: string[] }) =>
+    apiClient.put(`/api/companion/memories/${id}`, data),
+  deleteMemory: (id: number) => apiClient.delete(`/api/companion/memories/${id}`),
+  generateMemories: () => apiClient.post('/api/companion/memories/generate'),
+  conversations: () => apiClient.get('/api/companion/conversations'),
+  createConversation: (data: { title?: string; character?: string }) =>
+    apiClient.post('/api/companion/conversations', data),
+  updateConversation: (id: number, data: { title: string }) =>
+    apiClient.patch(`/api/companion/conversations/${id}`, data),
+  conversationMessages: (id: number) => apiClient.get(`/api/companion/conversations/${id}/messages`),
+  sendMessageUrl: (id: number) => `${API_URL}/api/companion/conversations/${id}/messages`,
+  sendAgentMessageUrl: (id: number) => `${API_URL}/api/companion/conversations/${id}/messages-agent`,
+  deleteConversation: (id: number) => apiClient.delete(`/api/companion/conversations/${id}`),
+  agentStatus: () => apiClient.get('/api/ai/agent-status'),
 }
 
 // 个人主页接口

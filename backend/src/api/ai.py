@@ -15,9 +15,11 @@ from sqlmodel import Session, select
 
 import asyncio
 import logging
+import json
 
-from src.services.ai_service import stream_chat, analyze_mood_multi_modal, generate_companion_memories
-from src.core.models import User, MoodEntry
+from src.services.ai_service import stream_chat, analyze_mood_multi_modal, generate_companion_memories, generate_greeting
+from src.services.companion_agent import run_companion_agent, LANGGRAPH_AVAILABLE
+from src.core.models import User, MoodEntry, CompanionConversation, CompanionMessage, CompanionMemory
 from src.db.database import get_session
 from src.api.auth import get_current_user
 
@@ -44,12 +46,17 @@ class AIChatRequest(BaseModel):
     avatar_character: str = "cat"        # 角色形象
     mbti: str = ""                       # 用户 MBTI
     zodiac: str = ""                     # 用户星座
+    conversation_id: Optional[int] = None  # 会话 ID（可选，用于保存消息）
 
 
 # ==================== AI 对话接口 ====================
 
 @router.post("/ai/chat")
-async def ai_chat(request: AIChatRequest):
+async def ai_chat(
+    request: AIChatRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     """
     AI 情绪对话（SSE 流式响应）
 
@@ -67,7 +74,8 @@ async def ai_chat(request: AIChatRequest):
       "intensity": 7,
       "message": "最近期末压力好大，睡不好",
       "tags": ["study"],
-      "history": []
+      "history": [],
+      "conversation_id": 123
     }
     ```
     """
@@ -75,6 +83,45 @@ async def ai_chat(request: AIChatRequest):
     history_dicts = None
     if request.history:
         history_dicts = [{"role": m.role, "content": m.content} for m in request.history]
+
+    # 如果指定了 conversation_id，从数据库加载历史消息
+    if request.conversation_id:
+        from datetime import datetime
+        # 验证会话属于当前用户
+        conv_statement = select(CompanionConversation).where(
+            CompanionConversation.id == request.conversation_id,
+            CompanionConversation.user_id == current_user.id,
+        )
+        conversation = session.exec(conv_statement).first()
+
+        if conversation:
+            # 获取最近 12 条消息
+            msg_statement = (
+                select(CompanionMessage)
+                .where(CompanionMessage.conversation_id == request.conversation_id)
+                .order_by(CompanionMessage.created_at.desc())
+                .limit(12)
+            )
+            messages = session.exec(msg_statement).all()
+            messages = list(reversed(messages))  # 按时间正序
+            history_dicts = [{"role": m.role, "content": m.content} for m in messages]
+
+            # 保存用户消息
+            user_msg = CompanionMessage(
+                conversation_id=request.conversation_id,
+                user_id=current_user.id,
+                role="user",
+                content=request.message,
+                mood_type=request.mood_type,
+            )
+            session.add(user_msg)
+
+            # 更新会话时间
+            conversation.updated_at = datetime.utcnow()
+            session.commit()
+
+    # 收集完整回复用于保存
+    full_reply = []
 
     async def event_generator():
         async for chunk in stream_chat(
@@ -88,6 +135,40 @@ async def ai_chat(request: AIChatRequest):
             zodiac=request.zodiac,
         ):
             yield chunk
+            # 收集完整回复用于保存
+            if '"type": "text"' in chunk:
+                try:
+                    data = chunk.replace("data: ", "").strip()
+                    if data:
+                        obj = json.loads(data)
+                        if obj.get("type") == "text":
+                            full_reply.append(obj.get("content", ""))
+                except:
+                    pass
+
+        # 流式结束后，异步保存 AI 回复
+        if request.conversation_id:
+            async def save_ai_reply():
+                try:
+                    ai_content = "".join(full_reply)
+                    if ai_content:
+                        from src.db.database import engine, SessionLocal
+                        with SessionLocal(engine) as save_session:
+                            ai_msg = CompanionMessage(
+                                conversation_id=request.conversation_id,
+                                user_id=current_user.id,
+                                role="assistant",
+                                content=ai_content,
+                                mood_type=request.mood_type,
+                            )
+                            save_session.add(ai_msg)
+                            save_session.commit()
+                            logger.info("AI reply saved: conversation_id=%d, length=%d",
+                                       request.conversation_id, len(ai_content))
+                except Exception as e:
+                    logger.error("save_ai_reply error: %s", str(e)[:200])
+
+            await save_ai_reply()
 
     return StreamingResponse(
         event_generator(),
@@ -98,6 +179,199 @@ async def ai_chat(request: AIChatRequest):
             "Connection": "keep-alive",
         },
     )
+
+
+# ==================== Agent 对话接口 ====================
+
+@router.post("/ai/chat-agent")
+async def ai_chat_agent(
+    request: AIChatRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    Agent 模式 AI 情绪对话（SSE 流式响应）
+
+    使用 LangGraph Agent 工作流编排：
+    load_profile → load_mood → load_memories → classify_emotion
+    → generate_reply → recommend_music → extract_memories → save_memories
+
+    与 /api/ai/chat 的区别：
+    1. 经过完整 Agent 工作流（8 个节点）
+    2. 自动检索长期记忆并注入上下文
+    3. 自动提取对话记忆并保存
+    4. 返回音乐推荐参数
+    5. SSE 中包含 agent_status 状态更新
+
+    SSE 数据格式：
+    - 状态:  data: {"type": "status", "content": "🧠 正在理解你的情绪..."}\n\n
+    - 文本:  data: {"type": "text", "content": "..."}\n\n
+    - 音乐:  data: {"type": "music", "content": {...}}\n\n
+    - 结束:  data: {"type": "done", "content": {...}}\n\n
+             content 包含完整 Agent 输出（reply + music_recommendation + memory_refs）
+    - 错误:  data: {"type": "error", "content": "..."}\n\n
+    """
+    # 转换 history 格式
+    history_dicts = None
+    if request.history:
+        history_dicts = [{"role": m.role, "content": m.content} for m in request.history]
+
+    # 如果指定了 conversation_id，从数据库加载历史消息
+    if request.conversation_id:
+        from datetime import datetime
+        conv_statement = select(CompanionConversation).where(
+            CompanionConversation.id == request.conversation_id,
+            CompanionConversation.user_id == current_user.id,
+        )
+        conversation = session.exec(conv_statement).first()
+
+        if conversation:
+            msg_statement = (
+                select(CompanionMessage)
+                .where(CompanionMessage.conversation_id == request.conversation_id)
+                .order_by(CompanionMessage.created_at.desc())
+                .limit(12)
+            )
+            messages = session.exec(msg_statement).all()
+            messages = list(reversed(messages))
+            history_dicts = [{"role": m.role, "content": m.content} for m in messages]
+
+            # 保存用户消息
+            user_msg = CompanionMessage(
+                conversation_id=request.conversation_id,
+                user_id=current_user.id,
+                role="user",
+                content=request.message,
+                mood_type=request.mood_type,
+            )
+            session.add(user_msg)
+            conversation.updated_at = datetime.utcnow()
+            session.commit()
+
+    # 收集完整回复用于保存
+    full_reply = []
+
+    async def event_generator():
+        try:
+            # 运行 Agent 工作流
+            agent_result = await run_companion_agent(
+                user_id=current_user.id,
+                user_message=request.message,
+                mood_type=request.mood_type,
+                intensity=request.intensity,
+                tags=request.tags or [],
+                conversation_id=request.conversation_id,
+                history=history_dicts or [],
+                avatar_character=request.avatar_character,
+                mbti=request.mbti,
+                zodiac=request.zodiac,
+            )
+
+            # 发送状态消息
+            for status_msg in agent_result.get("status_messages", []):
+                status_payload = json.dumps({"type": "status", "content": status_msg}, ensure_ascii=False)
+                yield f"data: {status_payload}\n\n"
+
+            # 流式输出回复（逐字）
+            reply_text = agent_result.get("reply", "")
+            for char in reply_text:
+                text_payload = json.dumps({"type": "text", "content": char}, ensure_ascii=False)
+                yield f"data: {text_payload}\n\n"
+                full_reply.append(char)
+                await asyncio.sleep(0.02)  # 模拟流式效果
+
+            # 发送音乐推荐
+            music_rec = agent_result.get("music_recommendation", {})
+            if music_rec:
+                music_payload = json.dumps({"type": "music", "content": music_rec}, ensure_ascii=False)
+                yield f"data: {music_payload}\n\n"
+
+            # 发送完成事件（包含完整 Agent 输出）
+            done_payload = json.dumps({
+                "type": "done",
+                "content": {
+                    "reply": reply_text,
+                    "mood_type": agent_result.get("mood_type", request.mood_type),
+                    "music_recommendation": music_rec,
+                    "memory_refs": agent_result.get("memory_refs", []),
+                    "agent_status": agent_result.get("agent_status", "completed"),
+                    "nodes_executed": agent_result.get("nodes_executed", []),
+                },
+            }, ensure_ascii=False)
+            yield f"data: {done_payload}\n\n"
+
+        except Exception as e:
+            logger.error("ai_chat_agent error: %s", str(e)[:200])
+            error_payload = json.dumps({"type": "error", "content": "Agent 执行异常，请稍后重试"}, ensure_ascii=False)
+            yield f"data: {error_payload}\n\n"
+
+        # 流式结束后保存 AI 回复
+        if request.conversation_id:
+            async def save_ai_reply():
+                try:
+                    ai_content = "".join(full_reply)
+                    if ai_content:
+                        from src.db.database import engine, SessionLocal
+                        with SessionLocal(engine) as save_session:
+                            ai_msg = CompanionMessage(
+                                conversation_id=request.conversation_id,
+                                user_id=current_user.id,
+                                role="assistant",
+                                content=ai_content,
+                                mood_type=request.mood_type,
+                            )
+                            save_session.add(ai_msg)
+                            save_session.commit()
+                            logger.info("Agent reply saved: conversation_id=%d, length=%d",
+                                       request.conversation_id, len(ai_content))
+                except Exception as e:
+                    logger.error("save_ai_reply error: %s", str(e)[:200])
+
+            await save_ai_reply()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+# ==================== Agent 状态接口 ====================
+
+@router.get("/ai/agent-status")
+async def get_agent_status():
+    """
+    获取 Agent 状态信息
+
+    Returns:
+        {
+            langgraph_available: bool,
+            agent_version: str,
+            nodes: [str],
+        }
+    """
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {
+            "langgraph_available": LANGGRAPH_AVAILABLE,
+            "agent_version": "1.0.0",
+            "nodes": [
+                "load_profile",
+                "load_mood",
+                "load_memories",
+                "classify_emotion",
+                "generate_reply",
+                "recommend_music",
+                "extract_memories",
+                "save_memories",
+            ],
+        },
+    }
 
 
 # ==================== 多模态情绪分析模型 ====================
@@ -177,6 +451,91 @@ async def analyze_mood_endpoint(request: AnalyzeMoodRequest):
         }, status_code=200)
 
 
+# ==================== 灵音伙伴欢迎语 ====================
+
+@router.get("/companion/greeting")
+async def get_companion_greeting(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    获取灵音伙伴动态欢迎语
+
+    根据当前伙伴形象和用户当天情绪记录，生成个性化欢迎语。
+
+    Returns:
+        { code, msg, data }
+        data = {
+            greeting: str,           # 主欢迎语
+            starter_messages: list,  # 开场白列表
+            source: str,             # 来源: today_mood / default
+            mood_type: str,          # 当天情绪类型 (如果有)
+            character: str           # 当前角色形象
+        }
+    """
+    from datetime import date
+    from sqlmodel import select
+
+    try:
+        # 获取当前用户信息
+        character = current_user.avatar_character or "cat"
+        mbti = current_user.mbti or ""
+        zodiac = current_user.zodiac or ""
+
+        # 查询当天情绪记录
+        today = date.today()
+        statement = (
+            select(MoodEntry)
+            .where(MoodEntry.user_id == current_user.id)
+            .where(MoodEntry.created_at >= str(today))
+            .order_by(MoodEntry.created_at.desc())
+            .limit(1)
+        )
+        today_mood = session.exec(statement).first()
+
+        # 提取情绪信息
+        mood_type = None
+        intensity = None
+        note = ""
+
+        if today_mood:
+            mood_type = today_mood.mood_type
+            intensity = today_mood.intensity
+            note = today_mood.note or ""
+
+        # 生成欢迎语
+        result = await generate_greeting(
+            character=character,
+            mood_type=mood_type,
+            intensity=intensity,
+            note=note,
+            mbti=mbti,
+            zodiac=zodiac,
+        )
+
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": result,
+        }
+
+    except Exception as e:
+        logger.error("get_companion_greeting error: %s", str(e)[:200])
+        # 返回 fallback 欢迎语
+        from src.services.ai_service import _fallback_greeting
+        fallback = _fallback_greeting(current_user.avatar_character or "cat")
+        return {
+            "code": 0,
+            "msg": "AI 服务暂不可用，已使用本地欢迎语",
+            "data": {
+                **fallback,
+                "source": "fallback",
+                "mood_type": None,
+                "character": current_user.avatar_character or "cat",
+            },
+        }
+
+
 # ==================== 灵音伙伴记忆 ====================
 
 @router.get("/companion/memories")
@@ -187,10 +546,54 @@ async def get_companion_memories(
     """
     获取灵音伙伴记住的关于用户的关键信息
 
-    优先使用 AI 语义记忆生成，失败时降级到规则引擎。
+    优先从数据库读取，如果为空则自动生成并保存。
     """
     import json
 
+    # 1. 优先从数据库读取记忆
+    statement = (
+        select(CompanionMemory)
+        .where(CompanionMemory.user_id == current_user.id)
+        .order_by(CompanionMemory.created_at.desc())
+        .limit(20)
+    )
+    db_memories = session.exec(statement).all()
+
+    if db_memories:
+        # 数据库有记忆，直接返回
+        memories = []
+        for mem in db_memories:
+            tags = []
+            if mem.tags:
+                try:
+                    tags = json.loads(mem.tags) if isinstance(mem.tags, str) else mem.tags
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            memories.append({
+                "id": mem.id,
+                "content": mem.content,
+                "source": mem.source,
+                "memory_type": mem.memory_type,
+                "mood_context": mem.mood_context,
+                "tags": tags,
+                "created_at": mem.created_at.isoformat(),
+                "updated_at": mem.updated_at.isoformat(),
+            })
+
+        logger.info("companion_memories from DB count=%d user=%d", len(memories), current_user.id)
+        return {
+            "code": 0,
+            "msg": "ok",
+            "data": {
+                "memories": memories,
+                "source": "db",
+                "character": current_user.avatar_character,
+                "mbti": current_user.mbti,
+                "zodiac": current_user.zodiac,
+            },
+        }
+
+    # 2. 数据库为空，尝试 AI 生成
     statement = (
         select(MoodEntry)
         .where(MoodEntry.user_id == current_user.id)
@@ -232,9 +635,22 @@ async def get_companion_memories(
             zodiac=current_user.zodiac or "",
         )
         if ai_memories:
-            memories = ai_memories
+            # 保存生成的记忆到数据库
+            for mem in ai_memories:
+                memory = CompanionMemory(
+                    user_id=current_user.id,
+                    content=mem["content"],
+                    source="ai",
+                    memory_type=mem.get("memory_type", "personality"),
+                    mood_context=mem.get("mood_context"),
+                    tags=json.dumps(mem.get("tags", [])),
+                )
+                session.add(memory)
+                memories.append(mem)
+
+            session.commit()
             source = "ai"
-            logger.info("companion_memories AI generated count=%d user=%s", len(memories), current_user.id)
+            logger.info("companion_memories AI generated and saved count=%d user=%d", len(memories), current_user.id)
     except Exception as e:
         logger.warning("companion_memories AI fallback to rules: %s", str(e)[:100])
 
@@ -251,7 +667,13 @@ async def get_companion_memories(
             "angry": "愤怒", "sad": "悲伤", "neutral": "平淡",
         }
 
-        memories.append(f"最近 {total} 天里，你最多的情绪是{mood_labels.get(dominant, dominant)}")
+        memories.append({
+            "content": f"最近 {total} 天里，你最多的情绪是{mood_labels.get(dominant, dominant)}",
+            "source": "rules",
+            "memory_type": "personality",
+            "mood_context": dominant,
+            "tags": [],
+        })
 
         all_tags = []
         for m in moods:
@@ -268,20 +690,57 @@ async def get_companion_memories(
             tag_labels = {"study": "学习", "work": "工作", "social": "社交",
                           "emotion": "情感", "health": "身体", "life": "生活"}
             tag_label = tag_labels.get(top_tag, top_tag)
-            memories.append(f"你经常记录和「{tag_label}」相关的情绪")
+            memories.append({
+                "content": f"你经常记录和「{tag_label}」相关的情绪",
+                "source": "rules",
+                "memory_type": "habit",
+                "mood_context": None,
+                "tags": [top_tag],
+            })
 
         intensities = [m.intensity for m in moods if m.intensity]
         if intensities:
             avg_intensity = sum(intensities) / len(intensities)
             if avg_intensity >= 7:
-                memories.append("你的情绪强度整体偏高，是个感情丰富的人")
+                memories.append({
+                    "content": "你的情绪强度整体偏高，是个感情丰富的人",
+                    "source": "rules",
+                    "memory_type": "personality",
+                    "mood_context": None,
+                    "tags": [],
+                })
             elif avg_intensity <= 4:
-                memories.append("你的情绪比较温和内敛")
+                memories.append({
+                    "content": "你的情绪比较温和内敛",
+                    "source": "rules",
+                    "memory_type": "personality",
+                    "mood_context": None,
+                    "tags": [],
+                })
 
         for m in moods:
             if m.note and m.note.strip():
-                memories.append(f"你上一次写道：「{m.note[:30]}{'...' if len(m.note) > 30 else ''}」")
+                memories.append({
+                    "content": f"你上一次写道：「{m.note[:30]}{'...' if len(m.note) > 30 else ''}」",
+                    "source": "rules",
+                    "memory_type": "event",
+                    "mood_context": m.mood_type,
+                    "tags": [],
+                })
                 break
+
+        # 保存规则生成的记忆到数据库
+        for mem in memories:
+            memory = CompanionMemory(
+                user_id=current_user.id,
+                content=mem["content"],
+                source="rules",
+                memory_type=mem.get("memory_type", "personality"),
+                mood_context=mem.get("mood_context"),
+                tags=json.dumps(mem.get("tags", [])),
+            )
+            session.add(memory)
+        session.commit()
 
     return {
         "code": 0,
