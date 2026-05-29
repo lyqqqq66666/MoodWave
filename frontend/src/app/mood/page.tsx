@@ -10,8 +10,10 @@ import { MoodWaveShell } from "@/components/moodwave-shell"
 import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mood-analysis-report"
 import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
+import { useAuthGuard } from "@/hooks/useAuthGuard"
 import { cn, convertBlobToWav } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
+import { useGuestStore } from "@/store/guest"
 
 const steps = ["情绪", "强度", "内容", "标签", "完成"]
 
@@ -25,8 +27,11 @@ const fallbackRadar = [
 ]
 
 export default function MoodPage() {
-  const { user } = useAuthStore()
+  const { user, token } = useAuthStore()
+  const { isGuest } = useAuthGuard({ silent: true })
+  const addGuestRecord = useGuestStore((state) => state.addRecord)
   const [step, setStep] = useState(1)
+  const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [selectedMood, setSelectedMood] = useState<MoodType>("calm")
   const [intensity, setIntensity] = useState(6)
   const [note, setNote] = useState("")
@@ -114,6 +119,12 @@ export default function MoodPage() {
     setVoiceStatus("uploading")
     setShowVoiceText(false)
 
+    if (!token) {
+      setVoiceStatus("ready")
+      setSubmitNotice((current) => current || "游客模式下语音会先保存在本地，本次不上传云端转写。")
+      return
+    }
+
     try {
       // 浏览器录音默认 webm/opus，Qwen ASR 稳定支持 WAV，先转换
       const wavFile = file.type.includes("wav") ? file : new File([await convertBlobToWav(file)], file.name.replace(/\.[^.]+$/, ".wav"), { type: "audio/wav" })
@@ -136,6 +147,22 @@ export default function MoodPage() {
     setSubmitNotice("")
 
     try {
+      if (isGuest) {
+        const imageUrls = images.map((image) => image.previewUrl)
+        const report = buildFallbackReport()
+        addGuestRecord({
+          date: recordDate,
+          mood_type: selectedMood,
+          intensity,
+          tags: selectedTags,
+          note: note || voiceText,
+          images: imageUrls,
+        })
+        setAnalysisReport(report)
+        setSubmitNotice("已保存到本地游客记录。登录后可把记录同步到云端。")
+        return
+      }
+
       let imageUrls = images.map((image) => image.previewUrl)
       if (images.length > 0) {
         try {
@@ -195,7 +222,7 @@ export default function MoodPage() {
 
       setAnalysisReport(report)
       await moodAPI.create({
-        date: new Date().toISOString().slice(0, 10),
+        date: recordDate,
         mood_type: selectedMood,
         intensity,
         tags: selectedTags,
@@ -219,6 +246,22 @@ export default function MoodPage() {
     <MoodWaveShell title="情绪录入">
       <div className="mx-auto max-w-6xl">
         <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8">
+          <div className="mb-5 flex flex-col gap-3 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">记录日期</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {isGuest ? "游客模式会先保存在本地。" : "支持补记过去某一天，创建时间仍会单独保留。"}
+              </p>
+            </div>
+            <input
+              type="date"
+              value={recordDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(event) => setRecordDate(event.target.value)}
+              className="min-h-11 rounded-full border border-[#f0dbe2] bg-white px-4 text-sm font-semibold text-slate-700 outline-none focus:border-[#ff9fb4]"
+              aria-label="记录日期"
+            />
+          </div>
           <div className="mx-auto mb-8 max-w-3xl">
             <div className="flex items-center justify-between gap-2">
               {steps.map((label, index) => {
@@ -490,17 +533,24 @@ export default function MoodPage() {
                     <MoodAnalysisReport report={analysisReport ?? buildFallbackReport()} />
                   </div>
                   <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-                    <Link
-                      href="/dashboard"
-                      className="rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white"
-                    >
-                      返回首页
-                    </Link>
-                    <Link
-                      href={`/music?mood=${selectedMood}&intensity=${intensity}`}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep(1)
+                        setSubmitted(false)
+                        setAnalysisReport(null)
+                        setSubmitNotice("")
+                      }}
                       className="rounded-full border border-[#f1dbe2] bg-white px-6 py-3 text-sm font-semibold text-slate-700"
                     >
-                      进入治愈音乐
+                      重新记录
+                    </button>
+                    <Link
+                      href={`/music?mood=${selectedMood}&intensity=${intensity}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white"
+                    >
+                      <Play className="h-4 w-4" />
+                      播放治愈音乐
                     </Link>
                   </div>
                 </section>

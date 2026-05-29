@@ -1,4 +1,4 @@
-import { Home, Music2, PenLine, Sparkles } from "lucide-react"
+import { Home, Music2, PenLine, Sparkles, UserRound } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { MoodType } from "./types"
 
@@ -26,8 +26,9 @@ export type MoodTagOption = {
 export const appNavItems: AppNavItem[] = [
   { href: "/dashboard", label: "首页", shortLabel: "首页", icon: Home },
   { href: "/mood", label: "情绪录入", shortLabel: "记录", icon: PenLine },
-  { href: "/music", label: "音乐", shortLabel: "音乐", icon: Music2 },
   { href: "/companion", label: "灵音伙伴", shortLabel: "伙伴", icon: Sparkles },
+  { href: "/music", label: "音乐", shortLabel: "音乐", icon: Music2 },
+  { href: "/profile", label: "我的", shortLabel: "我的", icon: UserRound },
 ]
 
 export const moodOptions: MoodOption[] = [

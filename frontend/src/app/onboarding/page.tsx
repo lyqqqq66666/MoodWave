@@ -4,18 +4,24 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow"
 import { hasCompletedOnboarding } from "@/lib/onboarding"
+import { useOnboardingStore } from "@/store/onboarding"
 
 export default function OnboardingPage() {
   const router = useRouter()
   const [isReady, setIsReady] = useState(false)
+  const resetOnboarding = useOnboardingStore((state) => state.reset)
 
   useEffect(() => {
-    if (hasCompletedOnboarding()) {
+    const restart = new URLSearchParams(window.location.search).get("restart") === "1"
+    if (restart) {
+      resetOnboarding()
+    }
+    if (!restart && hasCompletedOnboarding()) {
       router.replace("/dashboard")
       return
     }
     setIsReady(true)
-  }, [router])
+  }, [resetOnboarding, router])
 
   if (!isReady) {
     return (

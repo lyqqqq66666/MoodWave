@@ -283,6 +283,7 @@ function MusicPageContent() {
   const [currentBpm, setCurrentBpm] = useState(baseBpm)
   const [isBpmPanelOpen, setIsBpmPanelOpen] = useState(false)
   const [hasMoodRecord, setHasMoodRecord] = useState(true)
+  const [showDetails, setShowDetails] = useState(false)
   // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
   const insightRef = useRef(profile.insight)
 
@@ -809,9 +810,9 @@ function MusicPageContent() {
     >
       <div className="mx-auto max-w-7xl">
         {!hasMoodRecord ? <EmptyStateGuide variant="music" className="mb-5" /> : null}
-        <section className="relative isolate overflow-hidden rounded-[34px] bg-white/86 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 sm:p-5 lg:p-6">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#fff3f6] px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm">
+        <section className="relative isolate flex min-h-[calc(100svh-9rem)] flex-col overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff0f5]/80 via-[#f7f5ff]/60 to-[#f0faf8]/70 p-4 sm:p-5 lg:min-h-[calc(100svh-12rem)] lg:p-6">
+          <div className="relative z-20 mb-5 flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/72 px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm backdrop-blur-md lg:bg-[#fff3f6]">
               <span>{moodMeta.emoji}</span>
               {moodMeta.label}
             </div>
@@ -826,8 +827,8 @@ function MusicPageContent() {
             </button>
           </div>
 
-          <div className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(330px,0.42fr)] xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.42fr)]">
-            <div className="min-w-0 overflow-hidden">
+          <div className="relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(330px,0.42fr)] xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.42fr)]">
+            <div className="absolute inset-0 min-w-0 overflow-hidden lg:relative lg:inset-auto">
               <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
                 <div>
                   <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
@@ -836,8 +837,9 @@ function MusicPageContent() {
                 <BpmControl />
               </div>
 
-              <div className="relative z-0 aspect-[1.02/1] max-w-full overflow-hidden rounded-[30px] border border-white/80 bg-white sm:aspect-[16/11] lg:min-h-[420px]">
+              <div className="relative z-0 h-full min-h-full max-w-full overflow-hidden sm:aspect-[16/11] lg:h-full lg:min-h-[520px]">
                 <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full max-w-full" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 lg:hidden" />
                 <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3 sm:inset-x-5 sm:top-5">
                   <div className="hidden rounded-[24px] bg-white/68 px-4 py-3 text-sm text-slate-600 backdrop-blur-md sm:block">
                     <p className="font-semibold text-slate-800">{profile.texture}</p>
@@ -858,8 +860,8 @@ function MusicPageContent() {
               </div>
             </div>
 
-            <aside className="relative z-10 min-w-0 lg:pt-[74px]">
-              <div className="mx-auto max-w-sm lg:max-w-none">
+            <aside className="relative z-10 flex min-h-[calc(100svh-15rem)] min-w-0 items-end pt-[32vh] lg:block lg:min-h-0 lg:pt-[74px]">
+              <div className="mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0">
                 <div className="flex items-center gap-4">
                   <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br text-3xl text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]", profile.album)}>
                     ♪
@@ -950,7 +952,7 @@ function MusicPageContent() {
                   </button>
                 </div>
 
-                <div className="mt-7 grid grid-cols-3 gap-3 text-center">
+                <div className="mt-7 grid grid-cols-4 gap-3 text-center">
                   <button type="button" onClick={shuffleTracks} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]" aria-label="随机播放" title="随机播放">
                     <Shuffle className="mx-auto h-5 w-5" />
                     <span className="mt-1 block">随机</span>
@@ -963,13 +965,17 @@ function MusicPageContent() {
                     <Share2 className="mx-auto h-5 w-5" />
                     <span className="mt-1 block">分享</span>
                   </button>
+                  <button type="button" onClick={() => setShowDetails((value) => !value)} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#62bda9]" aria-label="更多" title="听后感与歌单">
+                    <MessageCircleHeart className="mx-auto h-5 w-5" />
+                    <span className="mt-1 block">更多</span>
+                  </button>
                 </div>
               </div>
             </aside>
           </div>
         </section>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <div className={cn("mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]", !showDetails && "hidden lg:grid")}>
           <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
               <div className="flex items-center gap-3">
                 <div className="relative">

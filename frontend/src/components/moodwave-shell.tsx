@@ -7,6 +7,7 @@ import { ReactNode, useState } from "react"
 import { appNavItems } from "@/lib/moodwave"
 import { cn } from "@/lib/utils"
 import { resolveAssetUrl } from "@/lib/api"
+import { isApp } from "@/lib/platform"
 import { MoodWaveLogo } from "./moodwave-logo"
 import { useAuthStore } from "@/store/auth"
 
@@ -27,6 +28,7 @@ export function MoodWaveShell({
   const router = useRouter()
   const { user, logout } = useAuthStore()
   const [notice, setNotice] = useState("")
+  const appMode = isApp()
 
   const handleLogout = () => {
     logout()
@@ -43,7 +45,7 @@ export function MoodWaveShell({
     { href: "/profile", label: "个人主页", icon: UserRound },
   ]
 
-  const displayName = user?.username || "MoodWave 用户"
+  const displayName = user?.username || (appMode ? "游客模式" : "MoodWave 用户")
   const avatarChar = displayName.charAt(0).toUpperCase()
   const avatarUrl = user?.avatar_url || null
 
@@ -99,7 +101,12 @@ export function MoodWaveShell({
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden lg:h-screen">
-          <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-5 py-4 backdrop-blur-xl lg:px-10">
+          <header
+            className={cn(
+              "sticky top-0 z-20 shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-5 py-4 backdrop-blur-xl lg:px-10",
+              "hidden lg:flex",
+            )}
+          >
             <div className="flex items-center gap-3">
               <div className="lg:hidden">
                 <MoodWaveLogo href="/dashboard" compact markOnly />
@@ -136,39 +143,50 @@ export function MoodWaveShell({
             </div>
           ) : null}
 
-          <main className={cn("min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-5 md:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:pb-10", contentClassName)}>
+          <main
+            className={cn(
+              "min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-5 md:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:pb-10",
+              appMode && "pt-[calc(env(safe-area-inset-top)+14px)]",
+              contentClassName,
+            )}
+          >
             {children}
           </main>
 
           <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/70 bg-white/88 px-3 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 backdrop-blur-xl lg:hidden">
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 items-end gap-1">
               {appNavItems.map((item) => {
                 const active = pathname === item.href
                 const Icon = item.icon
+                const featured = item.href === "/companion"
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-xs transition",
+                      "flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2 text-[11px] transition",
+                      featured && "-mt-7 min-h-[72px]",
                       active
-                        ? "bg-gradient-to-r from-[#ff9fb4] to-[#8de1d5] text-white shadow-[0_10px_24px_rgba(255,177,194,0.28)]"
-                        : "text-slate-500",
+                        ? "text-[#ff7894]"
+                        : "text-slate-500 hover:text-slate-700",
                     )}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.shortLabel}</span>
+                    <span
+                      className={cn(
+                        "grid h-8 w-8 place-items-center rounded-2xl transition",
+                        featured && "h-12 w-12 rounded-full bg-gradient-to-r from-[#ff9fb4] via-[#ffbfcb] to-[#8de1d5] text-white shadow-[0_14px_28px_rgba(255,181,194,0.34)]",
+                        active && !featured && "bg-[#fff0f4] shadow-[0_8px_18px_rgba(255,181,194,0.18)]",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4", featured && "h-5 w-5")} />
+                    </span>
+                    <span className={cn("font-medium leading-none", featured && active && "text-[#ff7894]")}>
+                      {item.shortLabel}
+                    </span>
                   </Link>
                 )
               })}
             </div>
-            <Link
-              href="/mood"
-              className="mt-3 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff9fb4] via-[#ffbfcb] to-[#8de1d5] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,181,194,0.32)]"
-            >
-              <Sparkles className="h-4 w-4" />
-              记录此刻心情
-            </Link>
           </nav>
         </div>
       </div>

@@ -19,6 +19,7 @@ type OnboardingState = {
   prevStep: () => void
   skipAll: () => void
   complete: () => void
+  reset: () => void
   setDemoMood: (mood: MoodType) => void
   setDemoIntensity: (intensity: number) => void
   setDemoNote: (note: string) => void
@@ -57,6 +58,15 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
     markOnboardingCompleted()
     set({ isCompleted: true })
   },
+  reset: () => set({
+    currentStep: 0,
+    isCompleted: false,
+    demoMood: "calm",
+    demoIntensity: 6,
+    demoNote: "",
+    aiResult: null,
+    aiError: "",
+  }),
   setDemoMood: (demoMood) => set({ demoMood }),
   setDemoIntensity: (demoIntensity) => set({ demoIntensity }),
   setDemoNote: (demoNote) => set({ demoNote }),

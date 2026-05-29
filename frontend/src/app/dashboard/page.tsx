@@ -11,6 +11,7 @@ import { MoodWaveShell } from "@/components/moodwave-shell"
 import { CompanionAvatar } from "@/components/companion-avatar"
 import { DashboardTooltip } from "@/components/onboarding/dashboard-tooltip"
 import { useAuthStore } from "@/store/auth"
+import { useGuestStore } from "@/store/guest"
 
 type SSEMessage = {
   type?: "text" | "done" | "error"
@@ -31,6 +32,7 @@ function unwrapData(payload: unknown) {
 
 export default function DashboardPage() {
   const { user, token } = useAuthStore()
+  const guestRecords = useGuestStore((state) => state.records)
   const [currentMoodIndex, setCurrentMoodIndex] = useState(1)
   const [recentMoods, setRecentMoods] = useState<RecentMood[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -50,6 +52,18 @@ export default function DashboardPage() {
     let active = true
 
     async function loadMoods() {
+      if (!token && guestRecords.length > 0) {
+        setRecentMoods(
+          guestRecords.slice(0, 3).map((item) => ({
+            id: item.id,
+            mood_type: item.mood_type,
+            note: item.note || "这一天被认真记录下来了。",
+            created_at: item.created_at,
+          })),
+        )
+        setIsLoading(false)
+        return
+      }
       try {
         const response = await moodAPI.list({ limit: 3 })
         if (!active) return
@@ -76,7 +90,7 @@ export default function DashboardPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [guestRecords, token])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -153,6 +167,33 @@ export default function DashboardPage() {
     >
       <DashboardTooltip />
       <div className="mx-auto grid max-w-6xl gap-6">
+        <section className="rounded-[34px] bg-white/84 p-5 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:p-7">
+          <div className="grid gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+            <div className="flex items-center gap-3">
+              <CompanionAvatar
+                character={user?.avatar_character}
+                color={user?.character_color}
+                mood={mood.value}
+                size="sm"
+              />
+              <div>
+                <p className="text-sm font-semibold text-[#ff718b]">AI 每日寄语</p>
+                <p className="mt-1 text-xs text-slate-500">{token ? "来自灵音伙伴的今日提醒" : "游客模式使用本地寄语兜底"}</p>
+              </div>
+            </div>
+            <p className="text-sm leading-7 text-slate-700 md:text-base">
+              {dailyMessage || (isDailyMessageLoading ? "灵音伙伴正在准备今天的寄语..." : buildDailyMessage(mood.value))}
+            </p>
+            <Link
+              href={token ? "/companion" : "/mood"}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,181,194,0.25)]"
+            >
+              {token ? "和伙伴聊聊" : "先记录心情"}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+
         <section className="rounded-[36px] bg-white/80 p-6 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/70 md:p-8">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
             <div className="space-y-4">
@@ -277,29 +318,30 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-[32px] bg-white/80 p-6 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/70">
-            <h3 className="text-xl font-semibold">AI 每日寄语</h3>
-            <p className="mt-1 text-sm text-slate-500">一段适合今天的温柔提醒。</p>
-            <div className="mt-5 flex items-center gap-3 rounded-[26px] bg-[#fff7f9] p-3 ring-1 ring-[#f8e7eb]">
-              <CompanionAvatar
-                character={user?.avatar_character}
-                color={user?.character_color}
-                mood={mood.value}
-                size="sm"
-              />
-              <div className="rounded-[22px] bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">
-                “{greeting.greeting.replace("，", "，")}我陪你把今天慢慢收好。”
-              </div>
-            </div>
-            <div className="mt-6 rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-6">
-              <p className="text-sm leading-7 text-slate-700">
-                {dailyMessage || (isDailyMessageLoading ? "灵音伙伴正在准备今天的寄语..." : buildDailyMessage(mood.value))}
-              </p>
+            <h3 className="text-xl font-semibold">今日闭环</h3>
+            <p className="mt-1 text-sm text-slate-500">从记录到音乐，保持一个轻量节奏。</p>
+            <div className="mt-5 grid gap-3">
+              {[
+                { href: "/mood", title: "记录此刻", helper: "选情绪、写一句话、保存今天" },
+                { href: "/music", title: "播放音乐", helper: "用当前情绪生成一段可视化旋律" },
+                { href: token ? "/companion" : "/login?redirect=/companion", title: "找伙伴聊聊", helper: token ? "把今天的心情交给灵音伙伴" : "登录后解锁长期记忆与对话" },
+              ].map((item, index) => (
+                <Link key={item.href} href={item.href} className="flex items-center gap-3 rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-r from-[#ffbfd0] to-[#8de1d5] text-sm font-semibold text-white">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-800">{item.title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">{item.helper}</span>
+                  </span>
+                </Link>
+              ))}
             </div>
             <Link
-              href="/companion"
+              href="/onboarding?restart=1"
               className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#ff718b] transition hover:text-[#e95d78]"
             >
-              和灵音伙伴聊聊
+              重新查看新手引导
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

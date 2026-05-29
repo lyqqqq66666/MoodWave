@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Download,
   Flame,
-  HeartHandshake,
   Info,
   LogOut,
   Medal,
@@ -37,7 +36,9 @@ import {
 } from "@/lib/profile"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { EditProfileDialog, getMbtiTone, getZodiac } from "@/components/edit-profile-dialog"
+import { useAuthGuard } from "@/hooks/useAuthGuard"
 import { useAuthStore } from "@/store/auth"
+import { useGuestStore } from "@/store/guest"
 import type { MusicRecommendation, MoodType } from "@/lib/types"
 
 const settingItems = [
@@ -95,6 +96,8 @@ function inferMoodFromText(text: string): MoodType {
 export default function ProfilePage() {
   const router = useRouter()
   const { user, updateUser, logout } = useAuthStore()
+  const { isGuest } = useAuthGuard({ silent: true })
+  const guestRecords = useGuestStore((state) => state.records)
   const [summary, setSummary] = useState<SummaryState>(fallbackSummary)
   const [records, setRecords] = useState<MoodRecord[]>(fallbackRecords)
   const [avatarPreview, setAvatarPreview] = useState("")
@@ -114,6 +117,33 @@ export default function ProfilePage() {
     let active = true
 
     async function loadProfile() {
+      if (isGuest) {
+        const localRecords = guestRecords.map((record) => {
+          const mood = getMoodOption(record.mood_type)
+          return {
+            id: record.id,
+            date: record.date,
+            mood: record.mood_type,
+            tag: record.tags[0] || "本地记录",
+            title: `${mood.label} · 强度 ${record.intensity}/10`,
+            note: record.note || "游客模式下保存的一条心情。",
+          }
+        })
+        if (!active) return
+        setRecords(localRecords.length > 0 ? localRecords : [])
+        setSummary({
+          ...fallbackSummary,
+          journalCount: localRecords.length,
+          monthCount: localRecords.length,
+          streakDays: localRecords.length > 0 ? 1 : 0,
+          musicCount: 0,
+          dominantMood: localRecords[0]?.mood || "calm",
+          favoriteTags: Array.from(new Set(guestRecords.flatMap((record) => record.tags))).slice(0, 5),
+        })
+        setFavoriteMusic([])
+        setIsLoading(false)
+        return
+      }
       try {
         const [summaryResponse, moodsResponse] = await Promise.all([
           analyticsAPI.summary(),
@@ -147,10 +177,10 @@ export default function ProfilePage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [guestRecords, isGuest])
 
   const dominant = getMoodOption(summary.dominantMood)
-  const username = user?.username || "MoodWave 用户"
+  const username = user?.username || (isGuest ? "游客模式" : "MoodWave 用户")
   const mbti = user?.mbti || ""
   const zodiac = getZodiac(user?.zodiac)
   const avatarInitial = username.slice(0, 1).toUpperCase()
@@ -183,6 +213,10 @@ export default function ProfilePage() {
 
   async function handleAvatarChange(file: File | undefined) {
     if (!file) return
+    if (isGuest) {
+      setSettingsNotice("游客模式下头像不会上传，登录后可以同步个人资料。")
+      return
+    }
     const preview = URL.createObjectURL(file)
     setAvatarPreview(preview)
     try {
@@ -342,6 +376,23 @@ export default function ProfilePage() {
       }
     >
       <EditProfileDialog open={showEditProfile} onOpenChange={setShowEditProfile} />
+      {isGuest ? (
+        <div className="mx-auto mb-5 max-w-6xl rounded-[28px] bg-gradient-to-r from-[#fff4f7] to-[#effdfa] p-4 shadow-[0_16px_36px_rgba(255,216,225,0.16)] ring-1 ring-white/80">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">当前是游客模式</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">本地已有 {guestRecords.length} 条情绪记录。登录后可同步到云端并解锁伙伴记忆、社区和数据导出。</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/login?redirect=/profile")}
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white"
+            >
+              登录同步
+            </button>
+          </div>
+        </div>
+      ) : null}
       {showSettingsMenu ? (
         <div className="fixed inset-x-0 bottom-0 z-[80] flex max-h-[86dvh] min-h-[360px] flex-col overflow-hidden rounded-t-[34px] border border-white/80 bg-white/96 p-4 shadow-[0_-18px_50px_rgba(255,181,194,0.24)] backdrop-blur-xl md:bottom-auto md:left-auto md:right-6 md:top-20 md:max-h-[calc(100vh-7rem)] md:min-h-0 md:w-[340px] md:rounded-[28px] md:shadow-[0_20px_50px_rgba(255,181,194,0.24)] lg:right-10">
           <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-[#f2d6de] md:hidden" />
@@ -500,6 +551,15 @@ export default function ProfilePage() {
           <section className="min-w-0 overflow-hidden rounded-[36px] bg-white/82 shadow-[0_24px_70px_rgba(255,206,216,0.24)] ring-1 ring-white/75 xl:col-start-1 xl:row-start-1 xl:h-full">
           <div className="relative min-h-[190px] bg-[radial-gradient(circle_at_20%_15%,rgba(255,181,194,0.6),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,230,207,0.72),transparent_34%),linear-gradient(135deg,#fff4f7,#f0fffb_48%,#fff8df)] px-6 pb-7 pt-8 md:px-9">
             <div className="absolute bottom-0 left-0 right-0 h-16 bg-[linear-gradient(135deg,rgba(255,255,255,0.48),rgba(255,255,255,0))]" />
+            <button
+              type="button"
+              onClick={() => setShowSettingsMenu((value) => !value)}
+              className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/88 text-slate-600 shadow-[0_10px_24px_rgba(255,205,216,0.22)] ring-1 ring-white/70 transition hover:-translate-y-0.5 hover:text-[#ff718b]"
+              aria-label="打开设置菜单"
+              aria-expanded={showSettingsMenu}
+            >
+              <Settings className="h-4 w-4" />
+            </button>
             <div className="relative flex flex-col items-center text-center md:flex-row md:text-left">
               <label className="group relative grid h-28 w-28 shrink-0 cursor-pointer place-items-center rounded-full bg-white p-2 shadow-[0_18px_42px_rgba(255,159,180,0.28)]">
                 {avatarPreview || user?.avatar_url ? (
@@ -549,7 +609,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid gap-3 px-5 py-5 sm:grid-cols-3 md:px-8">
+          <div className="grid gap-2 px-5 py-4 sm:grid-cols-3 md:px-8">
             {[
               { icon: PenLine, label: "篇日记", value: summary.journalCount },
               { icon: Music2, label: "首音乐", value: summary.musicCount },
@@ -557,9 +617,9 @@ export default function ProfilePage() {
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div key={item.label} className="rounded-[28px] bg-[#fff9fb] p-4 text-center ring-1 ring-[#ffe2ea]">
-                  <Icon className="mx-auto h-5 w-5 text-[#ff7f96]" />
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{item.value}</p>
+                <div key={item.label} className="flex items-center justify-center gap-2 rounded-[22px] bg-[#fff9fb] px-3 py-3 text-center ring-1 ring-[#ffe2ea]">
+                  <Icon className="h-4 w-4 shrink-0 text-[#ff7f96]" />
+                  <p className="text-lg font-semibold text-slate-900">{item.value}</p>
                   <p className="text-xs text-slate-500">{item.label}</p>
                 </div>
               )
@@ -721,37 +781,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6 xl:col-start-2 xl:row-start-3">
-            <div className="flex items-center gap-2">
-              <HeartHandshake className="h-5 w-5 text-[#ff9fb4]" />
-              <h3 className="text-xl font-semibold">音乐偏好</h3>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {summary.favoriteTags.map((tag) => (
-                <span key={tag} className="rounded-full bg-[#fff4f7] px-4 py-2 text-sm text-[#ff7894] ring-1 ring-[#ffd9e2]">
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {favoriteMusic.map((track) => {
-                const mood = getMoodOption(track.mood_type)
-                return (
-                  <article key={track.id} className="rounded-[26px] bg-white/88 p-4 ring-1 ring-[#f8e7eb]">
-                    <div className="flex items-center gap-3">
-                      <div className="grid h-12 w-12 place-items-center rounded-[18px] text-xl" style={{ backgroundColor: mood.softAccent }}>
-                        ♪
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900">{track.title}</p>
-                        <p className="mt-1 truncate text-xs text-slate-500">{track.artist} · {mood.label}</p>
-                      </div>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </div>
       </div>
     </MoodWaveShell>
   )

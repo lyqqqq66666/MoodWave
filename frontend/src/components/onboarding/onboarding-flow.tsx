@@ -1,8 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { useEffect, useRef } from "react"
+import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, X } from "lucide-react"
 import { onboardingSteps } from "@/lib/onboarding"
 import { useOnboardingStore } from "@/store/onboarding"
@@ -16,6 +16,7 @@ import { OnboardingStep5 } from "./onboarding-step-5"
 export function OnboardingFlow() {
   const router = useRouter()
   const { currentStep, isCompleted, isLoadingAI, setStep, nextStep, prevStep, skipAll, complete, analyzeDemo } = useOnboardingStore()
+  const dragStartX = useRef<number | null>(null)
 
   useEffect(() => {
     if (isCompleted) router.replace("/dashboard")
@@ -46,13 +47,26 @@ export function OnboardingFlow() {
     else nextStep()
   }
 
-  const content = [
+  const slides = [
     <OnboardingStep1 key="step-1" onStart={nextStep} />,
     <OnboardingStep2 key="step-2" />,
     <OnboardingStep3 key="step-3" />,
     <OnboardingStep4 key="step-4" />,
     <OnboardingStep5 key="step-5" onComplete={handleComplete} />,
-  ][currentStep]
+  ]
+
+  function handlePointerUp(clientX: number) {
+    if (dragStartX.current === null) return
+    const distance = clientX - dragStartX.current
+    dragStartX.current = null
+    if (Math.abs(distance) < 48) return
+    if (distance < 0) {
+      if (currentStep === 3) void analyzeDemo()
+      else nextStep()
+    } else {
+      prevStep()
+    }
+  }
 
   return (
     <main className="relative min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.78),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.74),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(210,198,255,0.44),_transparent_30%),linear-gradient(180deg,#fffdfb_0%,#fff7f0_100%)] px-4 pb-[calc(env(safe-area-inset-bottom)+8.75rem)] pt-[calc(env(safe-area-inset-top)+1rem)] text-slate-800">
@@ -69,19 +83,40 @@ export function OnboardingFlow() {
         跳过引导
       </button>
 
-      <section className="relative z-10 mx-auto flex min-h-[calc(100svh-9.75rem)] w-full max-w-5xl items-start justify-center pb-6 pt-20 md:items-center md:py-16">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-            className="w-full"
-          >
-            {content}
-          </motion.div>
-        </AnimatePresence>
+      <section
+        className="relative z-10 mx-auto flex min-h-[calc(100svh-9.75rem)] w-full max-w-5xl items-start justify-center overflow-hidden pb-6 pt-20 touch-pan-y md:items-center md:py-16"
+        onPointerDown={(event) => {
+          dragStartX.current = event.clientX
+        }}
+        onPointerUp={(event) => handlePointerUp(event.clientX)}
+        onPointerCancel={() => {
+          dragStartX.current = null
+        }}
+      >
+        <motion.div
+          animate={{ x: `-${currentStep * 100}%` }}
+          transition={{ duration: 0.42, ease: [0.34, 1.56, 0.64, 1] }}
+          className="flex w-full"
+        >
+          {slides.map((slide, index) => (
+            <div
+              key={index}
+              className="grid w-full shrink-0 place-items-center px-1"
+              aria-hidden={index !== currentStep}
+            >
+              <motion.div
+                animate={{ opacity: index === currentStep ? 1 : 0.35, scale: index === currentStep ? 1 : 0.96 }}
+                transition={{ duration: 0.28 }}
+                className="w-full"
+              >
+                {slide}
+              </motion.div>
+            </div>
+          ))}
+        </motion.div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-fit rounded-full bg-white/70 px-3 py-1 text-[11px] font-medium text-slate-400 shadow-sm backdrop-blur-md md:hidden">
+          左右滑动切换
+        </div>
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/70 bg-white/72 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-[0_-18px_50px_rgba(255,181,194,0.18)] backdrop-blur-2xl">

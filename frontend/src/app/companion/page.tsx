@@ -1,9 +1,11 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Brain, Check, ChevronDown, Edit3, History, Loader2, MessageCircleHeart, MessageSquarePlus, Music2, Palette, RefreshCw, Send, Sparkles, Trash2, X } from "lucide-react"
+import Link from "next/link"
+import { Brain, Check, ChevronDown, Edit3, History, Loader2, MessageCircleHeart, MessageSquarePlus, MoreVertical, Music2, Palette, RefreshCw, Send, Sparkles, Trash2, X } from "lucide-react"
 import { aiAPI, authAPI, companionAPI } from "@/lib/api"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { useAuthGuard } from "@/hooks/useAuthGuard"
 import {
   CompanionAvatar,
   companionCharacters,
@@ -284,6 +286,7 @@ function formatMemoryDate(value?: string) {
 
 export default function CompanionPage() {
   const { user, token, updateUser } = useAuthStore()
+  const { isGuest } = useAuthGuard({ silent: true })
   const [activeTab, setActiveTab] = useState<TabKey>("chat")
   const [character, setCharacter] = useState<CompanionCharacter>(normalizeCompanionCharacter(user?.avatar_character))
   const [color, setColor] = useState<CompanionColor>((user?.character_color as CompanionColor) || "pink")
@@ -305,6 +308,7 @@ export default function CompanionPage() {
   const [agentNodes, setAgentNodes] = useState<string[]>([])
   const [agentDebugOpen, setAgentDebugOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [editingConversationId, setEditingConversationId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
   const [agentAvailable, setAgentAvailable] = useState<boolean | null>(null)
@@ -789,10 +793,52 @@ export default function CompanionPage() {
     }
   }
 
+  if (isGuest) {
+    return (
+      <MoodWaveShell title="灵音伙伴">
+        <div className="mx-auto grid min-h-[calc(100svh-12rem)] max-w-5xl place-items-center">
+          <section className="w-full overflow-hidden rounded-[38px] bg-white/86 shadow-[0_24px_80px_rgba(255,206,216,0.24)] ring-1 ring-white/75 md:grid md:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid place-items-center bg-gradient-to-br from-[#fff7fa] via-[#effdfa] to-[#fff7df] p-8 text-center">
+              <div className="rounded-[52px] bg-white/70 p-6 shadow-[0_18px_46px_rgba(255,181,194,0.18)]">
+                <CompanionAvatar character={character} color={color} mood={latestMood} size="lg" />
+              </div>
+              <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/82 px-4 py-2 text-sm font-semibold text-[#ff718b]">
+                <Sparkles className="h-4 w-4" />
+                {companion.tagline}
+              </p>
+            </div>
+            <div className="p-6 md:p-8">
+              <p className="text-sm font-semibold text-[#62bda9]">登录后解锁</p>
+              <h2 className="mt-3 text-3xl font-semibold text-slate-900">让灵音伙伴记住你最近的情绪线索</h2>
+              <p className="mt-4 text-sm leading-7 text-slate-600">
+                游客可以先记录心情和播放音乐。登录后，灵音伙伴会保存对话历史、长期记忆和你的专属形象，回应会更贴近你。
+              </p>
+              <div className="mt-6 grid gap-3">
+                {["长期记忆与历史对话", "结合情绪记录生成建议", "同步伙伴形象与个人资料"].map((item) => (
+                  <div key={item} className="rounded-[22px] bg-[#fffafb] px-4 py-3 text-sm font-medium text-slate-700 ring-1 ring-[#f8e7eb]">
+                    {item}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link href="/login?redirect=/companion" className="inline-flex min-h-12 items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,181,194,0.28)]">
+                  登录后开始对话
+                </Link>
+                <Link href="/mood" className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-slate-700 ring-1 ring-[#f1dbe2]">
+                  先记录一条心情
+                </Link>
+              </div>
+            </div>
+          </section>
+        </div>
+      </MoodWaveShell>
+    )
+  }
+
   return (
     <MoodWaveShell title="灵音伙伴">
       <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[0.88fr_1.12fr]">
-        <section className="rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75">
+        <section className="hidden rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75 lg:block">
           <div className="mx-auto w-fit rounded-[48px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-5">
             <CompanionAvatar character={character} color={color} mood={latestMood} size="lg" />
           </div>
@@ -811,8 +857,59 @@ export default function CompanionPage() {
           </div>
         </section>
 
-        <section className="min-w-0 rounded-[36px] bg-white/84 p-4 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:p-5">
-          <div className="grid grid-cols-3 gap-2 rounded-[28px] bg-[#fff7f9] p-2">
+        <section className="min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5">
+          <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-3 ring-1 ring-white/80 lg:hidden">
+            <div className="flex min-w-0 items-center gap-3">
+              <CompanionAvatar character={character} color={color} mood={latestMood} size="sm" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{companion.name}</p>
+                <p className="mt-0.5 truncate text-xs text-slate-500">{companion.tagline}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu((value) => !value)}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-600 shadow-sm ring-1 ring-[#f8dce5]"
+              aria-label="打开伙伴菜单"
+              aria-expanded={showMobileMenu}
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+            {showMobileMenu ? (
+              <div className="absolute right-3 top-[calc(100%+8px)] z-30 w-48 rounded-[24px] bg-white p-2 shadow-[0_20px_60px_rgba(99,76,89,0.2)] ring-1 ring-[#f8e7eb]">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(tab.key)
+                        setShowMobileMenu(false)
+                      }}
+                      className={cn("flex min-h-11 w-full items-center gap-3 rounded-[18px] px-3 text-left text-sm font-medium", activeTab === tab.key ? "bg-[#fff1f5] text-[#ff718b]" : "text-slate-600")}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {tab.label}
+                    </button>
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryOpen(true)
+                    setActiveTab("chat")
+                    setShowMobileMenu(false)
+                  }}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-[18px] px-3 text-left text-sm font-medium text-slate-600"
+                >
+                  <History className="h-4 w-4" />
+                  历史对话
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="hidden grid-cols-3 gap-2 rounded-[28px] bg-[#fff7f9] p-2 md:grid">
             {tabs.map((tab) => {
               const Icon = tab.icon
               const active = activeTab === tab.key
@@ -831,7 +928,7 @@ export default function CompanionPage() {
           </div>
 
           {activeTab === "chat" ? (
-            <div className="mt-4 flex h-[560px] min-h-0 flex-col">
+            <div className="flex h-[calc(100svh-10rem)] min-h-[560px] flex-col md:mt-4 md:h-[560px]">
               <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-white/72 px-4 py-3 ring-1 ring-[#f8e7eb]">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{activeConversation?.title || "新的伙伴对话"}</p>
