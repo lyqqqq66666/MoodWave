@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Brain, Check, ChevronDown, Edit3, History, Loader2, MessageCircleHeart, MessageSquarePlus, MoreVertical, Music2, Palette, RefreshCw, Send, Sparkles, Trash2, X } from "lucide-react"
 import { aiAPI, authAPI, companionAPI } from "@/lib/api"
+import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/components/companion-avatar"
 import { useAuthStore } from "@/store/auth"
 import { cn } from "@/lib/utils"
+import { isIOSApp } from "@/lib/platform"
 import type { MoodType } from "@/lib/types"
 
 type TabKey = "chat" | "dress" | "memory"
@@ -316,6 +318,7 @@ export default function CompanionPage() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [notice, setNotice] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const iosApp = isIOSApp()
 
   const latestMood = useMemo(() => inferMood(messages[messages.length - 1]?.content || ""), [messages])
   const filteredMemories = useMemo(
@@ -837,8 +840,8 @@ export default function CompanionPage() {
 
   return (
     <MoodWaveShell title="灵音伙伴">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[0.88fr_1.12fr]">
-        <section className="hidden rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75 lg:block">
+      <div className={cn("mx-auto grid gap-5", iosApp ? "max-w-[460px] grid-cols-1" : "max-w-6xl lg:grid-cols-[0.88fr_1.12fr]")}>
+        <section className={cn("rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75", iosApp ? "block" : "hidden lg:block")}>
           <div className="mx-auto w-fit rounded-[48px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-5">
             <CompanionAvatar character={character} color={color} mood={latestMood} size="lg" />
           </div>
@@ -857,7 +860,7 @@ export default function CompanionPage() {
           </div>
         </section>
 
-        <section className="min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5">
+        <section className={cn("min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5", iosApp && "overflow-hidden rounded-[34px] bg-gradient-to-br from-white/88 via-[#fff9fb] to-[#eefdfa] p-4")}>
           <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-3 ring-1 ring-white/80 lg:hidden">
             <div className="flex min-w-0 items-center gap-3">
               <CompanionAvatar character={character} color={color} mood={latestMood} size="sm" />
@@ -909,7 +912,7 @@ export default function CompanionPage() {
               </div>
             ) : null}
           </div>
-          <div className="hidden grid-cols-3 gap-2 rounded-[28px] bg-[#fff7f9] p-2 md:grid">
+          <div className={cn("grid-cols-3 gap-2 rounded-[28px] bg-[#fff7f9] p-2", iosApp ? "mb-3 grid" : "hidden md:grid")}>
             {tabs.map((tab) => {
               const Icon = tab.icon
               const active = activeTab === tab.key
@@ -928,7 +931,7 @@ export default function CompanionPage() {
           </div>
 
           {activeTab === "chat" ? (
-            <div className="flex h-[calc(100svh-10rem)] min-h-[560px] flex-col md:mt-4 md:h-[560px]">
+            <div className={cn("flex flex-col", iosApp ? "h-[calc(100svh-11rem)] min-h-[620px]" : "h-[calc(100svh-10rem)] min-h-[560px] md:mt-4 md:h-[560px]")}>
               <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-white/72 px-4 py-3 ring-1 ring-[#f8e7eb]">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{activeConversation?.title || "新的伙伴对话"}</p>
@@ -1056,7 +1059,7 @@ export default function CompanionPage() {
                   ) : null}
                 </div>
               ) : null}
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-[30px] bg-gradient-to-br from-[#fffafb] to-[#f2fffb] p-4 pr-2 [scrollbar-color:#ffb5c2_transparent] [scrollbar-width:thin]">
+              <div className={cn("min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-[30px] bg-gradient-to-br from-[#fffafb] to-[#f2fffb] p-4 pr-2 [scrollbar-color:#ffb5c2_transparent] [scrollbar-width:thin]", iosApp && "rounded-[32px] bg-white/72 p-3.5")}>
                 {messages.map((message) => {
                   const fromAssistant = message.role === "assistant"
                   const isTyping = fromAssistant && isStreaming && !message.content
@@ -1113,17 +1116,17 @@ export default function CompanionPage() {
                 <div ref={messagesEndRef} />
               </div>
               {notice ? <p className="mt-3 rounded-[18px] bg-[#fff4df] px-4 py-2 text-xs text-slate-600">{notice}</p> : null}
-              <form onSubmit={handleSend} className="mt-4 flex gap-3">
+              <form onSubmit={handleSend} className={cn("mt-4 flex gap-3", iosApp && "rounded-[28px] bg-white/84 p-3 shadow-[0_16px_30px_rgba(255,206,216,0.18)] backdrop-blur-xl")}>
                 <input
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   placeholder="输入想说的话..."
-                  className="min-h-12 min-w-0 flex-1 rounded-full border border-[#f0dbe2] bg-white px-4 text-sm outline-none transition focus:border-[#ff9fb4]"
+                  className={cn("min-h-12 min-w-0 flex-1 rounded-full border border-[#f0dbe2] bg-white px-4 text-sm outline-none transition focus:border-[#ff9fb4]", iosApp && "min-h-[52px]")}
                 />
                 <button
                   type="submit"
                   disabled={isStreaming || !input.trim()}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,181,194,0.28)] disabled:cursor-wait disabled:opacity-60"
+                  className={cn("inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(255,181,194,0.28)] disabled:cursor-wait disabled:opacity-60", iosApp && "min-h-[52px]")}
                 >
                   {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {isStreaming ? "发送中" : "发送"}
@@ -1133,7 +1136,7 @@ export default function CompanionPage() {
           ) : null}
 
           {activeTab === "dress" ? (
-            <div className="mt-5 grid gap-5">
+            <div className={cn("mt-5 grid gap-5", iosApp && "gap-4")}>
               <div>
                 <h3 className="font-semibold text-slate-900">选择伙伴形象</h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -1175,7 +1178,7 @@ export default function CompanionPage() {
 
           {activeTab === "memory" ? (
             <div className="mt-5">
-              <div className="rounded-[30px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-5">
+              <IOSGlassCard className={cn("bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-5", iosApp && "rounded-[30px] bg-white/84 p-5")}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-semibold text-slate-900">伙伴记住的小线索</h3>
@@ -1191,7 +1194,7 @@ export default function CompanionPage() {
                     {isMemoryGenerating ? "整理中" : "生成记忆"}
                   </button>
                 </div>
-              </div>
+              </IOSGlassCard>
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-color:#ffb5c2_transparent] [scrollbar-width:thin]">
                 {memoryTypes.map((item) => {
                   const active = memoryTypeFilter === item.key

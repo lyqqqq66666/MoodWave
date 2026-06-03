@@ -35,8 +35,11 @@ import {
   unwrapData,
 } from "@/lib/profile"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { EditProfileDialog, getMbtiTone, getZodiac } from "@/components/edit-profile-dialog"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
+import { isIOSApp } from "@/lib/platform"
+import { cn } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
 import { useGuestStore } from "@/store/guest"
 import type { MusicRecommendation, MoodType } from "@/lib/types"
@@ -112,6 +115,7 @@ export default function ProfilePage() {
   const [exportFormat, setExportFormat] = useState<"json" | "csv">("json")
   const [exportScope, setExportScope] = useState("all")
   const [exportInclude, setExportInclude] = useState(["records", "summary", "profile", "favorites"])
+  const iosApp = isIOSApp()
 
   useEffect(() => {
     let active = true
@@ -360,7 +364,7 @@ export default function ProfilePage() {
 
   return (
     <MoodWaveShell
-      title="个人主页"
+      title={iosApp ? "我的" : "个人主页"}
       rightSlot={
         <div className="relative">
           <button
@@ -377,7 +381,7 @@ export default function ProfilePage() {
     >
       <EditProfileDialog open={showEditProfile} onOpenChange={setShowEditProfile} />
       {isGuest ? (
-        <div className="mx-auto mb-5 max-w-6xl rounded-[28px] bg-gradient-to-r from-[#fff4f7] to-[#effdfa] p-4 shadow-[0_16px_36px_rgba(255,216,225,0.16)] ring-1 ring-white/80">
+        <div className={cn("mx-auto mb-5 rounded-[28px] bg-gradient-to-r from-[#fff4f7] to-[#effdfa] p-4 shadow-[0_16px_36px_rgba(255,216,225,0.16)] ring-1 ring-white/80", iosApp ? "max-w-[460px]" : "max-w-6xl")}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-slate-800">当前是游客模式</p>
@@ -547,8 +551,8 @@ export default function ProfilePage() {
           </div>
         </div>
       ) : null}
-      <div className="mx-auto grid min-w-0 max-w-6xl gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-stretch">
-          <section className="min-w-0 overflow-hidden rounded-[36px] bg-white/82 shadow-[0_24px_70px_rgba(255,206,216,0.24)] ring-1 ring-white/75 xl:col-start-1 xl:row-start-1 xl:h-full">
+      <div className={cn("mx-auto grid min-w-0 gap-5", iosApp ? "max-w-[460px] grid-cols-1" : "max-w-6xl xl:grid-cols-[0.95fr_1.05fr] xl:items-stretch")}>
+          <section className={cn("min-w-0 overflow-hidden rounded-[36px] bg-white/82 shadow-[0_24px_70px_rgba(255,206,216,0.24)] ring-1 ring-white/75", !iosApp && "xl:col-start-1 xl:row-start-1 xl:h-full")}>
           <div className="relative min-h-[190px] bg-[radial-gradient(circle_at_20%_15%,rgba(255,181,194,0.6),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,230,207,0.72),transparent_34%),linear-gradient(135deg,#fff4f7,#f0fffb_48%,#fff8df)] px-6 pb-7 pt-8 md:px-9">
             <div className="absolute bottom-0 left-0 right-0 h-16 bg-[linear-gradient(135deg,rgba(255,255,255,0.48),rgba(255,255,255,0))]" />
             <button
@@ -627,7 +631,7 @@ export default function ProfilePage() {
           </div>
           </section>
 
-          <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,216,225,0.2)] ring-1 ring-white/75 md:p-6 xl:col-start-1 xl:row-start-2">
+          <IOSGlassCard className={cn("rounded-[34px] p-5 md:p-6", !iosApp && "xl:col-start-1 xl:row-start-2", iosApp && "bg-white/86")}>
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-semibold">本月数据统计</h3>
@@ -665,9 +669,9 @@ export default function ProfilePage() {
               ))}
             </div>
           </div>
-          </section>
+          </IOSGlassCard>
 
-          <div className="flex flex-col rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6 xl:col-start-2 xl:row-start-1 xl:h-full">
+          <IOSGlassCard className={cn("flex flex-col rounded-[34px] p-5 md:p-6", !iosApp && "xl:col-start-2 xl:row-start-1 xl:h-full", iosApp && "bg-white/86")}>
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">快乐能量库</h3>
               <Sparkles className="h-5 w-5 text-[#ff9fb4]" />
@@ -687,9 +691,9 @@ export default function ProfilePage() {
                 )
               })}
             </div>
-          </div>
+          </IOSGlassCard>
 
-          <div className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6 xl:col-start-2 xl:row-start-2">
+          <IOSGlassCard className={cn("rounded-[34px] p-5 md:p-6", !iosApp && "xl:col-start-2 xl:row-start-2", iosApp && "bg-white/86")}>
             <h3 className="text-xl font-semibold">历史记录</h3>
             <div className="mt-5 space-y-3">
               {records.slice(0, 4).map((record) => {
@@ -711,9 +715,9 @@ export default function ProfilePage() {
                 )
               })}
             </div>
-          </div>
+          </IOSGlassCard>
 
-          <div className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,216,225,0.18)] ring-1 ring-white/75 md:p-6 xl:col-start-1 xl:row-start-3">
+          <IOSGlassCard className={cn("rounded-[34px] p-5 md:p-6", !iosApp && "xl:col-start-1 xl:row-start-3", iosApp && "bg-white/86")}>
             <h3 className="text-xl font-semibold">心境清单</h3>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <input
@@ -779,7 +783,7 @@ export default function ProfilePage() {
                 )
               })}
             </div>
-          </div>
+          </IOSGlassCard>
 
       </div>
     </MoodWaveShell>
