@@ -1,0 +1,28 @@
+.ios-app-shell {
+  --ios-bg-base: #fff8f0;
+  --ios-bg-surface: rgba(255, 255, 255, 0.78);
+  --ios-bg-elevated: rgba(255, 255, 255, 0.92);
+  --ios-text-primary: #2d3436;
+  --ios-text-secondary: #636e72;
+  --ios-brand-pink: #ffb5c2;
+  --ios-brand-mint: #a8e6cf;
+  --ios-brand-yellow: #ffd93d;
+  --ios-brand-purple: #cbc3e3;
+  --ios-radius-card: 32px;
+  --ios-radius-pill: 9999px;
+  --ios-shadow-soft: 0 18px 40px rgba(255, 206, 216, 0.22);
+  --ios-shadow-float: 0 24px 60px rgba(255, 181, 194, 0.24);
+}
+
+.ios-app-shell,
+.ios-app-shell * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ios-app-shell .ios-tab-bar {
+  pointer-events: none;
+}
+
+.ios-app-shell .ios-tab-bar > * {
+  pointer-events: auto;
+}

@@ -7,8 +7,9 @@ import { ReactNode, useState } from "react"
 import { appNavItems } from "@/lib/moodwave"
 import { cn } from "@/lib/utils"
 import { resolveAssetUrl } from "@/lib/api"
-import { isApp } from "@/lib/platform"
+import { isApp, isIOSApp } from "@/lib/platform"
 import { MoodWaveLogo } from "./moodwave-logo"
+import { IOSAppShell } from "./ios/ios-app-shell"
 import { useAuthStore } from "@/store/auth"
 
 type MoodWaveShellProps = {
@@ -29,6 +30,7 @@ export function MoodWaveShell({
   const { user, logout } = useAuthStore()
   const [notice, setNotice] = useState("")
   const appMode = isApp()
+  const iosAppMode = isIOSApp()
 
   const handleLogout = () => {
     logout()
@@ -48,6 +50,26 @@ export function MoodWaveShell({
   const displayName = user?.username || (appMode ? "游客模式" : "MoodWave 用户")
   const avatarChar = displayName.charAt(0).toUpperCase()
   const avatarUrl = user?.avatar_url || null
+
+  if (iosAppMode) {
+    return (
+      <IOSAppShell
+        title={title}
+        rightSlot={rightSlot}
+        notice={notice}
+        onNoticeClick={() => setNotice("通知中心即将上线，今天先把重要心情留在这里。")}
+        onLogout={handleLogout}
+        pathname={pathname}
+        navItems={appNavItems}
+        displayName={displayName}
+        avatarChar={avatarChar}
+        avatarUrl={avatarUrl}
+        contentClassName={contentClassName}
+      >
+        {children}
+      </IOSAppShell>
+    )
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800 lg:h-screen lg:overflow-hidden">
