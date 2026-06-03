@@ -10,8 +10,11 @@ import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { CompanionAvatar } from "@/components/companion-avatar"
 import { DashboardTooltip } from "@/components/onboarding/dashboard-tooltip"
+import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { useAuthStore } from "@/store/auth"
 import { useGuestStore } from "@/store/guest"
+import { cn } from "@/lib/utils"
+import { isIOSApp } from "@/lib/platform"
 
 type SSEMessage = {
   type?: "text" | "done" | "error"
@@ -42,6 +45,7 @@ export default function DashboardPage() {
 
   const mood = moodOptions[currentMoodIndex]
   const greeting = getGreetingForHour()
+  const iosApp = isIOSApp()
 
   function shiftMood(direction: 1 | -1) {
     setMoodDirection(direction)
@@ -161,114 +165,195 @@ export default function DashboardPage() {
   }, [mood.label, mood.value, token, user?.avatar_character, user?.mbti, user?.zodiac])
 
   return (
-    <MoodWaveShell
-      title={greeting.greeting}
-      rightSlot={null}
-    >
+    <MoodWaveShell title={greeting.greeting} rightSlot={null}>
       <DashboardTooltip />
-      <div className="mx-auto grid max-w-6xl gap-6">
-        <section className="rounded-[34px] bg-white/84 p-5 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:p-7">
-          <div className="grid gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-            <div className="flex items-center gap-3">
-              <CompanionAvatar
-                character={user?.avatar_character}
-                color={user?.character_color}
-                mood={mood.value}
-                size="sm"
-              />
-              <div>
-                <p className="text-sm font-semibold text-[#ff718b]">AI 每日寄语</p>
-                <p className="mt-1 text-xs text-slate-500">{token ? "来自灵音伙伴的今日提醒" : "游客模式使用本地寄语兜底"}</p>
+      <div className={cn("mx-auto grid gap-5", iosApp ? "max-w-[460px]" : "max-w-6xl gap-6")}>
+        <IOSGlassCard className={cn(iosApp ? "overflow-hidden bg-gradient-to-br from-white/90 via-[#fff8fb] to-[#eefdfa] p-0" : "p-5 md:p-7")}>
+          {iosApp ? (
+            <div className="p-5">
+              <div className="flex items-center gap-3">
+                <CompanionAvatar
+                  character={user?.avatar_character}
+                  color={user?.character_color}
+                  mood={mood.value}
+                  size="sm"
+                />
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#ff7f96]">今日寄语</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-700">
+                    {dailyMessage || (isDailyMessageLoading ? "灵音伙伴正在准备今天的寄语..." : buildDailyMessage(mood.value))}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-[30px] bg-gradient-to-br from-[#fffafc] via-white to-[#f0fffb] p-5 shadow-[0_18px_40px_rgba(255,206,216,0.18)]">
+                <p className="text-sm text-slate-500">{greeting.signoff}</p>
+                <h2 className="mt-3 font-display text-[32px] font-semibold leading-tight text-slate-900">
+                  今天的心情，
+                  <br />
+                  值得被看见。
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  先从一个轻量入口开始，不用一次把全部心事说完。你只需要把“现在”交给我们。
+                </p>
+                <Link
+                  href="/mood"
+                  className="mt-5 inline-flex min-h-[54px] w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-base font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.3)]"
+                >
+                  <Mic className="h-5 w-5" />
+                  写下此刻的情绪
+                </Link>
+              </div>
+
+              <div className="mt-5 rounded-[30px] bg-white/88 p-5 shadow-[0_18px_40px_rgba(255,213,223,0.16)]">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-800">今日心情预览</p>
+                  <p className="rounded-full bg-[#fff1f5] px-3 py-1 text-xs font-semibold text-[#ff708b]">左右切换</p>
+                </div>
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => shiftMood(-1)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)]"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <AnimatePresence mode="wait" custom={moodDirection}>
+                    <motion.div
+                      key={mood.value}
+                      custom={moodDirection}
+                      initial={{ opacity: 0, x: moodDirection > 0 ? 28 : -28 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: moodDirection > 0 ? -28 : 28 }}
+                      transition={{ duration: 0.32, ease: [0.34, 1.56, 0.64, 1] }}
+                      className="flex h-32 w-32 items-center justify-center rounded-full text-6xl shadow-[0_16px_34px_rgba(255,214,153,0.22)]"
+                      style={{ backgroundColor: mood.softAccent }}
+                    >
+                      {mood.emoji}
+                    </motion.div>
+                  </AnimatePresence>
+                  <button
+                    type="button"
+                    onClick={() => shiftMood(1)}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)]"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="mt-4 text-center">
+                  <p className="text-2xl font-semibold text-slate-900">{mood.label}</p>
+                  <p className="mt-1 text-sm text-slate-500">{mood.insight}</p>
+                </div>
               </div>
             </div>
-            <p className="text-sm leading-7 text-slate-700 md:text-base">
-              {dailyMessage || (isDailyMessageLoading ? "灵音伙伴正在准备今天的寄语..." : buildDailyMessage(mood.value))}
-            </p>
-            <Link
-              href={token ? "/companion" : "/mood"}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,181,194,0.25)]"
-            >
-              {token ? "和伙伴聊聊" : "先记录心情"}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </section>
-
-        <section className="rounded-[36px] bg-white/80 p-6 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/70 md:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-            <div className="space-y-4">
-              <p className="text-sm text-slate-500">{greeting.signoff}</p>
-              <h2 className="font-display text-3xl font-semibold md:text-4xl">今天的心情值得被看见。</h2>
-              <p className="max-w-xl text-sm leading-7 text-slate-600 md:text-base">
-                先从一个轻量入口开始，不用立刻把全部心事说完。你只需要把“现在”交给我们。
+          ) : (
+            <div className="grid gap-5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+              <div className="flex items-center gap-3">
+                <CompanionAvatar
+                  character={user?.avatar_character}
+                  color={user?.character_color}
+                  mood={mood.value}
+                  size="sm"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-[#ff718b]">AI 每日寄语</p>
+                  <p className="mt-1 text-xs text-slate-500">{token ? "来自灵音伙伴的今日提醒" : "游客模式使用本地寄语兜底"}</p>
+                </div>
+              </div>
+              <p className="text-sm leading-7 text-slate-700 md:text-base">
+                {dailyMessage || (isDailyMessageLoading ? "灵音伙伴正在准备今天的寄语..." : buildDailyMessage(mood.value))}
               </p>
               <Link
-                href="/mood"
-                className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-base font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.3)]"
+                href={token ? "/companion" : "/mood"}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,181,194,0.25)]"
               >
-                <Mic className="h-5 w-5" />
-                说说此刻的心情
+                {token ? "和伙伴聊聊" : "先记录心情"}
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+          )}
+        </IOSGlassCard>
 
-            <div className="relative rounded-[36px] bg-gradient-to-br from-white via-[#fff9fb] to-[#eefdfa] p-6 text-center shadow-[0_20px_50px_rgba(255,213,223,0.2)] transition hover:-translate-y-1">
-              <p className="text-sm text-slate-500">今日心情</p>
-              <div className="mt-5 flex items-center justify-center gap-3 sm:gap-5">
-                <button
-                  type="button"
-                  onClick={() => shiftMood(-1)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)] backdrop-blur-sm transition hover:scale-105 hover:text-[#ff7894]"
-                  aria-label="切换到上一个情绪"
-                  title="上一个情绪"
+        {!iosApp ? (
+          <section className="rounded-[36px] bg-white/80 p-6 shadow-[0_20px_60px_rgba(255,206,216,0.2)] ring-1 ring-white/70 md:p-8">
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+              <div className="space-y-4">
+                <p className="text-sm text-slate-500">{greeting.signoff}</p>
+                <h2 className="font-display text-3xl font-semibold md:text-4xl">今天的心情值得被看见。</h2>
+                <p className="max-w-xl text-sm leading-7 text-slate-600 md:text-base">
+                  先从一个轻量入口开始，不用立刻把全部心事说完。你只需要把“现在”交给我们。
+                </p>
+                <Link
+                  href="/mood"
+                  className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-base font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.3)]"
                 >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <AnimatePresence mode="wait" custom={moodDirection}>
-                  <motion.div
-                    key={mood.value}
-                    custom={moodDirection}
-                    initial={{ opacity: 0, x: moodDirection > 0 ? 28 : -28 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: moodDirection > 0 ? -28 : 28 }}
-                    transition={{ duration: 0.32, ease: [0.34, 1.56, 0.64, 1] }}
-                    className="flex h-36 w-36 items-center justify-center rounded-full text-7xl shadow-[0_16px_34px_rgba(255,214,153,0.22)]"
-                    style={{ backgroundColor: mood.softAccent }}
-                  >
-                    {mood.emoji}
-                  </motion.div>
-                </AnimatePresence>
-                <button
-                  type="button"
-                  onClick={() => shiftMood(1)}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)] backdrop-blur-sm transition hover:scale-105 hover:text-[#62bda9]"
-                  aria-label="切换到下一个情绪"
-                  title="下一个情绪"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
+                  <Mic className="h-5 w-5" />
+                  说说此刻的心情
+                </Link>
               </div>
-              <p className="mt-5 text-2xl font-semibold">{mood.label}</p>
-              <p className="mt-2 text-sm text-slate-500">左右切换情绪预览</p>
-            </div>
-          </div>
-        </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+              <div className="relative rounded-[36px] bg-gradient-to-br from-white via-[#fff9fb] to-[#eefdfa] p-6 text-center shadow-[0_20px_50px_rgba(255,213,223,0.2)] transition hover:-translate-y-1">
+                <p className="text-sm text-slate-500">今日心情</p>
+                <div className="mt-5 flex items-center justify-center gap-3 sm:gap-5">
+                  <button
+                    type="button"
+                    onClick={() => shiftMood(-1)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)] backdrop-blur-sm transition hover:scale-105 hover:text-[#ff7894]"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <AnimatePresence mode="wait" custom={moodDirection}>
+                    <motion.div
+                      key={mood.value}
+                      custom={moodDirection}
+                      initial={{ opacity: 0, x: moodDirection > 0 ? 28 : -28 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: moodDirection > 0 ? -28 : 28 }}
+                      transition={{ duration: 0.32, ease: [0.34, 1.56, 0.64, 1] }}
+                      className="flex h-36 w-36 items-center justify-center rounded-full text-7xl shadow-[0_16px_34px_rgba(255,214,153,0.22)]"
+                      style={{ backgroundColor: mood.softAccent }}
+                    >
+                      {mood.emoji}
+                    </motion.div>
+                  </AnimatePresence>
+                  <button
+                    type="button"
+                    onClick={() => shiftMood(1)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-slate-500 shadow-[0_10px_24px_rgba(255,181,194,0.18)] backdrop-blur-sm transition hover:scale-105 hover:text-[#62bda9]"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+                <p className="mt-5 text-2xl font-semibold">{mood.label}</p>
+                <p className="mt-2 text-sm text-slate-500">左右切换情绪预览</p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <section className={cn("grid gap-4", iosApp ? "grid-cols-1" : "md:grid-cols-3")}>
           {dashboardFeatureCards.map((card) => (
             <Link
               key={card.href}
               href={card.href}
-              className="rounded-[30px] bg-white/78 p-5 shadow-[0_18px_36px_rgba(255,216,225,0.18)] ring-1 ring-white/70 transition hover:-translate-y-1"
+              className={cn(
+                "rounded-[30px] bg-white/78 p-5 shadow-[0_18px_36px_rgba(255,216,225,0.18)] ring-1 ring-white/70 transition hover:-translate-y-1",
+                iosApp && "flex items-center gap-4 bg-white/86",
+              )}
             >
-              <div className="text-3xl">{card.icon}</div>
-              <h3 className="mt-4 text-lg font-semibold">{card.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
+              <div className={cn("text-3xl", iosApp && "grid h-14 w-14 place-items-center rounded-[24px] bg-[#fff7fa] text-2xl")}>
+                {card.icon}
+              </div>
+              <div className={cn(iosApp && "min-w-0")}>
+                <h3 className={cn("text-lg font-semibold", !iosApp && "mt-4")}>{card.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
+              </div>
             </Link>
           ))}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-          <div className="rounded-[32px] bg-white/80 p-6 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/70">
+        <section className={cn("grid gap-6", iosApp ? "grid-cols-1" : "lg:grid-cols-[1fr_0.9fr]")}>
+          <IOSGlassCard className={cn(iosApp && "bg-white/86")}>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold">最近记录</h3>
@@ -289,37 +374,36 @@ export default function DashboardPage() {
                 </Link>
               ) : (
                 recentMoods.map((entry) => {
-                const option = getMoodOption(entry.mood_type)
-                return (
-                  <article
-                    key={entry.id}
-                    className="flex items-start gap-4 rounded-[24px] border border-[#f9e5ea] bg-white/90 p-4"
-                  >
-                    <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl"
-                      style={{ backgroundColor: option.softAccent }}
-                    >
-                      {option.emoji}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-slate-800">{option.label}</p>
-                        <span className="text-xs text-slate-400">
-                          {new Date(entry.created_at).toLocaleDateString("zh-CN")}
-                        </span>
+                  const option = getMoodOption(entry.mood_type)
+                  return (
+                    <article key={entry.id} className="flex items-start gap-4 rounded-[24px] border border-[#f9e5ea] bg-white/90 p-4">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl" style={{ backgroundColor: option.softAccent }}>
+                        {option.emoji}
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{entry.note}</p>
-                    </div>
-                  </article>
-                )
-              })
-            )}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-slate-800">{option.label}</p>
+                          <span className="text-xs text-slate-400">{new Date(entry.created_at).toLocaleDateString("zh-CN")}</span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">{entry.note}</p>
+                      </div>
+                    </article>
+                  )
+                })
+              )}
             </div>
-          </div>
+          </IOSGlassCard>
 
-          <div className="rounded-[32px] bg-white/80 p-6 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/70">
-            <h3 className="text-xl font-semibold">今日闭环</h3>
-            <p className="mt-1 text-sm text-slate-500">从记录到音乐，保持一个轻量节奏。</p>
+          <IOSGlassCard className={cn(iosApp && "bg-gradient-to-br from-white/88 via-[#fff8fb] to-[#effdfa]")}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold">今日闭环</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {iosApp ? "从记录到音乐，再到灵伴，保持一个柔软的小节奏。" : "从记录到音乐，保持一个轻量节奏。"}
+                </p>
+              </div>
+              {iosApp ? <span className="rounded-full bg-[#fff1f5] px-3 py-1 text-xs font-semibold text-[#ff718b]">一屏一主任务</span> : null}
+            </div>
             <div className="mt-5 grid gap-3">
               {[
                 { href: "/mood", title: "记录此刻", helper: "选情绪、写一句话、保存今天" },
@@ -337,14 +421,11 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
-            <Link
-              href="/onboarding?restart=1"
-              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#ff718b] transition hover:text-[#e95d78]"
-            >
+            <Link href="/onboarding?restart=1" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#ff718b] transition hover:text-[#e95d78]">
               重新查看新手引导
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
+          </IOSGlassCard>
         </section>
       </div>
     </MoodWaveShell>

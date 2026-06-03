@@ -7,10 +7,12 @@ import { aiAPI, moodAPI, uploadAPI } from "@/lib/api"
 import { getMoodOption, moodOptions, moodTagOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mood-analysis-report"
 import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
+import { isIOSApp } from "@/lib/platform"
 import { cn, convertBlobToWav } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
 import { useGuestStore } from "@/store/guest"
@@ -52,6 +54,7 @@ export default function MoodPage() {
   const [analysisReport, setAnalysisReport] = useState<MoodAnalysisReportData | null>(null)
   const [submitNotice, setSubmitNotice] = useState("")
   const voiceUploadTokenRef = useRef(0)
+  const iosApp = isIOSApp()
 
   const selectedMoodMeta = getMoodOption(selectedMood)
   const canContinue = useMemo(() => {
@@ -243,10 +246,20 @@ export default function MoodPage() {
   }
 
   return (
-    <MoodWaveShell title="情绪录入">
-      <div className="mx-auto max-w-6xl">
-        <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8">
-          <div className="mb-5 flex flex-col gap-3 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 sm:flex-row sm:items-center sm:justify-between">
+    <MoodWaveShell title={iosApp ? "记录此刻" : "情绪录入"}>
+      <div className={cn("mx-auto", iosApp ? "max-w-[460px]" : "max-w-6xl")}>
+        <section
+          className={cn(
+            "rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8",
+            iosApp && "overflow-hidden rounded-[36px] bg-gradient-to-br from-white/90 via-[#fff9fb] to-[#eefdfa] p-4 md:p-5",
+          )}
+        >
+          <div
+            className={cn(
+              "mb-5 flex flex-col gap-3 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 sm:flex-row sm:items-center sm:justify-between",
+              iosApp && "rounded-[30px] border border-white/80 bg-white/84 shadow-[0_16px_40px_rgba(255,208,219,0.16)]",
+            )}
+          >
             <div>
               <p className="text-sm font-semibold text-slate-700">记录日期</p>
               <p className="mt-1 text-xs text-slate-500">
@@ -262,14 +275,19 @@ export default function MoodPage() {
               aria-label="记录日期"
             />
           </div>
-          <div className="mx-auto mb-8 max-w-3xl">
-            <div className="flex items-center justify-between gap-2">
+          <div className={cn("mx-auto mb-8", iosApp ? "max-w-full" : "max-w-3xl")}>
+            <div
+              className={cn(
+                "flex items-center justify-between gap-2",
+                iosApp && "overflow-x-auto rounded-[28px] bg-white/72 px-3 py-3 shadow-[0_12px_28px_rgba(255,216,225,0.14)]",
+              )}
+            >
               {steps.map((label, index) => {
                 const current = index + 1
                 const active = step === current
                 const completed = step > current
                 return (
-                  <div key={label} className="flex flex-1 items-center gap-2">
+                  <div key={label} className={cn("flex flex-1 items-center gap-2", iosApp && "min-w-[72px]")}>
                     <div className="flex flex-col items-center gap-2">
                       <div
                         className={cn(
@@ -294,10 +312,10 @@ export default function MoodPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className={cn("grid gap-6", iosApp ? "grid-cols-1" : "lg:grid-cols-[1.05fr_0.95fr]")}>
             <div className="space-y-6">
               {step === 1 && (
-                <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">选择情绪</h2>
                   <p className="mt-2 text-sm text-slate-500">今天最接近你状态的是哪一种？</p>
                   <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -327,11 +345,11 @@ export default function MoodPage() {
                       </button>
                     ))}
                   </div>
-                </section>
+                </IOSGlassCard>
               )}
 
               {step === 2 && (
-                <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">情绪强度</h2>
                   <p className="mt-2 text-sm text-slate-500">拖一拖滑块，看看此刻情绪有多明显。</p>
                   <div className="mt-8">
@@ -353,11 +371,11 @@ export default function MoodPage() {
                       <span>强烈</span>
                     </div>
                   </div>
-                </section>
+                </IOSGlassCard>
               )}
 
               {step === 3 && (
-                <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">记录心情</h2>
                   <p className="mt-2 text-sm text-slate-500">文字、图片和语音可以一起留下。</p>
 
@@ -439,11 +457,11 @@ export default function MoodPage() {
                       />
                     </div>
                   </div>
-                </section>
+                </IOSGlassCard>
               )}
 
               {step === 4 && (
-                <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-5 md:p-6">
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">选择标签</h2>
                   <p className="mt-2 text-sm text-slate-500">标签是可选的，也可以用自己的词描述来源。</p>
                   <div className="mt-5 flex flex-wrap gap-3">
@@ -512,11 +530,11 @@ export default function MoodPage() {
                       })}
                     </div>
                   ) : null}
-                </section>
+                </IOSGlassCard>
               )}
 
               {step === 5 && (
-                <section className="rounded-[30px] border border-[#f8e4e9] bg-white/92 p-6 text-center md:p-8">
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 p-6 text-center md:p-8", iosApp && "rounded-[30px] bg-white/88")}>
                   <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_18px_34px_rgba(255,181,194,0.28)]">
                     <Sparkles className="h-8 w-8" />
                   </div>
@@ -532,7 +550,7 @@ export default function MoodPage() {
                   <div className="mx-auto mt-6 max-w-3xl">
                     <MoodAnalysisReport report={analysisReport ?? buildFallbackReport()} />
                   </div>
-                  <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                  <div className={cn("mt-6 flex flex-col justify-center gap-3 sm:flex-row", iosApp && "sm:flex-col")}>
                     <button
                       type="button"
                       onClick={() => {
@@ -541,27 +559,38 @@ export default function MoodPage() {
                         setAnalysisReport(null)
                         setSubmitNotice("")
                       }}
-                      className="rounded-full border border-[#f1dbe2] bg-white px-6 py-3 text-sm font-semibold text-slate-700"
+                      className={cn("rounded-full border border-[#f1dbe2] bg-white px-6 py-3 text-sm font-semibold text-slate-700", iosApp && "min-h-[52px]")}
                     >
                       重新记录
                     </button>
                     <Link
                       href={`/music?mood=${selectedMood}&intensity=${intensity}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white"
+                      className={cn(
+                        "inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white",
+                        iosApp && "min-h-[54px]",
+                      )}
                     >
                       <Play className="h-4 w-4" />
                       播放治愈音乐
                     </Link>
                   </div>
-                </section>
+                </IOSGlassCard>
               )}
 
-              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+              <div
+                className={cn(
+                  "flex flex-col-reverse gap-3 sm:flex-row sm:justify-between",
+                  iosApp && "sticky bottom-3 rounded-[28px] bg-white/84 p-3 shadow-[0_18px_36px_rgba(255,206,216,0.22)] backdrop-blur-xl",
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => setStep((value) => Math.max(1, value - 1))}
                   disabled={step === 1 || isSubmitting}
-                  className="rounded-full border border-[#f1dbe2] bg-white px-5 py-3 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={cn(
+                    "rounded-full border border-[#f1dbe2] bg-white px-5 py-3 text-sm font-semibold text-slate-600 disabled:cursor-not-allowed disabled:opacity-50",
+                    iosApp && "min-h-[52px] flex-1",
+                  )}
                 >
                   上一步
                 </button>
@@ -570,7 +599,10 @@ export default function MoodPage() {
                     type="button"
                     onClick={() => setStep((value) => Math.min(5, value + 1))}
                     disabled={!canContinue}
-                    className="rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className={cn(
+                      "rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50",
+                      iosApp && "min-h-[52px] flex-1",
+                    )}
                   >
                     下一步
                   </button>
@@ -580,7 +612,10 @@ export default function MoodPage() {
                     type="button"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className={cn(
+                      "rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60",
+                      iosApp && "min-h-[52px] flex-1",
+                    )}
                   >
                     {isSubmitting ? "提交中..." : "开始分析"}
                   </button>
@@ -589,7 +624,7 @@ export default function MoodPage() {
             </div>
 
             <aside className="space-y-5">
-              <div className="rounded-[30px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-6 shadow-[0_16px_40px_rgba(255,213,223,0.18)]">
+              <IOSGlassCard className={cn("bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-6", iosApp && "rounded-[30px] bg-white/84 p-5")}>
                 <p className="text-sm text-slate-500">当前情绪预览</p>
                 <div className="mt-5 flex items-center gap-4">
                   <div
@@ -605,14 +640,14 @@ export default function MoodPage() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </IOSGlassCard>
 
-              <div className="rounded-[30px] bg-white/85 p-6 shadow-[0_16px_40px_rgba(255,213,223,0.18)] ring-1 ring-white/70">
+              <IOSGlassCard className={cn("bg-white/85 p-6", iosApp && "rounded-[30px] bg-white/84 p-5")}>
                 <h3 className="text-lg font-semibold">今日小提示</h3>
                 <p className="mt-4 text-sm leading-7 text-slate-600">
                   情绪不需要一次说完整。先写下一句话、一个标签，或选一种最接近的心情，就已经是在照顾自己。
                 </p>
-              </div>
+              </IOSGlassCard>
             </aside>
           </div>
         </section>
