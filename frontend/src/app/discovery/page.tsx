@@ -4,8 +4,10 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { HeartHandshake, PenLine, Send, SmilePlus, Sparkles } from "lucide-react"
 import { postsAPI } from "@/lib/api"
+import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { EmptyStateGuide } from "@/components/onboarding/empty-state-guide"
+import { isIOSApp } from "@/lib/platform"
 import { cn } from "@/lib/utils"
 
 type Category = "all" | "study" | "emotion" | "vent"
@@ -92,6 +94,7 @@ export default function DiscoveryPage() {
   const [composerText, setComposerText] = useState("")
   const [isApiConnected, setIsApiConnected] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
+  const iosApp = isIOSApp()
 
   const loadPosts = useCallback(async (category: Category) => {
     try {
@@ -183,7 +186,7 @@ export default function DiscoveryPage() {
 
   return (
     <MoodWaveShell
-      title="解忧角"
+      title={iosApp ? "解忧" : "解忧角"}
       rightSlot={
         <Link
           href="/mood"
@@ -194,8 +197,8 @@ export default function DiscoveryPage() {
         </Link>
       }
     >
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[0.95fr_1.45fr]">
-        <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-5">
+      <div className={cn("mx-auto grid gap-5", iosApp ? "max-w-[460px] grid-cols-1" : "max-w-6xl lg:grid-cols-[0.95fr_1.45fr]")}>
+        <IOSGlassCard className={cn("rounded-[34px] p-5 md:p-6", !iosApp && "lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-5", iosApp && "bg-white/88")}>
           <div className="flex items-start gap-4">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#caf5ee] via-[#fff4df] to-[#ffdce6] text-4xl shadow-[0_16px_34px_rgba(166,224,213,0.24)]">
               🐰
@@ -264,9 +267,9 @@ export default function DiscoveryPage() {
             <PenLine className="h-4 w-4" />
             发布我的心情
           </Link>
-        </section>
+        </IOSGlassCard>
 
-        <section className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2">
+        <section className={cn("min-w-0", !iosApp && "lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-2")}>
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="text-xl font-semibold">大家的心情</h3>
@@ -282,7 +285,7 @@ export default function DiscoveryPage() {
           {visiblePosts.length === 0 ? (
             <EmptyStateGuide variant="discovery" />
           ) : (
-          <div className="columns-1 gap-5 md:columns-2 xl:columns-3">
+          <div className={cn("columns-1 gap-5", !iosApp && "md:columns-2 xl:columns-3")}>
             {visiblePosts.map((post, index) => (
               <article
                 key={post.id}
