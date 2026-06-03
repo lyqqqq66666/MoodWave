@@ -26,3 +26,50 @@
 .ios-app-shell .ios-tab-bar > * {
   pointer-events: auto;
 }
+
+@keyframes iosGradientFlow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.04);
+  }
+}
+
+@keyframes iosRiseIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.ios-app-shell .ios-poster {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 209, 220, 0.68), transparent 28%),
+    radial-gradient(circle at 82% 14%, rgba(179, 241, 232, 0.62), transparent 26%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 250, 252, 0.88) 54%, rgba(240, 255, 251, 0.92));
+  animation: iosGradientFlow 14s ease-in-out infinite;
+}
+
+.ios-app-shell .ios-floating-card {
+  animation: iosRiseIn 0.48s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.ios-app-shell .ios-pill-label {
+  border-radius: 9999px;
+  background: rgba(255, 241, 245, 0.92);
+  color: #ff6f8a;
+  box-shadow: 0 10px 24px rgba(255, 197, 210, 0.18);
+}
+
+.ios-app-shell .ios-sticky-action {
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 18px 36px rgba(255, 206, 216, 0.22);
+}

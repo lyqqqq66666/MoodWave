@@ -841,7 +841,7 @@ export default function CompanionPage() {
   return (
     <MoodWaveShell title="灵音伙伴">
       <div className={cn("mx-auto grid gap-5", iosApp ? "max-w-[460px] grid-cols-1" : "max-w-6xl lg:grid-cols-[0.88fr_1.12fr]")}>
-        <section className={cn("rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75", iosApp ? "block" : "hidden lg:block")}>
+        <section className={cn("rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75", iosApp ? "ios-floating-card block" : "hidden lg:block")}>
           <div className="mx-auto w-fit rounded-[48px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-5">
             <CompanionAvatar character={character} color={color} mood={latestMood} size="lg" />
           </div>
@@ -860,7 +860,7 @@ export default function CompanionPage() {
           </div>
         </section>
 
-        <section className={cn("min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5", iosApp && "overflow-hidden rounded-[34px] bg-gradient-to-br from-white/88 via-[#fff9fb] to-[#eefdfa] p-4")}>
+        <section className={cn("min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5", iosApp && "ios-floating-card overflow-hidden rounded-[34px] bg-gradient-to-br from-white/88 via-[#fff9fb] to-[#eefdfa] p-4")}>
           <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-3 ring-1 ring-white/80 lg:hidden">
             <div className="flex min-w-0 items-center gap-3">
               <CompanionAvatar character={character} color={color} mood={latestMood} size="sm" />
@@ -1116,7 +1116,7 @@ export default function CompanionPage() {
                 <div ref={messagesEndRef} />
               </div>
               {notice ? <p className="mt-3 rounded-[18px] bg-[#fff4df] px-4 py-2 text-xs text-slate-600">{notice}</p> : null}
-              <form onSubmit={handleSend} className={cn("mt-4 flex gap-3", iosApp && "rounded-[28px] bg-white/84 p-3 shadow-[0_16px_30px_rgba(255,206,216,0.18)] backdrop-blur-xl")}>
+              <form onSubmit={handleSend} className={cn("mt-4 flex gap-3", iosApp && "ios-sticky-action rounded-[28px] p-3")}>
                 <input
                   value={input}
                   onChange={(event) => setInput(event.target.value)}

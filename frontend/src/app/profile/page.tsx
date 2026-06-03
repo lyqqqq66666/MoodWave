@@ -552,8 +552,8 @@ export default function ProfilePage() {
         </div>
       ) : null}
       <div className={cn("mx-auto grid min-w-0 gap-5", iosApp ? "max-w-[460px] grid-cols-1" : "max-w-6xl xl:grid-cols-[0.95fr_1.05fr] xl:items-stretch")}>
-          <section className={cn("min-w-0 overflow-hidden rounded-[36px] bg-white/82 shadow-[0_24px_70px_rgba(255,206,216,0.24)] ring-1 ring-white/75", !iosApp && "xl:col-start-1 xl:row-start-1 xl:h-full")}>
-          <div className="relative min-h-[190px] bg-[radial-gradient(circle_at_20%_15%,rgba(255,181,194,0.6),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,230,207,0.72),transparent_34%),linear-gradient(135deg,#fff4f7,#f0fffb_48%,#fff8df)] px-6 pb-7 pt-8 md:px-9">
+          <section className={cn("min-w-0 overflow-hidden rounded-[36px] bg-white/82 shadow-[0_24px_70px_rgba(255,206,216,0.24)] ring-1 ring-white/75", iosApp && "ios-floating-card", !iosApp && "xl:col-start-1 xl:row-start-1 xl:h-full")}>
+          <div className={cn("relative min-h-[190px] bg-[radial-gradient(circle_at_20%_15%,rgba(255,181,194,0.6),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(168,230,207,0.72),transparent_34%),linear-gradient(135deg,#fff4f7,#f0fffb_48%,#fff8df)] px-6 pb-7 pt-8 md:px-9", iosApp && "ios-poster")}>
             <div className="absolute bottom-0 left-0 right-0 h-16 bg-[linear-gradient(135deg,rgba(255,255,255,0.48),rgba(255,255,255,0))]" />
             <button
               type="button"

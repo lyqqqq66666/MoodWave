@@ -813,7 +813,7 @@ function MusicPageContent() {
     >
       <div className={cn("mx-auto", iosApp ? "max-w-[460px]" : "max-w-7xl")}>
         {!hasMoodRecord ? <EmptyStateGuide variant="music" className="mb-5" /> : null}
-        <section className={cn("relative isolate flex min-h-[calc(100svh-9rem)] flex-col overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff0f5]/80 via-[#f7f5ff]/60 to-[#f0faf8]/70 p-4 sm:p-5 lg:min-h-[calc(100svh-12rem)] lg:p-6", iosApp && "min-h-[calc(100svh-10rem)] rounded-[36px] p-4")}>
+        <section className={cn("relative isolate flex min-h-[calc(100svh-9rem)] flex-col overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff0f5]/80 via-[#f7f5ff]/60 to-[#f0faf8]/70 p-4 sm:p-5 lg:min-h-[calc(100svh-12rem)] lg:p-6", iosApp && "ios-floating-card min-h-[calc(100svh-10rem)] rounded-[36px] p-4")}>
           <div className="relative z-20 mb-5 flex items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/72 px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm backdrop-blur-md lg:bg-[#fff3f6]">
               <span>{moodMeta.emoji}</span>
@@ -864,7 +864,7 @@ function MusicPageContent() {
             </div>
 
             <aside className={cn("relative z-10 flex min-h-[calc(100svh-15rem)] min-w-0 items-end pt-[32vh] lg:block lg:min-h-0 lg:pt-[74px]", iosApp && "min-h-0 items-stretch pt-0")}>
-              <div className="mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0">
+              <div className={cn("mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0", iosApp && "ios-sticky-action")}>
                 <div className="flex items-center gap-4">
                   <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br text-3xl text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]", profile.album)}>
                     ♪

@@ -198,7 +198,7 @@ export default function DiscoveryPage() {
       }
     >
       <div className={cn("mx-auto grid gap-5", iosApp ? "max-w-[460px] grid-cols-1" : "max-w-6xl lg:grid-cols-[0.95fr_1.45fr]")}>
-        <IOSGlassCard className={cn("rounded-[34px] p-5 md:p-6", !iosApp && "lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-5", iosApp && "bg-white/88")}>
+        <IOSGlassCard className={cn("rounded-[34px] p-5 md:p-6", !iosApp && "lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-5", iosApp && "ios-floating-card bg-white/88")}>
           <div className="flex items-start gap-4">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#caf5ee] via-[#fff4df] to-[#ffdce6] text-4xl shadow-[0_16px_34px_rgba(166,224,213,0.24)]">
               🐰
@@ -209,7 +209,7 @@ export default function DiscoveryPage() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-[28px] bg-white/92 p-4 shadow-inner ring-1 ring-[#f8e4e9]">
+          <div className={cn("mt-6 rounded-[28px] bg-white/92 p-4 shadow-inner ring-1 ring-[#f8e4e9]", iosApp && "ios-poster")}>
             <textarea
               value={composerText}
               onChange={(event) => setComposerText(event.target.value.slice(0, 160))}

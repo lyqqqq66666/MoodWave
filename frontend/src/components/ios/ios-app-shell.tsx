@@ -42,8 +42,13 @@ export function IOSAppShell({
     <div className="ios-app-shell min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(255,214,224,0.95),_transparent_28%),radial-gradient(circle_at_85%_12%,_rgba(181,239,230,0.8),_transparent_24%),radial-gradient(circle_at_50%_100%,_rgba(222,213,255,0.75),_transparent_28%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_52%,#fff6ef_100%)] text-slate-800">
       <IOSSafeArea>
         <div className="mx-auto flex min-h-screen max-w-[460px] flex-col">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-0 mx-auto h-72 max-w-[460px] overflow-hidden">
+            <div className="absolute -left-10 top-6 h-36 w-36 rounded-full bg-[#ffd7e1]/55 blur-3xl" />
+            <div className="absolute right-0 top-12 h-32 w-32 rounded-full bg-[#c7f5ea]/70 blur-3xl" />
+            <div className="absolute left-1/2 top-28 h-28 w-28 -translate-x-1/2 rounded-full bg-[#ece0ff]/52 blur-3xl" />
+          </div>
           <header className="sticky top-0 z-30 px-4 pb-3 pt-1">
-            <div className="rounded-[30px] border border-white/70 bg-white/72 px-4 py-3 shadow-[0_18px_40px_rgba(255,206,216,0.22)] backdrop-blur-2xl">
+            <div className="ios-floating-card rounded-[30px] border border-white/70 bg-white/72 px-4 py-3 shadow-[0_18px_40px_rgba(255,206,216,0.22)] backdrop-blur-2xl">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#ff8aa2]">MoodWave 灵音</p>

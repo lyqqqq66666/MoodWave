@@ -257,7 +257,7 @@ export default function MoodPage() {
           <div
             className={cn(
               "mb-5 flex flex-col gap-3 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 sm:flex-row sm:items-center sm:justify-between",
-              iosApp && "rounded-[30px] border border-white/80 bg-white/84 shadow-[0_16px_40px_rgba(255,208,219,0.16)]",
+              iosApp && "ios-floating-card rounded-[30px] border border-white/80 bg-white/84 shadow-[0_16px_40px_rgba(255,208,219,0.16)]",
             )}
           >
             <div>
@@ -315,7 +315,7 @@ export default function MoodPage() {
           <div className={cn("grid gap-6", iosApp ? "grid-cols-1" : "lg:grid-cols-[1.05fr_0.95fr]")}>
             <div className="space-y-6">
               {step === 1 && (
-                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "ios-floating-card rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">选择情绪</h2>
                   <p className="mt-2 text-sm text-slate-500">今天最接近你状态的是哪一种？</p>
                   <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -349,7 +349,7 @@ export default function MoodPage() {
               )}
 
               {step === 2 && (
-                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "ios-floating-card rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">情绪强度</h2>
                   <p className="mt-2 text-sm text-slate-500">拖一拖滑块，看看此刻情绪有多明显。</p>
                   <div className="mt-8">
@@ -375,7 +375,7 @@ export default function MoodPage() {
               )}
 
               {step === 3 && (
-                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "ios-floating-card rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">记录心情</h2>
                   <p className="mt-2 text-sm text-slate-500">文字、图片和语音可以一起留下。</p>
 
@@ -461,7 +461,7 @@ export default function MoodPage() {
               )}
 
               {step === 4 && (
-                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "rounded-[30px] bg-white/88 p-5")}>
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 md:p-6", iosApp && "ios-floating-card rounded-[30px] bg-white/88 p-5")}>
                   <h2 className="text-xl font-semibold">选择标签</h2>
                   <p className="mt-2 text-sm text-slate-500">标签是可选的，也可以用自己的词描述来源。</p>
                   <div className="mt-5 flex flex-wrap gap-3">
@@ -534,7 +534,7 @@ export default function MoodPage() {
               )}
 
               {step === 5 && (
-                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 p-6 text-center md:p-8", iosApp && "rounded-[30px] bg-white/88")}>
+                <IOSGlassCard className={cn("border-[#f8e4e9] bg-white/92 p-6 text-center md:p-8", iosApp && "ios-floating-card rounded-[30px] bg-white/88")}>
                   <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_18px_34px_rgba(255,181,194,0.28)]">
                     <Sparkles className="h-8 w-8" />
                   </div>
@@ -580,7 +580,7 @@ export default function MoodPage() {
               <div
                 className={cn(
                   "flex flex-col-reverse gap-3 sm:flex-row sm:justify-between",
-                  iosApp && "sticky bottom-3 rounded-[28px] bg-white/84 p-3 shadow-[0_18px_36px_rgba(255,206,216,0.22)] backdrop-blur-xl",
+                  iosApp && "ios-sticky-action sticky bottom-3 rounded-[28px] p-3",
                 )}
               >
                 <button

@@ -168,7 +168,7 @@ export default function DashboardPage() {
     <MoodWaveShell title={greeting.greeting} rightSlot={null}>
       <DashboardTooltip />
       <div className={cn("mx-auto grid gap-5", iosApp ? "max-w-[460px]" : "max-w-6xl gap-6")}>
-        <IOSGlassCard className={cn(iosApp ? "overflow-hidden bg-gradient-to-br from-white/90 via-[#fff8fb] to-[#eefdfa] p-0" : "p-5 md:p-7")}>
+        <IOSGlassCard className={cn(iosApp ? "ios-floating-card overflow-hidden bg-gradient-to-br from-white/90 via-[#fff8fb] to-[#eefdfa] p-0" : "p-5 md:p-7")}>
           {iosApp ? (
             <div className="p-5">
               <div className="flex items-center gap-3">
@@ -186,8 +186,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-5 rounded-[30px] bg-gradient-to-br from-[#fffafc] via-white to-[#f0fffb] p-5 shadow-[0_18px_40px_rgba(255,206,216,0.18)]">
-                <p className="text-sm text-slate-500">{greeting.signoff}</p>
+              <div className="ios-poster mt-5 rounded-[30px] p-5 shadow-[0_18px_40px_rgba(255,206,216,0.18)]">
+                <p className="ios-pill-label inline-flex px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">{greeting.signoff}</p>
                 <h2 className="mt-3 font-display text-[32px] font-semibold leading-tight text-slate-900">
                   今天的心情，
                   <br />
@@ -205,10 +205,10 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <div className="mt-5 rounded-[30px] bg-white/88 p-5 shadow-[0_18px_40px_rgba(255,213,223,0.16)]">
+              <div className="ios-floating-card mt-5 rounded-[30px] bg-white/88 p-5 shadow-[0_18px_40px_rgba(255,213,223,0.16)]">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-slate-800">今日心情预览</p>
-                  <p className="rounded-full bg-[#fff1f5] px-3 py-1 text-xs font-semibold text-[#ff708b]">左右切换</p>
+                  <p className="ios-pill-label px-3 py-1 text-xs font-semibold">左右切换</p>
                 </div>
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <button
