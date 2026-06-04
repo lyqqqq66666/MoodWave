@@ -1,73 +1,110 @@
 "use client"
 
-import { Cat, Moon, PawPrint, Rocket, Sparkles, Star, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { MoodType } from "@/lib/types"
+import {
+  companionCharacters,
+  companionColors,
+  getCompanionCharacter,
+  getCompanionColor,
+  normalizeCompanionCharacter,
+  type CompanionCharacter,
+  type CompanionColor,
+} from "@/config/companion-characters"
 
-export type CompanionCharacter = "sakura" | "planet" | "sunny" | "astronaut" | "moon" | "cat" | "fox"
-export type CompanionColor = "pink" | "mint" | "blue" | "amber" | "purple"
-
-export const companionCharacters: {
-  id: CompanionCharacter
-  name: string
-  tagline: string
-  icon: string
-  personality: string
-}[] = [
-  { id: "sakura", name: "小樱", tagline: "轻柔陪伴型", icon: "✿", personality: "说话温柔，适合睡前倾诉。" },
-  { id: "planet", name: "小星球", tagline: "安静观察型", icon: "◐", personality: "像一颗小行星，帮你整理思绪轨道。" },
-  { id: "sunny", name: "阳光少年", tagline: "清爽鼓励型", icon: "☀", personality: "活力但不吵，适合男生和喜欢直接鼓励的用户。" },
-  { id: "astronaut", name: "小宇航员", tagline: "理性探索型", icon: "✦", personality: "一起拆问题、找出口，适合学习和 deadline 场景。" },
-  { id: "moon", name: "月光伙伴", tagline: "深夜守候型", icon: "☾", personality: "低声量陪伴，把情绪慢慢放下来。" },
-  { id: "cat", name: "小喵", tagline: "软萌贴贴型", icon: "ฅ", personality: "轻轻接住委屈和疲惫，用软乎乎的话陪你慢慢缓过来。" },
-  { id: "fox", name: "小狐狸", tagline: "灵动拆解型", icon: "✧", personality: "机灵但不催促，帮你把焦虑拆成可以行动的小线索。" },
-]
-
-export const companionColors: {
-  id: CompanionColor
-  name: string
-  from: string
-  to: string
-  chip: string
-}[] = [
-  { id: "pink", name: "樱粉", from: "#FFB5C2", to: "#FFE8A8", chip: "bg-[#ffb5c2]" },
-  { id: "mint", name: "薄荷", from: "#A8E6CF", to: "#90E0EF", chip: "bg-[#a8e6cf]" },
-  { id: "blue", name: "晴空", from: "#90E0EF", to: "#CBC3E3", chip: "bg-[#90e0ef]" },
-  { id: "amber", name: "暖阳", from: "#FFD166", to: "#EF8D7B", chip: "bg-[#ffd166]" },
-  { id: "purple", name: "薰衣草", from: "#CBC3E3", to: "#FFB5C2", chip: "bg-[#cbc3e3]" },
-]
-
-const moodFace: Record<MoodType | "default", string> = {
-  happy: "＾▽＾",
-  calm: "˘◡˘",
-  anxious: "・_・",
-  angry: "｀へ´",
-  sad: "；︿；",
-  neutral: "・‿・",
-  default: "・‿・",
+const moodFace: Record<MoodType | "default", { eyeScale: string; mouth: string }> = {
+  happy: { eyeScale: "scale-y-[0.45]", mouth: "smile" },
+  calm: { eyeScale: "scale-y-[0.55]", mouth: "flat" },
+  anxious: { eyeScale: "scale-y-[0.95]", mouth: "worry" },
+  angry: { eyeScale: "scale-y-[0.9]", mouth: "zig" },
+  sad: { eyeScale: "scale-y-[0.75]", mouth: "sad" },
+  neutral: { eyeScale: "scale-y-[0.75]", mouth: "flat" },
+  default: { eyeScale: "scale-y-[0.75]", mouth: "flat" },
 }
 
-const IconByCharacter = {
-  sakura: Sparkles,
-  planet: Star,
-  sunny: Sun,
-  astronaut: Rocket,
-  moon: Moon,
-  cat: Cat,
-  fox: PawPrint,
+function CompanionFace({ mood, accent }: { mood?: MoodType; accent: string }) {
+  const expression = moodFace[mood ?? "default"]
+  return (
+    <div className="relative h-full w-full">
+      <div className="absolute left-[27%] top-[40%] flex w-[46%] items-center justify-between">
+        <span className={cn("block h-2.5 w-2 rounded-full bg-[#3f4350] transition-transform", expression.eyeScale)} />
+        <span className={cn("block h-2.5 w-2 rounded-full bg-[#3f4350] transition-transform", expression.eyeScale)} />
+      </div>
+      <span className="absolute left-[21%] top-[52%] h-3.5 w-6 rounded-full opacity-70 blur-[1px]" style={{ backgroundColor: accent }} />
+      <span className="absolute right-[21%] top-[52%] h-3.5 w-6 rounded-full opacity-70 blur-[1px]" style={{ backgroundColor: accent }} />
+      {expression.mouth === "smile" ? (
+        <span className="absolute left-1/2 top-[58%] h-5 w-8 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#4d5160]" />
+      ) : null}
+      {expression.mouth === "flat" ? (
+        <span className="absolute left-1/2 top-[61%] h-[3px] w-6 -translate-x-1/2 rounded-full bg-[#4d5160]" />
+      ) : null}
+      {expression.mouth === "worry" ? (
+        <span className="absolute left-1/2 top-[60%] h-4 w-8 -translate-x-1/2 rounded-t-full border-t-[3px] border-[#4d5160]" />
+      ) : null}
+      {expression.mouth === "sad" ? (
+        <span className="absolute left-1/2 top-[61%] h-4 w-8 -translate-x-1/2 rounded-t-full border-t-[3px] border-[#4d5160]" />
+      ) : null}
+      {expression.mouth === "zig" ? (
+        <span className="absolute left-1/2 top-[61%] h-[3px] w-7 -translate-x-1/2 rounded-full bg-[#4d5160] rotate-[8deg]" />
+      ) : null}
+    </div>
+  )
 }
 
-export function getCompanionCharacter(value?: string | null) {
-  const normalized = value === "star" ? "planet" : value
-  return companionCharacters.find((item) => item.id === normalized) ?? companionCharacters[1]
-}
+function MascotShape({
+  character,
+  mood,
+  size,
+}: {
+  character: CompanionCharacter
+  mood?: MoodType
+  size: "sm" | "md" | "lg" | "hero"
+}) {
+  const companion = getCompanionCharacter(character)
+  const dotSize = size === "hero" ? "h-[76%] w-[76%]" : size === "lg" ? "h-[74%] w-[74%]" : size === "md" ? "h-[72%] w-[72%]" : "h-[70%] w-[70%]"
 
-export function normalizeCompanionCharacter(value?: string | null): CompanionCharacter {
-  return getCompanionCharacter(value).id
-}
+  return (
+    <div className={cn("relative", dotSize)}>
+      {character === "cat" ? (
+        <>
+          <span className="absolute left-[12%] top-[1%] h-[26%] w-[24%] rotate-[-22deg] rounded-[48%_52%_34%_66%/42%_36%_64%_58%] bg-white/88" />
+          <span className="absolute right-[12%] top-[1%] h-[26%] w-[24%] rotate-[22deg] rounded-[52%_48%_66%_34%/36%_42%_58%_64%] bg-white/88" />
+        </>
+      ) : null}
+      {character === "fox" ? (
+        <>
+          <span className="absolute left-[10%] top-[2%] h-[24%] w-[20%] rotate-[-16deg] rounded-[40%_60%_30%_70%/40%_26%_74%_60%] bg-white/88" />
+          <span className="absolute right-[10%] top-[2%] h-[24%] w-[20%] rotate-[16deg] rounded-[60%_40%_70%_30%/26%_40%_60%_74%] bg-white/88" />
+        </>
+      ) : null}
+      {character === "astronaut" ? (
+        <span className="absolute left-1/2 top-[7%] h-[12%] w-[54%] -translate-x-1/2 rounded-full border border-white/80 bg-white/24" />
+      ) : null}
+      {character === "sakura" ? (
+        <>
+          <span className="absolute left-[3%] top-[21%] text-lg text-white/90">✿</span>
+          <span className="absolute right-[3%] top-[28%] text-sm text-white/80">✿</span>
+        </>
+      ) : null}
+      {character === "planet" ? (
+        <span className="absolute left-1/2 top-[51%] h-[16%] w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white/70 opacity-80" />
+      ) : null}
+      {character === "moon" ? (
+        <span className="absolute right-[5%] top-[8%] text-lg text-white/90">☾</span>
+      ) : null}
+      {character === "sunny" ? (
+        <>
+          <span className="absolute left-[2%] top-[24%] text-base text-white/90">✦</span>
+          <span className="absolute right-[8%] top-[18%] text-sm text-white/80">✦</span>
+        </>
+      ) : null}
 
-export function getCompanionColor(value?: string | null) {
-  return companionColors.find((item) => item.id === value) ?? companionColors[0]
+      <div className="relative h-full w-full animate-[breathe_4.8s_ease-in-out_infinite] rounded-[46%_54%_48%_52%/48%_44%_56%_52%] bg-white/92 shadow-[inset_0_-10px_24px_rgba(255,255,255,0.55)]">
+        <div className="absolute left-[18%] top-[13%] h-[26%] w-[26%] rounded-full bg-white/70 blur-[2px]" />
+        <CompanionFace mood={mood} accent={companion.face.blush} />
+      </div>
+    </div>
+  )
 }
 
 type CompanionAvatarProps = {
@@ -87,40 +124,80 @@ export function CompanionAvatar({
 }: CompanionAvatarProps) {
   const companion = getCompanionCharacter(character)
   const palette = getCompanionColor(color)
-  const Icon = IconByCharacter[companion.id]
   const sizes = {
-    sm: "h-12 w-12 rounded-[18px]",
-    md: "h-24 w-24 rounded-[30px]",
-    lg: "h-44 w-44 rounded-[44px] md:h-52 md:w-52",
-  }
-  const iconSizes = {
-    sm: "h-4 w-4",
-    md: "h-7 w-7",
-    lg: "h-12 w-12",
+    sm: "h-12 w-12 rounded-[20px]",
+    md: "h-24 w-24 rounded-[32px]",
+    lg: "h-44 w-44 rounded-[48px] md:h-52 md:w-52",
   }
 
   return (
     <div
       className={cn(
-        "relative grid shrink-0 place-items-center overflow-hidden bg-white shadow-[0_18px_44px_rgba(255,181,194,0.22)] ring-1 ring-white/80",
+        "relative grid shrink-0 place-items-center overflow-hidden ring-1 ring-white/85",
+        "shadow-[0_18px_44px_rgba(255,181,194,0.22)]",
         sizes[size],
         className,
       )}
-      style={{ background: `linear-gradient(135deg, ${palette.from}, ${palette.to})` }}
+      style={{ background: `linear-gradient(145deg, ${palette.from}, ${palette.to})` }}
       aria-label={companion.name}
       role="img"
     >
-      <div className="absolute inset-2 rounded-[inherit] bg-white/38" />
-      <div className="absolute left-3 top-3 h-3 w-3 rounded-full bg-white/75" />
-      <div className="relative grid place-items-center text-slate-800">
-        <Icon className={cn("mb-1 text-white drop-shadow-sm", iconSizes[size])} />
-        <div className={cn("font-semibold", size === "lg" ? "text-2xl" : size === "md" ? "text-base" : "text-[10px]")}>
-          {moodFace[mood ?? "default"]}
+      <span className="absolute inset-[10%] rounded-[inherit] bg-white/28" />
+      <span className="absolute left-[14%] top-[12%] h-4 w-4 rounded-full bg-white/75 blur-[1px]" />
+      <MascotShape character={companion.id} mood={mood} size={size} />
+      <span className="absolute bottom-2 right-2 grid h-7 min-w-7 place-items-center rounded-full bg-white/82 px-1 text-[11px] font-semibold text-slate-700 shadow-sm">
+        {companion.symbol}
+      </span>
+    </div>
+  )
+}
+
+type CompanionHeroMascotProps = {
+  character?: string | null
+  className?: string
+  subtitle?: string
+}
+
+export function CompanionHeroMascot({
+  character,
+  className,
+  subtitle,
+}: CompanionHeroMascotProps) {
+  const companion = getCompanionCharacter(character)
+
+  return (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-[42px] border border-white/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.78),rgba(255,248,240,0.92))] p-6 shadow-[0_24px_80px_rgba(255,196,209,0.22)] backdrop-blur-2xl",
+        className,
+      )}
+    >
+      <div className="pointer-events-none absolute left-8 top-8 h-20 w-20 rounded-full blur-2xl" style={{ backgroundColor: companion.halo }} />
+      <div className="pointer-events-none absolute bottom-6 right-10 h-24 w-24 rounded-full bg-white/60 blur-3xl" />
+      <div className="relative flex flex-col items-center gap-4 text-center">
+        <div
+          className="relative grid h-56 w-56 place-items-center rounded-[42%_58%_52%_48%/46%_48%_52%_54%] shadow-[0_24px_70px_rgba(255,181,194,0.24)]"
+          style={{ background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,0.88), transparent 26%), linear-gradient(145deg, ${companion.gradient[0]}, ${companion.gradient[1]} 54%, ${companion.gradient[2]})` }}
+        >
+          <span className="absolute inset-[9%] rounded-[inherit] bg-white/24" />
+          <MascotShape character={companion.id} size="hero" />
+          <span className="absolute -bottom-3 left-1/2 min-w-[88px] -translate-x-1/2 rounded-full bg-white/84 px-4 py-2 text-xs font-semibold text-slate-600 shadow-[0_10px_24px_rgba(255,181,194,0.18)]">
+            {companion.name}
+          </span>
         </div>
-      </div>
-      <div className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-white/82 text-sm text-slate-700 shadow-sm">
-        {companion.icon}
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-[#ff7894]">{companion.tagline}</p>
+          <p className="max-w-xs text-sm leading-6 text-slate-600">{subtitle || companion.personality}</p>
+        </div>
       </div>
     </div>
   )
 }
+
+export {
+  companionCharacters,
+  companionColors,
+  getCompanionCharacter,
+  normalizeCompanionCharacter,
+}
+export type { CompanionCharacter, CompanionColor }
