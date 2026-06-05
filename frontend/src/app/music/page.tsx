@@ -136,6 +136,15 @@ const moodProfiles: Record<MoodType, MoodSoundProfile> = {
   },
 }
 
+const moodChords: Record<MoodType, string[][]> = {
+  happy: [["C4", "E4", "G4", "B4"], ["F3", "A3", "C4", "E4"], ["G3", "B3", "D4", "F4"]],
+  calm: [["G3", "B3", "D4", "F#4"], ["C3", "E3", "G3", "B3"], ["D3", "F#3", "A3", "C#4"]],
+  anxious: [["A3", "D4", "E4", "G4"], ["G3", "C4", "D4", "F#4"], ["E3", "A3", "B3", "D4"]],
+  angry: [["D3", "F3", "A3", "C4"], ["G3", "Bb3", "D4", "F4"], ["A2", "D3", "E3", "G3"]],
+  sad: [["F3", "Ab3", "C4", "Eb4"], ["C3", "Eb3", "G3", "Bb3"], ["Bb2", "D3", "F3", "Ab3"]],
+  neutral: [["E3", "G3", "B3", "D4"], ["A3", "C4", "E4", "G4"], ["D3", "F3", "A3", "C4"]]
+}
+
 const fallbackRecommendations: Record<MoodType, MusicRecommendation[]> = {
   happy: [
     { id: "happy-1", title: "星空下的草莓", artist: "MoodWave AI", mood_type: "happy", url: "", duration: 214 },
@@ -278,6 +287,7 @@ function MusicPageContent() {
   const reverbRef = useRef<InstanceType<ToneModule["Reverb"]> | null>(null)
   const filterRef = useRef<InstanceType<ToneModule["Filter"]> | null>(null)
   const delayRef = useRef<InstanceType<ToneModule["PingPongDelay"]> | null>(null)
+  const analyserRef = useRef<InstanceType<ToneModule["Analyser"]> | null>(null)
   const loopRef = useRef<{ dispose: () => void } | null>(null)
   const bassLoopRef = useRef<{ dispose: () => void } | null>(null)
   const progressRef = useRef<HTMLDivElement | null>(null)
@@ -368,6 +378,7 @@ function MusicPageContent() {
     delayRef.current?.dispose()
     reverbRef.current?.dispose()
     filterRef.current?.dispose()
+    analyserRef.current?.dispose()
     loopRef.current = null
     bassLoopRef.current = null
     synthRef.current = null
@@ -376,6 +387,7 @@ function MusicPageContent() {
     delayRef.current = null
     reverbRef.current = null
     filterRef.current = null
+    analyserRef.current = null
   }, [])
 
   const stopMusic = useCallback(() => {
@@ -396,72 +408,80 @@ function MusicPageContent() {
 
       Tone.Transport.bpm.value = currentBpm
       
-      // 1. 创建空间效果器，增大 Reverb decay 形成大混响，接入 PingPongDelay
-      reverbRef.current = new Tone.Reverb({ decay: 5.6, wet: 0.45 }).toDestination()
+      // 1. 创建音频分析器连接至 Master，抓取 FFT 数据以同步画面
+      analyserRef.current = new Tone.Analyser("fft", 32)
+      
+      // 2. 空间效果器连线：Synth -> Filter -> PingPongDelay -> Reverb -> Analyser -> Destination
+      reverbRef.current = new Tone.Reverb({ decay: 6.2, wet: 0.45 }).connect(analyserRef.current)
+      analyserRef.current.toDestination()
+
       delayRef.current = new Tone.PingPongDelay({
-        delayTime: "0.4s",
+        delayTime: "4n", // 用乐符时间相应，实现 BPM 变化即时变速
         feedback: 0.58,
         wet: 0.35,
       }).connect(reverbRef.current)
       
-      filterRef.current = new Tone.Filter(360 + intensity * 60, "lowpass").connect(delayRef.current)
+      filterRef.current = new Tone.Filter(350 + intensity * 60, "lowpass").connect(delayRef.current)
       
-      // 2. 增大音符包络释放时间，实现空灵持音效果
+      // 3. 采用温暖包络的 PolySynth (弹奏和弦) 与 MonoSynth (低音铺底)
       synthRef.current = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: profile.wave },
-        envelope: { attack: 0.24, decay: 0.4, sustain: 0.55, release: 2.4 },
-        volume: -16,
+        envelope: { attack: 0.35, decay: 0.5, sustain: 0.65, release: 2.8 },
+        volume: -18,
       }).connect(filterRef.current)
       
       bassRef.current = new Tone.MonoSynth({
         oscillator: { type: "sine" },
-        envelope: { attack: 0.6, decay: 0.8, sustain: 0.7, release: 2.8 },
-        filterEnvelope: { attack: 0.4, decay: 0.6, sustain: 0.5, release: 2.0, baseFrequency: 80, octaves: 1.5 },
-        volume: -22,
+        envelope: { attack: 0.8, decay: 1.0, sustain: 0.75, release: 3.2 },
+        filterEnvelope: { attack: 0.6, decay: 0.8, sustain: 0.6, release: 2.4, baseFrequency: 65, octaves: 1.2 },
+        volume: -24,
       }).connect(reverbRef.current)
 
       if (mood === "anxious") {
         noiseRef.current = new Tone.NoiseSynth({
           noise: { type: "pink" },
-          envelope: { attack: 0.8, decay: 0.4, sustain: 0.3, release: 1.8 },
-          volume: -32,
+          envelope: { attack: 1.2, decay: 0.6, sustain: 0.4, release: 2.2 },
+          volume: -34,
         }).connect(reverbRef.current)
       }
 
       const scale = profile.scale
+      const chords = moodChords[mood]
 
-      // 3. 重构为 Brian Eno 异步多重 Loop 机制，利用非倍数周期在相位上漂移
-      // Loop A: 高音风铃 (周期 3.2s, 35% 触发概率)
+      // 4. 重构节拍循环周期（全为乐符单位如 4n, 2n, 1m），当用户拖动 BPM 时，速率瞬间响应
+      // Loop A: 高音风铃 (周期 4n, 35% 触发概率)
       const loopA = new Tone.Loop((time) => {
         if (Math.random() < 0.35 && scale.length >= 3) {
-          // 随机挑选一个高音音符
           const randomNote = scale[Math.floor(Math.random() * (scale.length - 2)) + 2]
-          // 20% 概率向上平移一个八度
-          const finalNote = Math.random() < 0.2 ? Tone.Frequency(randomNote).transpose(12).toNote() : randomNote
-          const velocity = 0.22 + Math.random() * 0.32
-          synthRef.current?.triggerAttackRelease(finalNote, "2n", time, velocity)
+          const finalNote = Math.random() < 0.25 ? Tone.Frequency(randomNote).transpose(12).toNote() : randomNote
+          const velocity = 0.18 + Math.random() * 0.28
+          synthRef.current?.triggerAttackRelease(finalNote, "4n", time, velocity)
         }
-      }, "3.2s").start(0)
+      }, "4n").start(0)
 
-      // Loop B: 中音和弦/旋律游走 (周期 4.5s, 45% 触发概率)
+      // Loop B: 中音旋律游走 (周期 2n, 45% 触发概率)
       const loopB = new Tone.Loop((time) => {
         if (Math.random() < 0.45) {
           const randomNote = scale[Math.floor(Math.random() * scale.length)]
-          const velocity = 0.3 + Math.random() * 0.3
-          synthRef.current?.triggerAttackRelease(randomNote, "1n", time, velocity)
+          const velocity = 0.24 + Math.random() * 0.24
+          synthRef.current?.triggerAttackRelease(randomNote, "2n", time, velocity)
         }
-      }, "4.5s").start(0)
+      }, "2n").start(0)
 
-      // Loop C: 低音铺底 root note 与焦虑时的白噪呼吸模拟 (周期 6.8s, 80% 触发概率)
+      // Loop C: 真正的治愈七和弦 Pad 乐垫背景 (周期 1m，即一个小节，85% 触发概率)
       const loopC = new Tone.Loop((time) => {
-        if (Math.random() < 0.8) {
-          const baseNote = scale[0] // 根音
-          bassRef.current?.triggerAttackRelease(baseNote, "1m", time, 0.42)
+        if (Math.random() < 0.85 && chords.length > 0) {
+          const chosenChord = chords[Math.floor(Math.random() * chords.length)]
+          // 弹奏柔和的背景和弦垫（Pad）
+          synthRef.current?.triggerAttackRelease(chosenChord, "1m", time, 0.28)
+          
+          // 低音 MonoSynth 负责弹奏和弦根音，稳固基调
+          bassRef.current?.triggerAttackRelease(chosenChord[0], "1m", time, 0.38)
         }
         if (noiseRef.current && Math.random() < 0.6) {
-          noiseRef.current.triggerAttackRelease("2n", time, 0.14)
+          noiseRef.current.triggerAttackRelease("1n", time, 0.15)
         }
-      }, "6.8s").start(0)
+      }, "1m").start(0)
 
       loopRef.current = {
         dispose: () => {
@@ -598,18 +618,47 @@ function MusicPageContent() {
       const rect = canvas.getBoundingClientRect()
       const width = rect.width
       const height = rect.height
-      const energy = isPlaying ? profile.pulse + intensity / 10 : 0.35
       const t = time / 1000
 
-      // 1. 清理并填充微弱漫反射的暗色调疗愈底色
+      // 1. 获取音频分析器的实时分贝值，转换为归一化的跳动能量
+      let audioVol = 0.12
+      if (analyserRef.current && isPlaying) {
+        try {
+          const rawValues = analyserRef.current.getValue() as Float32Array
+          let sum = 0
+          let count = 0
+          for (let i = 0; i < rawValues.length; i++) {
+            const val = rawValues[i]
+            if (val > -120) {
+              const norm = Math.max(0, (val + 90) / 90) // 将 -90dB 至 0dB 归一化
+              sum += norm
+              count++
+            }
+          }
+          if (count > 0) {
+            audioVol = sum / count
+          }
+        } catch (e) {
+          // 降级使用静态脉冲
+        }
+      }
+      
+      // energy 作为整体更新速率与收缩幅度，随音乐能量实时起伏
+      const energy = isPlaying ? 0.35 + audioVol * 2.2 : 0.18
+
+      // 2. 清理并填充高颜值的浅色渐变极光背景（不再是死板的纯黑）
       context.clearRect(0, 0, width, height)
-      context.fillStyle = "rgba(12, 10, 16, 0.96)"
+      const background = context.createLinearGradient(0, 0, width, height)
+      background.addColorStop(0, "rgba(255, 255, 255, 0.94)")
+      background.addColorStop(0.5, `${profile.color}24`) // 浅马卡龙色过渡
+      background.addColorStop(1, `${profile.colorTo}34`)
+      context.fillStyle = background
       context.fillRect(0, 0, width, height)
 
       const centerX = width * 0.5
       const centerY = height * 0.4
 
-      // 2. 绘制星空深处微弱漫反射极光层
+      // 3. 绘制星空深处微弱漫反射的极光层
       const bgGrad = context.createRadialGradient(
         centerX + Math.cos(t * 0.4) * 40,
         centerY + Math.sin(t * 0.4) * 40,
@@ -618,22 +667,22 @@ function MusicPageContent() {
         centerY,
         width * 0.8
       )
-      bgGrad.addColorStop(0, `rgba(${hexToRgb(profile.color)}, 0.12)`)
-      bgGrad.addColorStop(0.5, `rgba(${hexToRgb(profile.colorTo)}, 0.06)`)
+      bgGrad.addColorStop(0, `rgba(${hexToRgb(profile.color)}, 0.18)`)
+      bgGrad.addColorStop(0.5, `rgba(${hexToRgb(profile.colorTo)}, 0.08)`)
       bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)")
       context.fillStyle = bgGrad
       context.fillRect(0, 0, width, height)
 
-      // 3. 启用 lighter 混合模式实现星云粒子重叠叠加
+      // 4. 启用 lighter 混合模式进行发光星沙粒子渲染
       context.globalCompositeOperation = "lighter"
 
       particlesRef.current.forEach((p) => {
-        p.x += Math.cos(p.angle) * p.speed * energy
-        p.y += Math.sin(p.angle) * p.speed * energy
+        p.x += Math.cos(p.angle) * p.speed * (energy * 1.4)
+        p.y += Math.sin(p.angle) * p.speed * (energy * 1.4)
         p.life -= 1
 
         const alpha = Math.max(0, p.life / p.maxLife)
-        const curRadius = p.radius * (0.45 + alpha * 0.55)
+        const curRadius = p.radius * (0.45 + alpha * 0.55) * (0.8 + audioVol * 0.8)
 
         context.beginPath()
         context.arc(p.x, p.y, curRadius, 0, Math.PI * 2)
@@ -661,13 +710,13 @@ function MusicPageContent() {
         }
       })
 
-      // 4. 恢复 normal 模式绘制共振圈和 Orb 球，重置发光阴影以保护外部 UI
+      // 5. 恢复 normal 模式绘制共振涟漪和 Orb 呼吸球，重置发光阴影以保护外部 UI
       context.globalCompositeOperation = "source-over"
       context.shadowBlur = 0
 
-      // 绘制共振波纹涟漪
+      // 绘制共振波纹涟漪，其半径和震动受实时音量 audioVol 和能量 energy 联合驱动
       for (let i = 0; i < 3; i++) {
-        const ringRadius = (55 + i * 32) + Math.sin(t * 1.8 + i) * 6 * energy
+        const ringRadius = (55 + i * 32) + Math.sin(t * 1.8 + i) * 6 * energy + (audioVol * 45)
         const ringAlpha = (0.22 - i * 0.06) * (isPlaying ? 1.0 : 0.4)
         context.beginPath()
         context.arc(centerX, centerY, Math.max(10, ringRadius), 0, Math.PI * 2)
@@ -677,7 +726,7 @@ function MusicPageContent() {
       }
 
       // 绘制中心呼吸球 (Orb)
-      const orbRadius = 45 + Math.sin(t * 1.6) * 5 * energy
+      const orbRadius = (45 + Math.sin(t * 1.6) * 5 * energy) + (audioVol * 25)
       const orbGradient = context.createRadialGradient(
         centerX,
         centerY,
