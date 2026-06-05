@@ -76,6 +76,9 @@ tmp/
 # Project memory (local only, not for git)
 .workbuddy/
 memory-bank/
+!memory-bank/
+!memory-bank/collaboration/
+!memory-bank/collaboration/web-revamp-phases.md
 .agents/
 .claude/
 

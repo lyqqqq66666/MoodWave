@@ -7,7 +7,11 @@
 - GET  /api/auth/me        获取当前用户信息
 """
 
-from datetime import datetime, timedelta
+import base64
+import hashlib
+import hmac
+import json
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
@@ -27,6 +31,55 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # ==================== 工具函数 ====================
 
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+
+
+def _b64url_decode(data: str) -> bytes:
+    padding = "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode(f"{data}{padding}".encode("utf-8"))
+
+
+def _jwt_sign(message: bytes) -> str:
+    signature = hmac.new(
+        JWT_SECRET_KEY.encode("utf-8"),
+        message,
+        hashlib.sha256,
+    ).digest()
+    return _b64url_encode(signature)
+
+
+def encode_access_token(payload: dict) -> str:
+    header = {"alg": JWT_ALGORITHM, "typ": "JWT"}
+    header_b64 = _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+    payload_b64 = _b64url_encode(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+    return f"{header_b64}.{payload_b64}.{_jwt_sign(signing_input)}"
+
+
+def decode_access_token(token: str) -> dict:
+    try:
+        header_b64, payload_b64, signature = token.split(".")
+    except ValueError as exc:
+        raise ValueError("invalid token format") from exc
+
+    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+    expected_signature = _jwt_sign(signing_input)
+    if not hmac.compare_digest(signature, expected_signature):
+        raise ValueError("invalid token signature")
+
+    try:
+        payload = json.loads(_b64url_decode(payload_b64))
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("invalid token payload") from exc
+
+    exp = payload.get("exp")
+    if exp is None or int(exp) < int(datetime.now(timezone.utc).timestamp()):
+        raise ValueError("token expired")
+
+    return payload
+
+
 def verify_password(plain: str, hashed: str) -> bool:
     """校验密码"""
     try:
@@ -44,10 +97,12 @@ def hash_password(password: str) -> str:
 
 def create_access_token(user_id: int) -> str:
     """签发 JWT token"""
-    expire = datetime.utcnow() + timedelta(days=JWT_EXPIRE_DAYS)
-    to_encode = {"sub": str(user_id), "exp": expire}
-    from jose import jwt
-    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    expire = datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRE_DAYS)
+    to_encode = {
+        "sub": str(user_id),
+        "exp": int(expire.timestamp()),
+    }
+    return encode_access_token(to_encode)
 
 
 def get_current_user(
@@ -55,8 +110,6 @@ def get_current_user(
     session: Session = Depends(get_session),
 ) -> User:
     """从 JWT token 获取当前用户（依赖注入）"""
-    from jose import jwt, JWTError
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="无效的认证凭据，请重新登录",
@@ -64,12 +117,12 @@ def get_current_user(
     )
 
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        payload = decode_access_token(token)
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             raise credentials_exception
         token_data = TokenData(user_id=int(user_id_str))
-    except JWTError:
+    except (ValueError, TypeError):
         raise credentials_exception
 
     user = session.get(User, token_data.user_id)

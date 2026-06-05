@@ -41,7 +41,6 @@ const withPWA = require('next-pwa')({
   ],
 })
 
-const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || ''
 const isStaticExport = process.env.NEXT_OUTPUT === 'export'
 
 const nextConfig = {
@@ -52,9 +51,7 @@ const nextConfig = {
   ...(isStaticExport ? { output: 'export' } : {}),
   images: { unoptimized: true },
 
-  env: {
-    NEXT_PUBLIC_API_URL,
-  },
+  // 不再手动覆盖 NEXT_PUBLIC_*，让 Next.js 自动从 .env.local / .env.development 读取
 }
 
 module.exports = withPWA(nextConfig)
