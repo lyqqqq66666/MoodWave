@@ -55,6 +55,7 @@ type Particle = {
   life: number
   maxLife: number
   opacity: number
+  isGlowing: boolean
 }
 
 type ToneModule = typeof import("tone/build/esm/index")
@@ -573,7 +574,7 @@ function MusicPageContent() {
       const centerX = rect.width * 0.5
       const centerY = rect.height * 0.4
 
-      particlesRef.current = Array.from({ length: 90 }, () => {
+      particlesRef.current = Array.from({ length: 50 }, () => {
         const angle = Math.random() * Math.PI * 2
         const speed = 0.35 + Math.random() * 1.65
         const life = 60 + Math.random() * 120
@@ -587,7 +588,8 @@ function MusicPageContent() {
           radius: 1.2 + Math.random() * 4.2,
           life,
           maxLife: life,
-          opacity: 0.35 + Math.random() * 0.55
+          opacity: 0.35 + Math.random() * 0.55,
+          isGlowing: Math.random() < 0.22
         }
       })
     }
@@ -636,8 +638,12 @@ function MusicPageContent() {
         context.beginPath()
         context.arc(p.x, p.y, curRadius, 0, Math.PI * 2)
 
-        context.shadowBlur = 10 * alpha
-        context.shadowColor = profile.color
+        if (p.isGlowing) {
+          context.shadowBlur = 10 * alpha
+          context.shadowColor = profile.color
+        } else {
+          context.shadowBlur = 0
+        }
         context.fillStyle = `rgba(${hexToRgb(profile.color)}, ${alpha * p.opacity * 0.72})`
         context.fill()
 
@@ -651,6 +657,7 @@ function MusicPageContent() {
           p.life = 70 + Math.random() * 110
           p.maxLife = p.life
           p.opacity = 0.35 + Math.random() * 0.55
+          p.isGlowing = Math.random() < 0.22
         }
       })
 
