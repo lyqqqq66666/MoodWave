@@ -24,7 +24,7 @@ import { aiAPI, moodAPI, musicAPI } from "@/lib/api"
 import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import type { MoodType, MusicRecommendation } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
-import { CompanionAvatar } from "@/components/companion-avatar"
+import { CompanionPetOrb } from "@/components/companion-avatar"
 import { EmptyStateGuide } from "@/components/onboarding/empty-state-guide"
 import { useAuthStore } from "@/store/auth"
 import { cn } from "@/lib/utils"
@@ -288,6 +288,10 @@ function MusicPageContent() {
   const insightRef = useRef(profile.insight)
 
   const selectedRecommendation = recommendations[selectedTrack] ?? { id: "empty", title: "", artist: "", mood_type: mood, url: "", duration: 200 }
+  const sceneChips = useMemo(
+    () => [profile.texture, `${currentBpm} BPM`, `${intensity}/10 强度`],
+    [currentBpm, intensity, profile.texture],
+  )
   const progress = useMemo(
     () => Math.min(100, (elapsedTime / Math.max(1, selectedRecommendation.duration)) * 100),
     [elapsedTime, selectedRecommendation.duration],
@@ -827,7 +831,7 @@ function MusicPageContent() {
             </button>
           </div>
 
-          <div className="relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(330px,0.42fr)] xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.42fr)]">
+          <div className="relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.4fr)] xl:grid-cols-[minmax(0,1.14fr)_minmax(360px,0.38fr)]">
             <div className="absolute inset-0 min-w-0 overflow-hidden lg:relative lg:inset-auto">
               <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
                 <div>
@@ -837,7 +841,17 @@ function MusicPageContent() {
                 <BpmControl />
               </div>
 
-              <div className="relative z-0 h-full min-h-full max-w-full overflow-hidden sm:aspect-[16/11] lg:h-full lg:min-h-[520px]">
+              <div className="relative z-0 h-full min-h-full max-w-full overflow-hidden rounded-[36px] border border-white/55 bg-white/18 shadow-[0_24px_70px_rgba(255,203,214,0.18)] sm:aspect-[16/11] lg:h-full lg:min-h-[520px]">
+                <motion.div
+                  className="pointer-events-none absolute inset-[12%] rounded-full border border-white/24"
+                  animate={{ scale: [0.94, 1.05, 0.97], opacity: [0.14, 0.28, 0.16] }}
+                  transition={{ duration: 6.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div
+                  className="pointer-events-none absolute inset-[22%] rounded-full border border-white/20"
+                  animate={{ scale: [1, 1.08, 1], opacity: [0.08, 0.22, 0.1] }}
+                  transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut" }}
+                />
                 <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full max-w-full" />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 lg:hidden" />
                 <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3 sm:inset-x-5 sm:top-5">
@@ -857,19 +871,41 @@ function MusicPageContent() {
                     </motion.div>
                   </AnimatePresence>
                 </div>
+                <div className="pointer-events-none absolute inset-x-4 bottom-4 flex flex-wrap gap-2 sm:inset-x-5 sm:bottom-5">
+                  {sceneChips.map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-[0_10px_20px_rgba(255,208,219,0.18)] backdrop-blur-md"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 
             <aside className="relative z-10 flex min-h-[calc(100svh-15rem)] min-w-0 items-end pt-[32vh] lg:block lg:min-h-0 lg:pt-[74px]">
               <div className="mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0">
                 <div className="flex items-center gap-4">
-                  <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br text-3xl text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]", profile.album)}>
-                    ♪
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
+                  <CompanionPetOrb
+                    character={user?.avatar_character}
+                    color={user?.character_color}
+                    mood={mood}
+                    size="md"
+                    className="shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ff7993]">正在倾听的房间</p>
+                    <p className="mt-2 truncate text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
                     <p className="mt-1 truncate text-sm text-slate-500">{selectedRecommendation.artist}</p>
                   </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  {sceneChips.map((chip) => (
+                    <span key={chip} className="rounded-full bg-white/82 px-3 py-1.5 font-semibold text-slate-500 shadow-sm ring-1 ring-white/80">
+                      {chip}
+                    </span>
+                  ))}
                 </div>
                 <BpmControl className="mt-4 md:hidden" />
 
@@ -979,7 +1015,7 @@ function MusicPageContent() {
           <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <CompanionAvatar
+                  <CompanionPetOrb
                     character={user?.avatar_character}
                     color={user?.character_color}
                     mood={mood}

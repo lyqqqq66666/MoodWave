@@ -198,3 +198,48 @@
 - 灵音伙伴页不再出现明显的方框角色选择观感
 - 顶部主形象和角色选择区统一成桌宠 / 悬浮宠物表达
 - 前端检查通过后提交推送到 `codex/web-current`
+
+## Phase 6
+
+### 时间
+
+- 2026-06-06
+
+### Codex 汇报
+
+- 开始执行 `P2` 的前端增强版本，不等待正式美术资产先卡住整体进度。
+- 更新 [frontend/src/config/companion-characters.ts](/private/tmp/moodwave-web-current/frontend/src/config/companion-characters.ts)：
+  - 把角色配置扩展成更完整的资产定义层
+  - 新增 `species / sceneTitle / orbitPills / expressions`
+  - 为后续 `Lottie` 或正式角色素材接入预留统一配置位
+- 更新 [frontend/src/components/companion-avatar.tsx](/private/tmp/moodwave-web-current/frontend/src/components/companion-avatar.tsx)：
+  - 把首页 / 登录页 / 伙伴页共享的宠物舞台升级成更明显的悬浮主视觉
+  - `CompanionHeroMascot` 改为直接消费角色资产配置
+  - `CompanionPetOrb` 增加轨道提示语与更强的光晕层次
+- 更新 [frontend/src/app/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/page.tsx)：
+  - 首页主视觉升级成更强的动态灵音舞台
+  - 用更轻的能力标签和功能说明承接首屏，而不是堆叠文字
+- 更新 [frontend/src/app/music/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/music/page.tsx)：
+  - 把音乐房间进一步往“情绪空间”方向推进
+  - 强化主可视化区的环形氛围层和场景状态 chip
+  - 把右侧播放器头部换成宠物陪伴入口，减少传统播放器观感
+  - 听后感区同步换成悬浮宠物表现，统一角色语言
+
+### WorkBuddy 汇报
+
+- 本阶段暂不要求新增后端接口。
+- 下一阶段如果继续做正式角色资源映射、音乐参数细化或角色资源配置持久化，可由 WorkBuddy 接手：
+  - 角色资源路径字段
+  - 音乐可视化参数映射字段
+  - 更细的情绪空间推荐元数据
+
+### 当前阶段目标
+
+- 完成 `P2-1 / P2-2 / P2-3` 的前端第一轮增强，让首页主视觉、角色体系和音乐页空间感进入可展示、可回退状态。
+
+### 阶段测试要求
+
+- 首页首屏出现更明显的动态灵音主视觉
+- 角色配置层不再只是名字和颜色，而是具备统一资产描述能力
+- 音乐页主视觉区比 `P1` 更像情绪空间，而不是普通播放器
+- 前端检查通过后提交推送到 `codex/web-current`

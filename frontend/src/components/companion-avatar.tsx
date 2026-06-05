@@ -46,7 +46,7 @@ function CompanionFace({ mood, accent }: { mood?: MoodType; accent: string }) {
         <span className="absolute left-1/2 top-[61%] h-4 w-8 -translate-x-1/2 rounded-t-full border-t-[3px] border-[#4d5160]" />
       ) : null}
       {expression.mouth === "zig" ? (
-        <span className="absolute left-1/2 top-[61%] h-[3px] w-7 -translate-x-1/2 rounded-full bg-[#4d5160] rotate-[8deg]" />
+        <span className="absolute left-1/2 top-[61%] h-[3px] w-7 -translate-x-1/2 rotate-[8deg] rounded-full bg-[#4d5160]" />
       ) : null}
     </div>
   )
@@ -160,6 +160,7 @@ type CompanionPetOrbProps = {
   size?: "sm" | "md" | "lg"
   className?: string
   showLabel?: boolean
+  showOrbitPills?: boolean
 }
 
 export function CompanionPetOrb({
@@ -169,6 +170,7 @@ export function CompanionPetOrb({
   size = "md",
   className,
   showLabel = false,
+  showOrbitPills = false,
 }: CompanionPetOrbProps) {
   const companion = getCompanionCharacter(character)
   const palette = getCompanionColor(color)
@@ -187,15 +189,20 @@ export function CompanionPetOrb({
   return (
     <div className={cn("relative grid place-items-center", shellSize[size], className)}>
       <motion.div
-        className="absolute inset-[10%] rounded-full blur-2xl"
+        className="absolute inset-[8%] rounded-full blur-2xl"
         style={{ background: `radial-gradient(circle, ${palette.from}, ${palette.to})` }}
         animate={{ scale: [0.92, 1.06, 0.95], opacity: [0.45, 0.78, 0.5] }}
         transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
-        className="absolute inset-[23%] rounded-full border border-white/50"
+        className="absolute inset-[20%] rounded-full border border-white/50"
         animate={{ scale: [0.96, 1.02, 0.97], opacity: [0.24, 0.55, 0.26] }}
         transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute inset-[3%] rounded-full border border-white/28"
+        animate={{ scale: [1, 1.08, 1], opacity: [0.08, 0.28, 0.1] }}
+        transition={{ duration: 6.1, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         className={cn("relative grid place-items-center rounded-[42%_58%_52%_48%/46%_48%_52%_54%] shadow-[0_18px_40px_rgba(255,181,194,0.22)]", stageSize[size])}
@@ -206,6 +213,25 @@ export function CompanionPetOrb({
         <span className="absolute inset-[10%] rounded-[inherit] bg-white/28" />
         <MascotShape character={companion.id} mood={mood} size={mascotSize} />
       </motion.div>
+      {showOrbitPills && size === "lg" ? (
+        <>
+          {companion.orbitPills.map((pill, index) => (
+            <motion.span
+              key={pill}
+              className={cn(
+                "absolute rounded-full bg-white/82 px-3 py-1 text-[11px] font-medium text-slate-500 shadow-[0_10px_20px_rgba(255,204,214,0.16)]",
+                index === 0 && "left-0 top-7",
+                index === 1 && "right-0 top-12",
+                index === 2 && "bottom-1 left-7",
+              )}
+              animate={{ y: [0, -7, 0], rotate: [0, 1.2, 0] }}
+              transition={{ duration: 4.8 + index * 0.3, repeat: Infinity, ease: "easeInOut", delay: index * 0.25 }}
+            >
+              {pill}
+            </motion.span>
+          ))}
+        </>
+      ) : null}
       {showLabel ? (
         <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white/88 px-3 py-1 text-[11px] font-semibold text-slate-600 shadow-[0_10px_20px_rgba(255,181,194,0.18)]">
           {companion.name}
@@ -227,11 +253,6 @@ export function CompanionHeroMascot({
   subtitle,
 }: CompanionHeroMascotProps) {
   const companion = getCompanionCharacter(character)
-  const orbitBadges = [
-    { label: "陪你理一理", className: "left-4 top-10", delay: 0 },
-    { label: "先轻一点", className: "right-4 top-16", delay: 0.4 },
-    { label: "慢慢说也可以", className: "bottom-6 left-8", delay: 0.8 },
-  ]
 
   return (
     <div
@@ -253,41 +274,36 @@ export function CompanionHeroMascot({
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[radial-gradient(circle_at_center,_rgba(255,191,208,0.18),_transparent_70%)]" />
 
-      {orbitBadges.map((badge) => (
+      {companion.orbitPills.map((pill, index) => (
         <motion.span
-          key={badge.label}
+          key={pill}
           className={cn(
             "pointer-events-none absolute rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-[0_10px_20px_rgba(255,204,214,0.16)] backdrop-blur-sm",
-            badge.className,
+            index === 0 && "left-4 top-10",
+            index === 1 && "right-4 top-16",
+            index === 2 && "bottom-6 left-8",
           )}
           animate={{ y: [0, -8, 0], rotate: [0, 1.5, 0] }}
-          transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: badge.delay }}
+          transition={{ duration: 4.8 + index * 0.2, repeat: Infinity, ease: "easeInOut", delay: index * 0.2 }}
         >
-          {badge.label}
+          {pill}
         </motion.span>
       ))}
 
       <div className="relative flex flex-col items-center gap-4 text-center">
-        <motion.div
-          className="relative grid h-56 w-56 place-items-center rounded-[42%_58%_52%_48%/46%_48%_52%_54%] shadow-[0_24px_70px_rgba(255,181,194,0.24)]"
-          style={{ background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,0.88), transparent 26%), linear-gradient(145deg, ${companion.gradient[0]}, ${companion.gradient[1]} 54%, ${companion.gradient[2]})` }}
-          animate={{ y: [0, -12, 0], rotate: [0, -1.5, 0.8, 0], scale: [1, 1.02, 1] }}
-          transition={{ duration: 5.8, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <span className="absolute inset-[9%] rounded-[inherit] bg-white/24" />
-          <motion.span
-            className="absolute inset-[14%] rounded-[inherit] border border-white/35"
-            animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.98, 1.02, 0.98] }}
-            transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <MascotShape character={companion.id} size="hero" />
-          <span className="absolute -bottom-3 left-1/2 min-w-[88px] -translate-x-1/2 rounded-full bg-white/84 px-4 py-2 text-xs font-semibold text-slate-600 shadow-[0_10px_24px_rgba(255,181,194,0.18)]">
-            {companion.name}
-          </span>
-        </motion.div>
-        <div className="space-y-1">
+        <CompanionPetOrb character={companion.id} size="lg" showOrbitPills className="mt-3" />
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#ff7894]">{companion.sceneTitle}</p>
           <p className="text-sm font-semibold text-[#ff7894]">{companion.tagline}</p>
           <p className="max-w-xs text-sm leading-6 text-slate-600">{subtitle || companion.personality}</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-slate-600">{companion.species}</span>
+          {companion.expressions.map((item) => (
+            <span key={item} className="rounded-full bg-white/82 px-3 py-1 text-xs text-slate-500 shadow-sm ring-1 ring-white/80">
+              {item}
+            </span>
+          ))}
         </div>
       </div>
     </div>

@@ -6,20 +6,22 @@ import { CompanionHeroMascot } from "@/components/companion-avatar"
 const supportPoints = [
   {
     icon: HeartHandshake,
-    title: "情绪说不清",
-    description: "用一句话、一次语音或一张图，把模糊的心情先接住。",
+    title: "接住情绪",
+    description: "一句话、一段语音或一张图，先把此刻接住。",
   },
   {
     icon: Sparkles,
-    title: "需要被理解",
-    description: "灵音会帮你整理情绪线索，不会用说教的方式催你振作。",
+    title: "温柔分析",
+    description: "灵音会整理情绪线索，不会催你立刻振作。",
   },
   {
     icon: Music4,
-    title: "想慢慢缓下来",
-    description: "把当下状态转成一段更适合你的治愈节奏和陪伴空间。",
+    title: "治愈音乐",
+    description: "把状态转成一段更适合你的可视化陪伴空间。",
   },
 ]
+
+const quickHighlights = ["记录情绪", "灵音陪伴", "趋势回看", "音乐疗愈"]
 
 export default function LandingPage() {
   return (
@@ -48,25 +50,38 @@ export default function LandingPage() {
             <div className="pointer-events-none absolute bottom-[12%] left-[50%] h-36 w-36 -translate-x-1/2 rounded-full bg-[#ddd5ff]/65 blur-3xl" />
 
             <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center text-center">
-              <CompanionHeroMascot
-                character="cat"
-                className="w-full max-w-3xl"
-                subtitle="灵音会先把气氛放软一点，再陪你慢慢看清今天真正卡住的是哪件事。"
-              />
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {quickHighlights.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-white/76 px-4 py-2 text-xs font-semibold tracking-[0.14em] text-slate-500 shadow-[0_10px_26px_rgba(255,205,215,0.14)] ring-1 ring-white/78"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
 
-              <div className="mt-8 max-w-3xl space-y-5">
+              <div className="mt-6 max-w-3xl space-y-5">
                 <p className="inline-flex rounded-full bg-white/84 px-4 py-2 text-sm font-semibold text-[#ff708b] ring-1 ring-white/80">
                   先被接住，再慢慢理解自己
                 </p>
-                <h1 className="font-display text-[clamp(2.4rem,7vw,4.8rem)] font-semibold leading-[1.04] tracking-tight text-[#202636]">
+                <h1 className="font-display text-[clamp(2.5rem,7vw,5rem)] font-semibold leading-[1.04] tracking-tight text-[#202636]">
                   当你说不清楚自己怎么了，
                   <span className="block bg-gradient-to-r from-[#ff8fa7] via-[#f7b4c7] to-[#79d5c8] bg-clip-text text-transparent">
                     让灵音先陪你坐一会儿。
                   </span>
                 </h1>
                 <p className="mx-auto max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
-                  MoodWave 灵音是一个把情绪记录、温柔分析、伙伴陪伴和治愈音乐放在一起的轻量空间。
+                  MoodWave 灵音把情绪记录、伙伴陪伴、温柔分析和治愈音乐放进同一个轻盈空间里，先帮你把心情放软一点，再慢慢往前走。
                 </p>
+              </div>
+
+              <div className="mt-8 w-full max-w-4xl">
+                <CompanionHeroMascot
+                  character="cat"
+                  className="w-full"
+                  subtitle="首页主视觉先用轻量悬浮舞台承接正式动画资产，后续可以直接平滑替换成 Lottie 角色。"
+                />
               </div>
 
               <div className="mt-8">
