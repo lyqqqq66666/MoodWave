@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from typing import List
 import os
 import uuid
+import logging
 
 from sqlmodel import Session
 from src.core.models import User
@@ -16,6 +17,7 @@ from src.api.auth import get_current_user
 from src.services.ai_service import transcribe_voice
 
 router = APIRouter()
+logger = logging.getLogger("moodwave.upload_api")
 
 
 @router.post("/upload/image")

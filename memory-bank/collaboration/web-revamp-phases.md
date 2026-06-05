@@ -84,3 +84,42 @@
 - 顶部能明确看到当前记录日期
 - 录音后用户能更直接看到转写状态或结果
 - 分析页存在更明确的处理中间态
+
+## Phase 3
+
+### 时间
+
+- 2026-06-05
+
+### Codex 汇报
+
+- 对接 `WorkBuddy P0` 后端修复，完成 Web 端情绪录入联调收口。
+- 更新 [frontend/src/app/mood/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/mood/page.tsx)：
+  - 调用 `analyze-mood` 时追加 `image_urls`，启用后端真实图片分析
+  - 接入 `voice_status / voice_error`，不再把语音转写失败静默当成“已完成”
+  - 为分析阶段补充明确进度条、处理中步骤和最短等待节奏，避免报告卡片瞬间跳出
+  - 在分析未完成前不提前展示 fallback 报告，先展示处理过程
+- 补了 [backend/src/api/upload.py](/private/tmp/moodwave-web-current/backend/src/api/upload.py) 的日志对象初始化，
+  避免语音转写异常时因为 `logger` 未定义再次变成 500。
+
+### WorkBuddy 汇报
+
+- 已推送 `80e6b81`：
+  - 修复 AI 分析 `json` 作用域问题
+  - 新增 `POST /api/ai/analyze-images`
+  - `analyze-mood` 支持 `image_urls`
+  - 上传响应新增 `voice_status / voice_error`
+- 当前联调结论：
+  - 后端新字段和新能力已被前端消费
+  - 图片、语音、文字三路输入的前端透传链路已补齐
+
+### 当前阶段目标
+
+- 完成 `P0` 的前后端协作闭环，让情绪录入页的“多模态 + AI 分析真实性”体验达到可验收状态
+
+### 阶段测试要求
+
+- 上传图片后，前端会把 `image_urls` 传给 `analyze-mood`
+- 语音转写失败时，页面会明确显示失败状态或原因
+- AI 分析阶段会先显示进度条和处理中说明，不会瞬间直接出现报告
+- 前后端静态检查通过后再提交推送到 `codex/web-current`

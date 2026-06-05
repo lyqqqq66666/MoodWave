@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { ChevronDown, ChevronUp, Play, Plus, Sparkles, Trash2 } from "lucide-react"
 import { aiAPI, moodAPI, uploadAPI } from "@/lib/api"
@@ -49,7 +49,8 @@ export default function MoodPage() {
   const [voicePreviewUrl, setVoicePreviewUrl] = useState("")
   const [voiceUploadUrl, setVoiceUploadUrl] = useState("")
   const [voiceText, setVoiceText] = useState("")
-  const [voiceStatus, setVoiceStatus] = useState<"idle" | "uploading" | "ready" | "failed">("idle")
+  const [voiceStatus, setVoiceStatus] = useState<"idle" | "uploading" | "ready" | "empty" | "failed">("idle")
+  const [voiceError, setVoiceError] = useState("")
   const [showVoiceText, setShowVoiceText] = useState(false)
   const [voiceResetKey, setVoiceResetKey] = useState(0)
   const [customTag, setCustomTag] = useState("")
@@ -59,7 +60,9 @@ export default function MoodPage() {
   const [analysisReport, setAnalysisReport] = useState<MoodAnalysisReportData | null>(null)
   const [submitNotice, setSubmitNotice] = useState("")
   const [analysisStage, setAnalysisStage] = useState("")
+  const [analysisProgress, setAnalysisProgress] = useState(0)
   const voiceUploadTokenRef = useRef(0)
+  const analysisStartedAtRef = useRef(0)
 
   const selectedMoodMeta = getMoodOption(selectedMood)
   const canContinue = useMemo(() => {
@@ -103,9 +106,24 @@ export default function MoodPage() {
     setVoiceUploadUrl("")
     setVoiceText("")
     setVoiceStatus("idle")
+    setVoiceError("")
     setShowVoiceText(false)
     setVoiceResetKey((value) => value + 1)
   }
+
+  useEffect(() => {
+    if (!isSubmitting || submitted) return
+
+    const timer = window.setInterval(() => {
+      setAnalysisProgress((current) => {
+        if (current >= 92) return current
+        const increment = current < 32 ? 5 : current < 68 ? 3 : 1
+        return Math.min(92, current + increment)
+      })
+    }, 280)
+
+    return () => window.clearInterval(timer)
+  }, [isSubmitting, submitted])
 
   async function handleVoiceRecording(file: File | null, duration: number) {
     if (!file) {
@@ -123,10 +141,12 @@ export default function MoodPage() {
     setVoiceUploadUrl("")
     setVoiceText("")
     setVoiceStatus("uploading")
+    setVoiceError("")
     setShowVoiceText(true)
 
     if (!token) {
       setVoiceStatus("ready")
+      setVoiceError("")
       setSubmitNotice((current) => current || "游客模式下语音会先保存在本地，本次不上传云端转写。")
       return
     }
@@ -139,11 +159,22 @@ export default function MoodPage() {
       setVoiceUploadUrl(payload?.url || payload?.voice_url || "")
       setVoiceText(payload?.voice_text || payload?.text || "")
       if (payload?.duration) setVoiceDuration(Math.max(1, Math.round(Number(payload.duration))))
-      setVoiceStatus("ready")
+      const nextStatus = payload?.voice_status
+      const nextError = payload?.voice_error || ""
+      setVoiceError(nextError)
+      if (nextStatus === "error") {
+        setVoiceStatus("failed")
+        setSubmitNotice((current) => current || nextError || "语音转写暂时不可用，录音已经保留。")
+      } else if (nextStatus === "empty" || !payload?.voice_text) {
+        setVoiceStatus("empty")
+      } else {
+        setVoiceStatus("ready")
+      }
       setShowVoiceText(true)
     } catch {
       if (voiceUploadTokenRef.current !== uploadToken) return
       setVoiceStatus("failed")
+      setVoiceError("语音转写暂时不可用")
       setSubmitNotice((current) => current || "语音转写暂时不可用，已保留本地录音。")
       setShowVoiceText(true)
     }
@@ -153,8 +184,10 @@ export default function MoodPage() {
     setIsSubmitting(true)
     setSubmitNotice("")
     setAnalysisStage("正在整理你刚刚留下的心情线索…")
+    setAnalysisProgress(10)
     setStep(3)
     setSubmitted(false)
+    analysisStartedAtRef.current = Date.now()
 
     try {
       if (isGuest) {
@@ -169,6 +202,7 @@ export default function MoodPage() {
           images: imageUrls,
         })
         setAnalysisStage("已先保存在本地，正在给你一段轻一点的反馈…")
+        setAnalysisProgress(100)
         setAnalysisReport(report)
         setSubmitNotice("已保存到本地游客记录。登录后可把记录同步到云端。")
         return
@@ -177,6 +211,7 @@ export default function MoodPage() {
       let imageUrls = images.map((image) => image.previewUrl)
       if (images.length > 0) {
         setAnalysisStage("正在整理图片和文字，一起放进这次分析里…")
+        setAnalysisProgress(28)
         try {
           const uploadResponse = await uploadAPI.images(images.map((image) => image.file))
           const payload = uploadResponse.data?.data ?? uploadResponse.data
@@ -190,16 +225,32 @@ export default function MoodPage() {
       let submittedVoiceUrl = voiceUploadUrl
       if (voiceFile && !submittedVoiceUrl) {
         setAnalysisStage("正在把语音转成文字，再一起理解你的感受…")
+        setAnalysisProgress(46)
         try {
-          const voiceResponse = await uploadAPI.voice(voiceFile)
+          const wavFile = voiceFile.type.includes("wav")
+            ? voiceFile
+            : new File([await convertBlobToWav(voiceFile)], voiceFile.name.replace(/\.[^.]+$/, ".wav"), { type: "audio/wav" })
+          const voiceResponse = await uploadAPI.voice(wavFile)
           const payload = voiceResponse.data?.data ?? voiceResponse.data
           submittedVoiceUrl = payload?.url || payload?.voice_url || ""
           submittedVoiceText = payload?.voice_text || payload?.text || ""
           setVoiceUploadUrl(submittedVoiceUrl)
           setVoiceText(submittedVoiceText)
-          setVoiceStatus("ready")
+          const nextStatus = payload?.voice_status
+          const nextError = payload?.voice_error || ""
+          setVoiceError(nextError)
+          if (nextStatus === "error") {
+            setVoiceStatus("failed")
+            setSubmitNotice((current) => current || nextError || "语音转写失败，本次会先用文字和图片完成分析。")
+          } else if (nextStatus === "empty" || !submittedVoiceText) {
+            setVoiceStatus("empty")
+          } else {
+            setVoiceStatus("ready")
+          }
           setShowVoiceText(true)
         } catch {
+          setVoiceStatus("failed")
+          setVoiceError("语音转写接口暂时不可用")
           setSubmitNotice((current) => current || "语音转写接口暂时不可用，本次先保留文字和图片内容。")
         }
       }
@@ -210,6 +261,7 @@ export default function MoodPage() {
           : ""
 
       setAnalysisStage("AI 正在结合情绪、标签、文字和语音，为你生成更真实的分析…")
+      setAnalysisProgress(72)
       const report = await aiAPI
         .analyzeMood({
           mood_type: selectedMood,
@@ -217,6 +269,7 @@ export default function MoodPage() {
           note,
           tags: selectedTags,
           image_analysis: imageAnalysis,
+          image_urls: imageUrls,
           voice_text: submittedVoiceText,
           mbti: user?.mbti || "",
           zodiac: user?.zodiac || "",
@@ -236,6 +289,7 @@ export default function MoodPage() {
         .catch(() => buildFallbackReport())
 
       setAnalysisStage("分析完成，正在把这次心情慢慢整理给你…")
+      setAnalysisProgress(92)
       setAnalysisReport(report)
       await moodAPI.create({
         date: recordDate,
@@ -250,8 +304,15 @@ export default function MoodPage() {
       })
     } catch {
       setAnalysisStage("网络有点不稳，我先把这次心情接住，再给你一版本地反馈。")
+      setAnalysisProgress(100)
       setAnalysisReport(buildFallbackReport())
     } finally {
+      const elapsed = Date.now() - analysisStartedAtRef.current
+      const minVisibleDuration = 2400
+      if (elapsed < minVisibleDuration) {
+        await new Promise((resolve) => window.setTimeout(resolve, minVisibleDuration - elapsed))
+      }
+      setAnalysisProgress(100)
       setIsSubmitting(false)
       setSubmitted(true)
     }
@@ -469,8 +530,10 @@ export default function MoodPage() {
                                     ? voiceText
                                       ? "已识别完成，下面就是这段语音的转写"
                                       : "已保存录音，但这段语音暂时没有识别出文字"
+                                    : voiceStatus === "empty"
+                                      ? "录音已收到，但这段语音暂时没有识别出可展示的文字"
                                     : voiceStatus === "failed"
-                                      ? "转写失败，录音已保留"
+                                      ? voiceError || "转写失败，录音已保留"
                                       : "已录制"}
                               </p>
                             </div>
@@ -506,7 +569,11 @@ export default function MoodPage() {
                               </p>
                             ) : (
                               <p className="mt-3 rounded-[18px] bg-[#f9f6f8] p-3 text-xs leading-6 text-slate-400">
-                                {voiceStatus === "uploading" ? "AI 正在识别中，请稍候…" : "这段录音暂时还没有可展示的转写文字。"}
+                                {voiceStatus === "uploading"
+                                  ? "AI 正在识别中，请稍候…"
+                                  : voiceStatus === "failed"
+                                    ? voiceError || "语音转写失败，但录音已经为你保留下来了。"
+                                    : "这段录音暂时还没有可展示的转写文字。"}
                               </p>
                             )
                           ) : null}
@@ -532,11 +599,50 @@ export default function MoodPage() {
                   <p className="mt-3 text-sm leading-7 text-slate-500">
                     {analysisStage || "正在分析你的情绪波纹，马上给你一段轻轻的回应。"}
                   </p>
+                  <div className="mx-auto mt-6 max-w-2xl">
+                    <div className="h-3 overflow-hidden rounded-full bg-[#f6e9ee]">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffc3d0] to-[#8de1d5] transition-[width] duration-500 ease-out"
+                        style={{ width: `${analysisProgress}%` }}
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                      <span>正在整合文字、语音和图片线索</span>
+                      <span>{analysisProgress}%</span>
+                    </div>
+                  </div>
                   {submitNotice ? (
                     <p className="mx-auto mt-4 max-w-xl rounded-full bg-[#fff7d8] px-4 py-2 text-xs text-[#b67820]">{submitNotice}</p>
                   ) : null}
                   <div className="mx-auto mt-6 max-w-3xl">
-                    <MoodAnalysisReport report={analysisReport ?? buildFallbackReport()} />
+                    {submitted ? (
+                      <MoodAnalysisReport report={analysisReport ?? buildFallbackReport()} />
+                    ) : (
+                      <div className="space-y-4 text-left">
+                        <div className="rounded-[28px] bg-gradient-to-br from-[#fff4f7] to-[#effdfa] p-5">
+                          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#ff718b]">
+                            <Sparkles className="h-4 w-4" />
+                            AI 正在生成情绪报告
+                          </div>
+                          <p className="text-sm leading-7 text-slate-600">
+                            灵音会把你刚刚留下的情绪、标签、语音转写和图片一起理解，再整理成更贴近你的反馈。
+                          </p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {[
+                            "整理你的主要情绪和强度",
+                            "对照语音与文字里的细节",
+                            "提取图片里和情绪有关的线索",
+                            "生成更真实的洞察与建议",
+                          ].map((item, index) => (
+                            <div key={item} className="rounded-[26px] bg-white/88 p-4 ring-1 ring-[#f8e2e8]">
+                              <p className="text-sm font-semibold text-slate-900">步骤 {index + 1}</p>
+                              <p className="mt-2 text-sm leading-7 text-slate-600">{item}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
                     <button
