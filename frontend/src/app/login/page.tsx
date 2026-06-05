@@ -94,9 +94,9 @@ function LoginForm() {
   const displayError = localError || error || ""
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,204,219,0.85),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.88),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(213,205,255,0.45),_transparent_28%),linear-gradient(180deg,#fffdfb_0%,#fff6ef_100%)]">
-      <div className="mx-auto grid min-h-screen max-w-[1520px] items-stretch lg:grid-cols-[1.08fr_0.92fr]">
-        <section className="relative hidden overflow-hidden px-10 py-12 lg:flex lg:flex-col">
+    <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,204,219,0.85),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.88),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(213,205,255,0.45),_transparent_28%),linear-gradient(180deg,#fffdfb_0%,#fff6ef_100%)]">
+      <div className="mx-auto grid h-screen max-w-[1520px] items-stretch lg:grid-cols-[1.04fr_0.96fr]">
+        <section className="relative hidden overflow-hidden px-8 py-8 lg:flex lg:flex-col">
           <div className="relative z-10 flex items-center gap-4">
             <div className="relative h-20 w-28 shrink-0">
               <Image
@@ -119,32 +119,33 @@ function LoginForm() {
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-64 bg-[radial-gradient(circle_at_center,_rgba(189,174,255,0.32),_transparent_58%)]" />
 
           <div className="relative z-10 flex flex-1 flex-col justify-center">
-            <div className="max-w-2xl space-y-7">
-              <div className="space-y-4">
+            <div className="max-w-[620px] space-y-5">
+              <div className="space-y-3">
                 <p className="inline-flex rounded-full bg-white/70 px-4 py-2 text-sm font-semibold text-[#ff7894] shadow-[0_10px_24px_rgba(255,190,205,0.16)]">
                   先被温柔接住
                 </p>
-                <h1 className="max-w-[11ch] font-display text-[clamp(2.6rem,4vw,4rem)] font-bold leading-[1.15] tracking-[-0.03em] text-[#121b33]">
+                <h1 className="max-w-[10ch] font-display text-[clamp(2.1rem,3.2vw,3.4rem)] font-bold leading-[1.18] tracking-[-0.035em] text-[#121b33]">
                   不用急着解释
                   <span className="block">自己怎么了，</span>
-                  <span className="block text-[#ff7894]">先让灵音陪你浮一会儿。</span>
+                  <span className="block text-[#ff7894]">先让灵音陪你</span>
+                  <span className="block text-[#ff7894]">浮一会儿。</span>
                 </h1>
-                <p className="max-w-xl text-lg leading-8 text-slate-600">
+                <p className="max-w-xl text-base leading-7 text-slate-600">
                   先登录，再把今天的心情交给一个更柔软的入口。你可以从一句话开始，也可以先安静看着它陪你慢慢落地。
                 </p>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.16fr_0.84fr]">
+              <div className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
                 <CompanionHeroMascot
                   character="cat"
                   subtitle="这次先把登录页主视觉换成更接近 iOS 原型气质的小灵体宠物，后续再继续补正式 Lottie 动画。"
                 />
 
-                <div className="rounded-[34px] border border-white/80 bg-white/74 p-5 shadow-[0_24px_80px_rgba(255,190,205,0.18)] backdrop-blur-2xl">
+                <div className="rounded-[30px] border border-white/80 bg-white/74 p-4 shadow-[0_20px_56px_rgba(255,190,205,0.16)] backdrop-blur-2xl">
                   <p className="text-sm font-semibold text-[#ff7894]">登录后你会看到</p>
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-3 space-y-2.5">
                     {companionHighlights.map((item, index) => (
-                      <div key={item} className="rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f7e2e8]">
+                      <div key={item} className="rounded-[22px] bg-[#fffafb] p-3.5 ring-1 ring-[#f7e2e8]">
                         <div className="flex items-center gap-3">
                           <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-r from-[#ffbfd0] to-[#8de1d5] text-xs font-semibold text-white">
                             {index + 1}
@@ -159,13 +160,13 @@ function LoginForm() {
             </div>
           </div>
 
-          <div className="relative z-10 mt-10 flex max-w-xl items-center gap-3 rounded-full bg-white/58 px-4 py-3 text-sm font-medium text-slate-500 shadow-[0_16px_36px_rgba(255,214,224,0.14)] backdrop-blur-xl">
+          <div className="relative z-10 mt-6 hidden max-w-xl items-center gap-3 rounded-full bg-white/58 px-4 py-3 text-sm font-medium text-slate-500 shadow-[0_16px_36px_rgba(255,214,224,0.14)] backdrop-blur-xl 2xl:flex">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff1f5] text-[#ff7894]">♡</span>
             <span>登录后就能保留聊天历史、伙伴记忆和更完整的陪伴闭环。</span>
           </div>
         </section>
 
-        <section className="flex min-h-screen items-center justify-center px-4 py-8 md:px-6">
+        <section className="flex h-screen items-center justify-center overflow-hidden px-4 py-4 md:px-6 lg:py-6">
           <div className="w-full max-w-md rounded-[36px] border border-white/70 bg-white/82 p-6 shadow-[0_24px_80px_rgba(255,201,213,0.3)] backdrop-blur-2xl md:p-8">
             <div className="mb-8 lg:hidden">
               <Link href="/" className="flex min-w-0 items-center gap-3">
@@ -237,7 +238,7 @@ function LoginForm() {
               </div>
             ) : null}
 
-            <form className="mt-8 min-h-[310px] space-y-5 transition-all duration-300" onSubmit={handleSubmit}>
+            <form className="mt-7 space-y-[18px] transition-all duration-300" onSubmit={handleSubmit}>
               {mode === "register" ? (
                 <label className="block space-y-2">
                   <span className="text-sm font-medium text-slate-700">用户名</span>

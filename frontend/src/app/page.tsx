@@ -65,14 +65,17 @@ export default function LandingPage() {
                 <p className="inline-flex rounded-full bg-white/84 px-4 py-2 text-sm font-semibold text-[#ff708b] ring-1 ring-white/80">
                   先被接住，再慢慢理解自己
                 </p>
-                <h1 className="mx-auto max-w-[12ch] font-display text-[clamp(2.4rem,5.2vw,4.6rem)] font-semibold leading-[1.14] tracking-[-0.03em] text-[#202636] md:max-w-[14ch]">
+                <h1 className="mx-auto max-w-[11ch] font-display text-[clamp(2rem,4.2vw,3.8rem)] font-semibold leading-[1.22] tracking-[-0.035em] text-[#202636] sm:max-w-[12ch] lg:max-w-[13ch]">
                   <span className="block">当你说不清楚</span>
                   <span className="block">自己怎么了，</span>
-                  <span className="mt-2 block bg-gradient-to-r from-[#ff8fa7] via-[#f7b4c7] to-[#79d5c8] bg-clip-text text-transparent">
-                    让灵音先陪你坐一会儿。
+                  <span className="mt-1.5 block bg-gradient-to-r from-[#ff8fa7] via-[#f7b4c7] to-[#79d5c8] bg-clip-text text-transparent">
+                    让灵音先陪你
+                  </span>
+                  <span className="block bg-gradient-to-r from-[#ff8fa7] via-[#f7b4c7] to-[#79d5c8] bg-clip-text text-transparent">
+                    坐一会儿。
                   </span>
                 </h1>
-                <p className="mx-auto max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
+                <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
                   MoodWave 灵音把情绪记录、伙伴陪伴、温柔分析和治愈音乐放进同一个轻盈空间里，先帮你把心情放软一点，再慢慢往前走。
                 </p>
               </div>

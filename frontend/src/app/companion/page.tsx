@@ -1127,9 +1127,12 @@ export default function CompanionPage() {
                       key={item.id}
                       type="button"
                       onClick={() => void saveLook(character, item.id)}
-                      className={cn("flex items-center gap-2 rounded-full bg-white px-4 py-3 text-sm text-slate-600 ring-1 ring-[#f8e7eb]", color === item.id && "ring-2 ring-[#ffb5c2]")}
+                      className={cn(
+                        "flex min-h-14 items-center gap-3 rounded-full bg-white/92 px-5 py-3 text-sm font-medium text-slate-600 shadow-[0_10px_24px_rgba(255,214,224,0.1)] ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5",
+                        color === item.id && "bg-[#fff7fa] text-[#ff7894] ring-2 ring-[#ffb5c2] shadow-[0_14px_28px_rgba(255,181,194,0.18)]",
+                      )}
                     >
-                      <span className={cn("h-5 w-5 rounded-full", item.chip)} />
+                      <span className={cn("h-7 w-7 rounded-full ring-4 ring-white", item.chip)} />
                       {item.name}
                     </button>
                   ))}
