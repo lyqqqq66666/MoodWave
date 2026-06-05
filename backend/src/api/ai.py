@@ -28,6 +28,18 @@ logger = logging.getLogger("moodwave.ai_api")
 router = APIRouter()
 
 
+def build_sse_response(event_generator):
+    return StreamingResponse(
+        event_generator,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
 # ==================== 请求/响应模型 ====================
 
 class ChatMessage(BaseModel):
@@ -170,15 +182,7 @@ async def ai_chat(
 
             await save_ai_reply()
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲，确保流式实时传输
-            "Connection": "keep-alive",
-        },
-    )
+    return build_sse_response(event_generator())
 
 
 # ==================== Agent 对话接口 ====================
@@ -329,15 +333,7 @@ async def ai_chat_agent(
 
             await save_ai_reply()
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
+    return build_sse_response(event_generator())
 
 
 # ==================== Agent 状态接口 ====================

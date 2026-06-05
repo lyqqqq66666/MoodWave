@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { BarChart3, Bell, HeartHandshake, Home, LogOut, Music2, PenLine, Sparkles, UserRound } from "lucide-react"
@@ -79,7 +80,14 @@ export function MoodWaveShell({
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-white text-sm font-semibold overflow-hidden">
                 {avatarUrl ? (
-                  <img src={resolveAssetUrl(avatarUrl)} alt={displayName} className="h-full w-full object-cover" />
+                  <Image
+                    src={resolveAssetUrl(avatarUrl)}
+                    alt={displayName}
+                    width={40}
+                    height={40}
+                    sizes="40px"
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   avatarChar
                 )}
@@ -130,7 +138,14 @@ export function MoodWaveShell({
                 aria-label="个人主页"
               >
                 {avatarUrl ? (
-                  <img src={resolveAssetUrl(avatarUrl)} alt={displayName} className="h-full w-full object-cover" />
+                  <Image
+                    src={resolveAssetUrl(avatarUrl)}
+                    alt={displayName}
+                    width={40}
+                    height={40}
+                    sizes="40px"
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   avatarChar
                 )}

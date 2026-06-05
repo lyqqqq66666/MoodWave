@@ -379,8 +379,11 @@ export default function CompanionPage() {
         const rows = normalizeConversations(response.data?.data ?? response.data)
         setConversations(rows)
         if (!activeConversationId && rows[0]?.id) {
-          setActiveConversationId(rows[0].id)
-          await loadConversationMessages(rows[0].id, active)
+          const firstConversationId = rows[0].id
+          setActiveConversationId(firstConversationId)
+          const messagesResponse = await companionAPI.conversationMessages(firstConversationId)
+          if (!active) return
+          setMessages(normalizeStoredMessages(messagesResponse.data?.data ?? messagesResponse.data, starterMessages))
         }
       } catch {
         if (!active) return
@@ -394,7 +397,7 @@ export default function CompanionPage() {
     return () => {
       active = false
     }
-  }, [token])
+  }, [activeConversationId, starterMessages, token])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })

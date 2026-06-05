@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -eu
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+echo "[pre-commit] running web phase checks"
+sh "$ROOT_DIR/scripts/check-frontend.sh"
+sh "$ROOT_DIR/scripts/check-backend.sh"
