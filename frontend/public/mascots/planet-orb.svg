@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="orbBody" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(220 156) rotate(55) scale(252 242)">
+      <stop stop-color="#FFF7E3"/>
+      <stop offset="0.42" stop-color="#DFE3FF"/>
+      <stop offset="0.72" stop-color="#D6F6F0"/>
+      <stop offset="1" stop-color="#FFF8EF"/>
+    </radialGradient>
+    <linearGradient id="orbWave" x1="146" y1="302" x2="366" y2="382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DFE1FF"/>
+      <stop offset="0.5" stop-color="#F7DBE8"/>
+      <stop offset="1" stop-color="#BCE9DF"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="256" cy="418" rx="114" ry="34" fill="#DEE4F6" fill-opacity=".42"/>
+  <circle cx="256" cy="236" r="138" fill="url(#orbBody)"/>
+  <ellipse cx="256" cy="234" rx="176" ry="52" stroke="#D4D8FF" stroke-width="12" stroke-linecap="round"/>
+  <path d="M146 292C182 269 225 282 256 300C287 318 330 331 366 304V332C338 357 303 373 256 373C209 373 174 359 146 332V292Z" fill="url(#orbWave)"/>
+  <ellipse cx="214" cy="224" rx="18" ry="24" fill="#3B3D4E"/>
+  <ellipse cx="298" cy="224" rx="18" ry="24" fill="#3B3D4E"/>
+  <ellipse cx="214" cy="216" rx="6" ry="9" fill="white"/>
+  <ellipse cx="298" cy="216" rx="6" ry="9" fill="white"/>
+  <ellipse cx="184" cy="255" rx="24" ry="14" fill="#D7CFFF" fill-opacity=".72"/>
+  <ellipse cx="328" cy="255" rx="24" ry="14" fill="#D7CFFF" fill-opacity=".72"/>
+  <path d="M244 262C248 268 254 271 256 271C258 271 264 268 268 262" stroke="#6D6579" stroke-width="7" stroke-linecap="round"/>
+  <path d="M236 281C243 292 251 298 256 298C261 298 269 292 276 281" stroke="#6D6579" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="214" cy="374" rx="32" ry="25" fill="#E5F6F3"/>
+  <ellipse cx="298" cy="374" rx="32" ry="25" fill="#E5F6F3"/>
+  <circle cx="372" cy="182" r="18" fill="#FFF7CF"/>
+</svg>
