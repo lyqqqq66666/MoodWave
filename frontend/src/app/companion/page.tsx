@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Brain, Check, ChevronDown, Edit3, History, Loader2, MessageCircleHeart, MessageSquarePlus, MoreVertical, Music2, Palette, RefreshCw, Send, Sparkles, Trash2, X } from "lucide-react"
+import { Brain, Check, Edit3, History, Loader2, MessageCircleHeart, MessageSquarePlus, MoreVertical, Music2, Palette, RefreshCw, Send, Sparkles, Trash2, X } from "lucide-react"
 import { aiAPI, authAPI, companionAPI } from "@/lib/api"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
@@ -65,11 +65,6 @@ type AgentDonePayload = {
   nodes_executed?: string[]
   assistant_message_id?: number
   assistant_created_at?: string
-}
-type AgentStatusPayload = {
-  langgraph_available?: boolean
-  agent_version?: string
-  nodes?: string[]
 }
 type CompanionMemory = {
   id: string
@@ -305,13 +300,10 @@ export default function CompanionPage() {
   const [isConversationLoading, setIsConversationLoading] = useState(false)
   const [conversationNotice, setConversationNotice] = useState("")
   const [agentStatuses, setAgentStatuses] = useState<string[]>([])
-  const [agentNodes, setAgentNodes] = useState<string[]>([])
-  const [agentDebugOpen, setAgentDebugOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [editingConversationId, setEditingConversationId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState("")
-  const [agentAvailable, setAgentAvailable] = useState<boolean | null>(null)
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [notice, setNotice] = useState("")
@@ -326,10 +318,8 @@ export default function CompanionPage() {
   const serverCharacter = character === "planet" ? "star" : character
   const activeConversation = conversations.find((item) => item.id === activeConversationId)
   const agentStatusSummary = isStreaming
-    ? agentStatuses[agentStatuses.length - 1] || "灵音正在想一想..."
-    : agentNodes.length > 0
-      ? "灵音已完成回应"
-      : ""
+    ? agentStatuses[agentStatuses.length - 1] || "灵音正在整理你的心情..."
+    : ""
 
   useEffect(() => {
     setCharacter(normalizeCompanionCharacter(user?.avatar_character))
@@ -371,28 +361,6 @@ export default function CompanionPage() {
       active = false
     }
   }, [character, serverCharacter, user?.username])
-
-  useEffect(() => {
-    let active = true
-
-    async function loadAgentStatus() {
-      try {
-        const response = await companionAPI.agentStatus()
-        if (!active) return
-        const payload = (response.data?.data ?? response.data) as AgentStatusPayload
-        setAgentAvailable(Boolean(payload.langgraph_available))
-        setAgentNodes(Array.isArray(payload.nodes) ? payload.nodes : [])
-      } catch {
-        if (!active) return
-        setAgentAvailable(false)
-      }
-    }
-
-    loadAgentStatus()
-    return () => {
-      active = false
-    }
-  }, [])
 
   useEffect(() => {
     let active = true
@@ -478,8 +446,6 @@ export default function CompanionPage() {
     setIsStreaming(true)
     setNotice("")
     setAgentStatuses([])
-    setAgentNodes([])
-    setAgentDebugOpen(false)
 
     // AbortController：30 秒超时防止无限等待
     const abortController = new AbortController()
@@ -603,7 +569,6 @@ export default function CompanionPage() {
               music_recommendation: done.music_recommendation || item.music_recommendation,
               nodes_executed: done.nodes_executed || item.nodes_executed,
             } : item))
-            if (Array.isArray(done.nodes_executed)) setAgentNodes(done.nodes_executed)
           }
           clearTimeout(timeoutId)
           return
@@ -670,15 +635,11 @@ export default function CompanionPage() {
     setInput("")
     setNotice("")
     setAgentStatuses([])
-    setAgentNodes([])
-    setAgentDebugOpen(false)
   }
 
   async function handleSelectConversation(conversationId: number) {
     if (isStreaming || conversationId === activeConversationId) return
     setAgentStatuses([])
-    setAgentNodes([])
-    setAgentDebugOpen(false)
     setHistoryOpen(false)
     await loadConversationMessages(conversationId)
   }
@@ -837,27 +798,40 @@ export default function CompanionPage() {
 
   return (
     <MoodWaveShell title="灵音伙伴">
-      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[0.88fr_1.12fr]">
-        <section className="hidden rounded-[36px] bg-white/84 p-6 text-center shadow-[0_22px_70px_rgba(255,206,216,0.22)] ring-1 ring-white/75 lg:block">
-          <div className="mx-auto w-fit rounded-[48px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-5">
-            <CompanionAvatar character={character} color={color} mood={latestMood} size="lg" />
-          </div>
-          <div className="mt-5">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#fff4f7] px-4 py-2 text-sm font-medium text-[#ff718b]">
-              <Sparkles className="h-4 w-4" />
-              {companion.tagline}
-            </div>
-            <h2 className="mt-4 text-3xl font-semibold text-slate-900">{companion.name}</h2>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-600">{companion.personality}</p>
-          </div>
-          <div className="mt-6 rounded-[28px] bg-white/86 p-4 text-left ring-1 ring-[#f8e7eb]">
-            <p className="text-xs font-semibold text-slate-400">今日问候</p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">“{dailyGreeting}”</p>
-            {isGreetingLoading ? <p className="mt-2 text-xs text-slate-400">正在同步今天的情绪问候...</p> : null}
-          </div>
-        </section>
-
+      <div className="mx-auto max-w-5xl">
         <section className="min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5">
+          <div className="mb-4 hidden items-center justify-between gap-4 rounded-[28px] bg-gradient-to-br from-[#fff7f9] via-white to-[#effdfa] p-4 ring-1 ring-white/80 lg:flex">
+            <div className="flex min-w-0 items-center gap-4">
+              <CompanionAvatar character={character} color={color} mood={latestMood} size="md" />
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#fff4f7] px-3 py-1 text-xs font-semibold text-[#ff718b]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {companion.tagline}
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold text-slate-900">{companion.name}</h2>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">{dailyGreeting}</p>
+                {isGreetingLoading ? <p className="mt-2 text-xs text-slate-400">正在同步今天的情绪问候...</p> : null}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                const active = activeTab === tab.key
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key)}
+                    className={cn("inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition", active ? "bg-white text-[#ff718b] shadow-sm ring-1 ring-[#f8dce5]" : "bg-white/68 text-slate-500 ring-1 ring-white/80")}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-3 ring-1 ring-white/80 lg:hidden">
             <div className="flex min-w-0 items-center gap-3">
               <CompanionAvatar character={character} color={color} mood={latestMood} size="sm" />
@@ -909,23 +883,6 @@ export default function CompanionPage() {
               </div>
             ) : null}
           </div>
-          <div className="hidden grid-cols-3 gap-2 rounded-[28px] bg-[#fff7f9] p-2 md:grid">
-            {tabs.map((tab) => {
-              const Icon = tab.icon
-              const active = activeTab === tab.key
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={cn("flex min-h-11 items-center justify-center gap-2 rounded-[22px] text-sm font-medium transition", active ? "bg-white text-[#ff718b] shadow-sm" : "text-slate-500")}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
 
           {activeTab === "chat" ? (
             <div className="flex h-[calc(100svh-10rem)] min-h-[560px] flex-col md:mt-4 md:h-[560px]">
@@ -933,7 +890,7 @@ export default function CompanionPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{activeConversation?.title || "新的伙伴对话"}</p>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    {agentAvailable === null ? "正在检查 Agent 模式" : agentAvailable ? "Agent 模式已开启" : "普通对话模式"}
+                    {token ? "你的对话会自动沉淀成更贴近你的陪伴记忆。" : "登录后可保存长期记忆与对话历史。"}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -1041,19 +998,7 @@ export default function CompanionPage() {
               </div>
               {agentStatusSummary ? (
                 <div className="mb-3 rounded-[20px] bg-[#fffafc] px-4 py-2 ring-1 ring-[#f8e7eb]">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-slate-500">{agentStatusSummary}</span>
-                    <button type="button" onClick={() => setAgentDebugOpen((open) => !open)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#ff718b]">
-                      查看 Agent 过程
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition", agentDebugOpen && "rotate-180")} />
-                    </button>
-                  </div>
-                  {agentDebugOpen ? (
-                    <div className="mt-2 space-y-2">
-                      {agentStatuses.length > 0 ? <p className="text-xs leading-5 text-slate-500">{agentStatuses.join(" / ")}</p> : null}
-                      {agentNodes.length > 0 ? <p className="text-[11px] leading-5 text-slate-400">{agentNodes.join(" → ")}</p> : null}
-                    </div>
-                  ) : null}
+                  <span className="text-xs font-medium text-slate-500">{agentStatusSummary}</span>
                 </div>
               ) : null}
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-[30px] bg-gradient-to-br from-[#fffafb] to-[#f2fffb] p-4 pr-2 [scrollbar-color:#ffb5c2_transparent] [scrollbar-width:thin]">
