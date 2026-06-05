@@ -760,7 +760,7 @@ export default function CompanionPage() {
   if (isGuest) {
     return (
       <MoodWaveShell title="灵音伙伴">
-        <div className="mx-auto grid min-h-[calc(100svh-12rem)] max-w-5xl place-items-center">
+        <div className="mx-auto grid min-h-[calc(100svh-12rem)] max-w-5xl place-items-center" suppressHydrationWarning>
           <section className="w-full overflow-hidden rounded-[38px] bg-white/86 shadow-[0_24px_80px_rgba(255,206,216,0.24)] ring-1 ring-white/75 md:grid md:grid-cols-[0.9fr_1.1fr]">
             <div className="grid place-items-center bg-gradient-to-br from-[#fff7fa] via-[#effdfa] to-[#fff7df] p-8 text-center">
               <div className="rounded-[52px] bg-white/70 p-6 shadow-[0_18px_46px_rgba(255,181,194,0.18)]">
@@ -801,7 +801,7 @@ export default function CompanionPage() {
 
   return (
     <MoodWaveShell title="灵音伙伴">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-5xl" suppressHydrationWarning>
         <section className="min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5">
           <div className="mb-4 hidden items-center justify-between gap-6 rounded-[30px] bg-gradient-to-br from-[#fff7f9] via-white to-[#effdfa] p-5 ring-1 ring-white/80 lg:flex">
             <div className="flex min-w-0 items-center gap-5">
