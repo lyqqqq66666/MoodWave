@@ -8,6 +8,7 @@ import { MoodWaveShell } from "@/components/moodwave-shell"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
 import {
   CompanionAvatar,
+  CompanionPetOrb,
   companionCharacters,
   companionColors,
   getCompanionCharacter,
@@ -803,16 +804,21 @@ export default function CompanionPage() {
     <MoodWaveShell title="灵音伙伴">
       <div className="mx-auto max-w-5xl">
         <section className="min-w-0 rounded-[30px] bg-white/84 p-3 shadow-[0_22px_70px_rgba(255,206,216,0.2)] ring-1 ring-white/75 md:rounded-[36px] md:p-5">
-          <div className="mb-4 hidden items-center justify-between gap-4 rounded-[28px] bg-gradient-to-br from-[#fff7f9] via-white to-[#effdfa] p-4 ring-1 ring-white/80 lg:flex">
-            <div className="flex min-w-0 items-center gap-4">
-              <CompanionAvatar character={character} color={color} mood={latestMood} size="md" />
+          <div className="mb-4 hidden items-center justify-between gap-6 rounded-[30px] bg-gradient-to-br from-[#fff7f9] via-white to-[#effdfa] p-5 ring-1 ring-white/80 lg:flex">
+            <div className="flex min-w-0 items-center gap-5">
+              <div className="relative">
+                <CompanionPetOrb character={character} color={color} mood={latestMood} size="lg" showLabel />
+                <div className="pointer-events-none absolute -right-2 top-5 rounded-full bg-white/82 px-3 py-1 text-[11px] font-medium text-slate-500 shadow-[0_10px_20px_rgba(255,204,214,0.16)]">
+                  悬浮陪伴中
+                </div>
+              </div>
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-2 rounded-full bg-[#fff4f7] px-3 py-1 text-xs font-semibold text-[#ff718b]">
                   <Sparkles className="h-3.5 w-3.5" />
                   {companion.tagline}
                 </div>
-                <h2 className="mt-3 text-2xl font-semibold text-slate-900">{companion.name}</h2>
-                <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">{dailyGreeting}</p>
+                <h2 className="mt-3 text-3xl font-semibold text-slate-900">{companion.name}</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">{dailyGreeting}</p>
                 {isGreetingLoading ? <p className="mt-2 text-xs text-slate-400">正在同步今天的情绪问候...</p> : null}
               </div>
             </div>
@@ -837,7 +843,7 @@ export default function CompanionPage() {
 
           <div className="relative mb-3 flex items-center justify-between gap-3 rounded-[24px] bg-gradient-to-br from-[#fff7f9] to-[#effdfa] p-3 ring-1 ring-white/80 lg:hidden">
             <div className="flex min-w-0 items-center gap-3">
-              <CompanionAvatar character={character} color={color} mood={latestMood} size="sm" />
+              <CompanionPetOrb character={character} color={color} mood={latestMood} size="sm" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">{companion.name}</p>
                 <p className="mt-0.5 truncate text-xs text-slate-500">{companion.tagline}</p>
@@ -1084,20 +1090,32 @@ export default function CompanionPage() {
             <div className="mt-5 grid gap-5">
               <div>
                 <h3 className="font-semibold text-slate-900">选择伙伴形象</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <p className="mt-1 text-sm text-slate-500">把方框头像换成更像桌宠的悬浮宠物，选一个最想让它陪你的样子。</p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {companionCharacters.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => void saveLook(item.id, color)}
-                      className={cn("flex items-center gap-3 rounded-[26px] bg-white/88 p-4 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5", character === item.id && "ring-2 ring-[#ffb5c2]")}
+                      className={cn(
+                        "group rounded-[28px] bg-gradient-to-br from-[#fffafb] to-white p-4 text-left ring-1 ring-[#f8e7eb] transition hover:-translate-y-1",
+                        character === item.id && "ring-2 ring-[#ffb5c2] shadow-[0_18px_34px_rgba(255,181,194,0.18)]",
+                      )}
                     >
-                      <CompanionAvatar character={item.id} color={color} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-slate-900">{item.name}</span>
-                        <span className="mt-1 block text-xs leading-5 text-slate-500">{item.tagline}</span>
-                      </span>
-                      {character === item.id ? <Check className="h-4 w-4 text-[#ff7894]" /> : null}
+                      <div className="flex flex-col items-center gap-3 text-center">
+                        <div className="relative">
+                          <CompanionPetOrb character={item.id} color={color} mood={latestMood} size="md" showLabel />
+                          {character === item.id ? (
+                            <span className="absolute -right-2 top-1 grid h-7 w-7 place-items-center rounded-full bg-white text-[#ff7894] shadow-[0_10px_22px_rgba(255,181,194,0.22)]">
+                              <Check className="h-4 w-4" />
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="min-w-0">
+                          <span className="block font-semibold text-slate-900">{item.name}</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">{item.tagline}</span>
+                        </span>
+                      </div>
                     </button>
                   ))}
                 </div>

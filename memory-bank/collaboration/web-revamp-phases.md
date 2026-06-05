@@ -165,3 +165,36 @@
 - 登录后首页主入口明确，不再保留低优先级引导入口
 - 音乐页不再直接暴露生硬技术异常文案，进度条控制更轻一点
 - 前端检查通过后再提交推送到 `codex/web-current`
+
+## Phase 5
+
+### 时间
+
+- 2026-06-06
+
+### Codex 汇报
+
+- 完成 `P1-3` 灵音伙伴页宠物体系第一轮重做，并把整轮 `P1` 收口到可回退状态。
+- 更新 [frontend/src/app/companion/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/companion/page.tsx)：
+  - 把顶部展示区从普通头像 + 文案，改成更像桌宠舞台的悬浮宠物主视觉
+  - 移动端顶部也换成悬浮宠物入口，不再继续沿用方框头像观感
+  - 装扮页签把角色选择从方框列表改成宠物胶囊式选择器
+- 更新 [frontend/src/components/companion-avatar.tsx](/private/tmp/moodwave-web-current/frontend/src/components/companion-avatar.tsx)：
+  - 新增 `CompanionPetOrb`
+  - 用无边框悬浮宠物形态承接伙伴页顶部展示和形象选择
+  - 保持后续可继续替换正式 `Lottie` 资产
+
+### WorkBuddy 汇报
+
+- 本阶段无需新增后端接口修改
+- 后续如果要继续推进角色配置持久化、角色资源映射或音乐页元数据细化，再由 WorkBuddy 跟进
+
+### 当前阶段目标
+
+- 完成 `P1` 的核心前端改版：登录页、登录后首页、灵音伙伴页、音乐页第一轮统一到更治愈、更像产品成品的方向
+
+### 阶段测试要求
+
+- 灵音伙伴页不再出现明显的方框角色选择观感
+- 顶部主形象和角色选择区统一成桌宠 / 悬浮宠物表达
+- 前端检查通过后提交推送到 `codex/web-current`

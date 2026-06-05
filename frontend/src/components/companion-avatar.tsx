@@ -153,6 +153,68 @@ export function CompanionAvatar({
   )
 }
 
+type CompanionPetOrbProps = {
+  character?: string | null
+  color?: string | null
+  mood?: MoodType
+  size?: "sm" | "md" | "lg"
+  className?: string
+  showLabel?: boolean
+}
+
+export function CompanionPetOrb({
+  character,
+  color,
+  mood,
+  size = "md",
+  className,
+  showLabel = false,
+}: CompanionPetOrbProps) {
+  const companion = getCompanionCharacter(character)
+  const palette = getCompanionColor(color)
+  const shellSize = {
+    sm: "h-20 w-20",
+    md: "h-36 w-36",
+    lg: "h-56 w-56",
+  }
+  const stageSize = {
+    sm: "h-14 w-14",
+    md: "h-24 w-24",
+    lg: "h-40 w-40",
+  }
+  const mascotSize = size === "lg" ? "lg" : size === "md" ? "md" : "sm"
+
+  return (
+    <div className={cn("relative grid place-items-center", shellSize[size], className)}>
+      <motion.div
+        className="absolute inset-[10%] rounded-full blur-2xl"
+        style={{ background: `radial-gradient(circle, ${palette.from}, ${palette.to})` }}
+        animate={{ scale: [0.92, 1.06, 0.95], opacity: [0.45, 0.78, 0.5] }}
+        transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute inset-[23%] rounded-full border border-white/50"
+        animate={{ scale: [0.96, 1.02, 0.97], opacity: [0.24, 0.55, 0.26] }}
+        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className={cn("relative grid place-items-center rounded-[42%_58%_52%_48%/46%_48%_52%_54%] shadow-[0_18px_40px_rgba(255,181,194,0.22)]", stageSize[size])}
+        style={{ background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,0.88), transparent 26%), linear-gradient(145deg, ${companion.gradient[0]}, ${companion.gradient[1]} 54%, ${companion.gradient[2]})` }}
+        animate={{ y: [0, -8, 0], rotate: [0, -1, 0.6, 0], scale: [1, 1.015, 1] }}
+        transition={{ duration: 5.6, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <span className="absolute inset-[10%] rounded-[inherit] bg-white/28" />
+        <MascotShape character={companion.id} mood={mood} size={mascotSize} />
+      </motion.div>
+      {showLabel ? (
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white/88 px-3 py-1 text-[11px] font-semibold text-slate-600 shadow-[0_10px_20px_rgba(255,181,194,0.18)]">
+          {companion.name}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 type CompanionHeroMascotProps = {
   character?: string | null
   className?: string
