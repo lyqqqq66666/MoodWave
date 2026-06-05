@@ -152,11 +152,11 @@ export const companionColors: {
   to: string
   chip: string
 }[] = [
-  { id: "pink", name: "樱粉", from: "#FFB5C2", to: "#FFE8A8", chip: "bg-[#ffb5c2]" },
-  { id: "mint", name: "薄荷", from: "#A8E6CF", to: "#90E0EF", chip: "bg-[#a8e6cf]" },
-  { id: "blue", name: "晴空", from: "#90E0EF", to: "#CBC3E3", chip: "bg-[#90e0ef]" },
-  { id: "amber", name: "暖阳", from: "#FFD166", to: "#EF8D7B", chip: "bg-[#ffd166]" },
-  { id: "purple", name: "薰衣草", from: "#CBC3E3", to: "#FFB5C2", chip: "bg-[#cbc3e3]" },
+  { id: "pink", name: "樱粉", from: "#FF9FB4", to: "#FFD1DC", chip: "bg-[#ff6b8a]" },
+  { id: "mint", name: "薄荷", from: "#6DD5B8", to: "#A8F0D8", chip: "bg-[#2d8f78]" },
+  { id: "blue", name: "晴空", from: "#64B5F6", to: "#BBDEFB", chip: "bg-[#4a90d9]" },
+  { id: "amber", name: "暖阳", from: "#FFB74D", to: "#FFE0B2", chip: "bg-[#f59e0b]" },
+  { id: "purple", name: "薰衣草", from: "#B39DDB", to: "#E1BEE7", chip: "bg-[#7c5cbf]" },
 ]
 
 export function getCompanionCharacter(value?: string | null) {
