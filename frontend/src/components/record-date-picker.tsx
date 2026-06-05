@@ -41,10 +41,11 @@ export function RecordDatePicker({
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-auto rounded-[28px] border border-white/80 bg-white/96 p-3 shadow-[0_24px_60px_rgba(255,210,220,0.24)]"
+        sideOffset={12}
+        className="z-[70] w-auto rounded-[28px] border border-white/80 bg-white/96 p-3 shadow-[0_24px_60px_rgba(255,210,220,0.24)]"
       >
         <div className="mb-2 px-2">
-          <p className="text-sm font-semibold text-slate-800">补记日期</p>
+          <p className="text-sm font-semibold text-slate-800">选择要记录的那一天</p>
           <p className="mt-1 text-xs leading-5 text-slate-500">默认是今天，也可以补记过去的心情。</p>
         </div>
         <Calendar
@@ -61,9 +62,11 @@ export function RecordDatePicker({
           disabled={(date) => date > today}
           className="rounded-[24px] bg-[#fffafb]"
           classNames={{
+            cell: "h-9 w-9 p-0 text-center text-sm relative focus-within:relative focus-within:z-20",
+            day: "h-9 w-9 rounded-full p-0 font-normal text-slate-700 hover:bg-[#fff1f5] hover:text-[#ff708b]",
             day_selected:
-              "bg-[#ff97ad] text-white hover:bg-[#ff97ad] hover:text-white focus:bg-[#ff97ad] focus:text-white",
-            day_today: "bg-[#fff1f5] text-[#ff708b]",
+              "rounded-full bg-[#ff97ad] text-white hover:bg-[#ff97ad] hover:text-white focus:bg-[#ff97ad] focus:text-white",
+            day_today: "rounded-full border border-[#ffd9e2] bg-white text-[#ff708b]",
             head_cell: "text-slate-400 rounded-md w-9 font-medium text-[0.8rem]",
             caption_label: "text-sm font-semibold text-slate-700",
           }}
