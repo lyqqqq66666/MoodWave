@@ -10,6 +10,7 @@ import { MoodWaveShell } from "@/components/moodwave-shell"
 import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mood-analysis-report"
 import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
+import { RecordDatePicker } from "@/components/record-date-picker"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
 import { cn, convertBlobToWav } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
@@ -246,21 +247,14 @@ export default function MoodPage() {
     <MoodWaveShell title="情绪录入">
       <div className="mx-auto max-w-6xl">
         <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8">
-          <div className="mb-5 flex flex-col gap-3 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mb-5 flex flex-col gap-4 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-slate-700">记录日期</p>
               <p className="mt-1 text-xs text-slate-500">
                 {isGuest ? "游客模式会先保存在本地。" : "支持补记过去某一天，创建时间仍会单独保留。"}
               </p>
             </div>
-            <input
-              type="date"
-              value={recordDate}
-              max={new Date().toISOString().slice(0, 10)}
-              onChange={(event) => setRecordDate(event.target.value)}
-              className="min-h-11 rounded-full border border-[#f0dbe2] bg-white px-4 text-sm font-semibold text-slate-700 outline-none focus:border-[#ff9fb4]"
-              aria-label="记录日期"
-            />
+            <RecordDatePicker value={recordDate} onChange={setRecordDate} />
           </div>
           <div className="mx-auto mb-8 max-w-3xl">
             <div className="flex items-center justify-between gap-2">
