@@ -108,6 +108,28 @@ export function CompanionPetOrb({
         animate={{ scaleX: [0.92, 1.04, 0.94], opacity: [0.28, 0.4, 0.28] }}
         transition={{ duration: 5.8, repeat: Infinity, ease: "easeInOut" }}
       />
+      {[0, 1, 2].map((sparkle) => (
+        <motion.span
+          key={`sparkle-${sparkle}`}
+          className={cn(
+            "absolute rounded-full bg-white/82 shadow-[0_0_14px_rgba(255,255,255,0.72)]",
+            sparkle === 0 && "left-[18%] top-[20%] h-2.5 w-2.5",
+            sparkle === 1 && "right-[17%] top-[28%] h-2 w-2",
+            sparkle === 2 && "bottom-[24%] right-[20%] h-1.5 w-1.5",
+          )}
+          animate={{
+            y: [0, -6, 0],
+            opacity: [0.3, 0.82, 0.34],
+            scale: [0.7, 1.18, 0.78],
+          }}
+          transition={{
+            duration: 3.8 + sparkle * 0.45,
+            repeat: Infinity,
+            delay: sparkle * 0.55,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
 
       <motion.div
         className="relative z-10 grid place-items-center rounded-full border border-white/65 bg-white/54 shadow-[0_22px_50px_rgba(255,181,194,0.22)] backdrop-blur-sm"
@@ -116,12 +138,26 @@ export function CompanionPetOrb({
           height: size === "lg" ? "72%" : size === "md" ? "68%" : "66%",
           background: `radial-gradient(circle at 36% 26%, rgba(255,255,255,0.95), rgba(255,255,255,0.54) 48%, rgba(255,255,255,0.22) 100%)`,
         }}
-        animate={{ y: [0, -10, 0], rotate: [0, -1.4, 0.8, 0], scale: [1, 1.018, 1] }}
+        animate={{
+          y: [0, -10, -7, 0],
+          rotate: [0, -1.4, 1.1, 0],
+          scale: [1, 1.02, 0.992, 1],
+        }}
         transition={{ duration: 5.8, repeat: Infinity, ease: "easeInOut" }}
       >
-        <div className={cn("relative", artSize[size])}>
-          <Image src={companion.artwork} alt={companion.name} fill sizes="220px" className="object-contain drop-shadow-[0_16px_24px_rgba(255,255,255,0.35)]" />
-        </div>
+        <motion.div
+          className={cn("relative", artSize[size])}
+          animate={{ rotate: [0, 0.8, -0.9, 0], scaleY: [1, 1.02, 0.985, 1] }}
+          transition={{ duration: 4.9, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Image
+            src={companion.artwork}
+            alt={companion.name}
+            fill
+            sizes="220px"
+            className="object-contain drop-shadow-[0_16px_24px_rgba(255,255,255,0.35)]"
+          />
+        </motion.div>
       </motion.div>
 
       {showOrbitPills && size === "lg" ? (
@@ -157,12 +193,14 @@ type CompanionHeroMascotProps = {
   character?: string | null
   className?: string
   subtitle?: string
+  compact?: boolean
 }
 
 export function CompanionHeroMascot({
   character,
   className,
   subtitle,
+  compact = false,
 }: CompanionHeroMascotProps) {
   const companion = getCompanionCharacter(character)
 
@@ -203,15 +241,22 @@ export function CompanionHeroMascot({
       ))}
 
       <div className="relative flex flex-col items-center gap-4 text-center">
-        <CompanionPetOrb character={companion.id} size="lg" showOrbitPills className="mt-2" />
-        <div className="space-y-2">
+        <CompanionPetOrb
+          character={companion.id}
+          size={compact ? "md" : "lg"}
+          showOrbitPills={!compact}
+          className={cn("mt-2", compact && "scale-[0.92]")}
+        />
+        <div className={cn("space-y-2", compact && "space-y-1.5")}>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ff7894]">{companion.sceneTitle}</p>
           <p className="text-sm font-semibold text-[#ff7894]">{companion.tagline}</p>
-          <p className="mx-auto max-w-sm text-sm leading-6 text-slate-600">{subtitle || companion.personality}</p>
+          <p className={cn("mx-auto max-w-sm text-sm leading-6 text-slate-600", compact && "max-w-[18rem] text-[13px] leading-5")}>
+            {subtitle || companion.personality}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
+        <div className={cn("flex flex-wrap items-center justify-center gap-2", compact && "gap-1.5")}>
           <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-slate-600">{companion.species}</span>
-          {companion.expressions.map((item) => (
+          {(compact ? companion.expressions.slice(0, 2) : companion.expressions).map((item) => (
             <span key={item} className="rounded-full bg-white/84 px-3 py-1 text-xs text-slate-500 shadow-sm ring-1 ring-white/80">
               {item}
             </span>

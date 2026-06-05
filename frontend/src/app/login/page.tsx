@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState } from "react"
-import { Eye, EyeOff, Lock, Mail, MessageCircle, User } from "lucide-react"
+import { Eye, EyeOff, Lock, Mail, User } from "lucide-react"
 import { CompanionHeroMascot } from "@/components/companion-avatar"
 import { useAuthStore } from "@/store/auth"
 import { hasCompletedOnboarding } from "@/lib/onboarding"
@@ -16,6 +16,26 @@ const companionHighlights = [
   "再慢慢整理今天真正卡住的点。",
   "最后把陪伴、趋势和音乐留给你自己选择。",
 ]
+
+function WechatBrandIcon() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden="true">
+      <rect x="2" y="2" width="44" height="44" rx="12" fill="#07C160" />
+      <path
+        d="M20.5 13.5c-5.7 0-10.3 3.75-10.3 8.37 0 2.55 1.42 4.82 3.64 6.35l-1.12 3.35 3.9-1.95c1.14.28 2.35.42 3.88.42 5.68 0 10.28-3.75 10.28-8.37 0-4.62-4.6-8.17-10.28-8.17Z"
+        fill="white"
+      />
+      <path
+        d="M31.76 19.68c-4.73 0-8.57 3.1-8.57 6.95 0 3.84 3.84 6.95 8.57 6.95.9 0 1.75-.1 2.56-.32l3.07 1.54-.86-2.58c1.73-1.17 2.8-3 2.8-5.59 0-3.85-3.84-6.95-8.57-6.95Z"
+        fill="white"
+      />
+      <circle cx="17.4" cy="21.1" r="1.3" fill="#07C160" />
+      <circle cx="23.7" cy="21.1" r="1.3" fill="#07C160" />
+      <circle cx="29.7" cy="26.5" r="1.15" fill="#07C160" />
+      <circle cx="34.7" cy="26.5" r="1.15" fill="#07C160" />
+    </svg>
+  )
+}
 
 export default function LoginPage() {
   return (
@@ -95,22 +115,22 @@ function LoginForm() {
 
   return (
     <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,204,219,0.85),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.88),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(213,205,255,0.45),_transparent_28%),linear-gradient(180deg,#fffdfb_0%,#fff6ef_100%)]">
-      <div className="mx-auto grid h-screen max-w-[1520px] items-stretch lg:grid-cols-[1.04fr_0.96fr]">
-        <section className="relative hidden overflow-hidden px-8 py-8 lg:flex lg:flex-col">
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="relative h-20 w-28 shrink-0">
+      <div className="mx-auto grid h-screen max-w-[1480px] items-stretch lg:grid-cols-[1.02fr_0.98fr]">
+        <section className="relative hidden overflow-hidden px-7 py-5 lg:grid lg:grid-rows-[auto_1fr]">
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="relative h-16 w-24 shrink-0">
               <Image
                 src="/brand/moodwave-logo-mark.png"
                 alt=""
                 fill
-                sizes="112px"
+                sizes="96px"
                 className="object-contain drop-shadow-[0_14px_24px_rgba(255,151,173,0.26)]"
                 priority
               />
             </div>
-            <div className="space-y-1.5">
-              <p className="font-display text-3xl font-bold text-[#263145]">MoodWave</p>
-              <p className="text-sm font-medium text-slate-500">记录情绪的潮汐，遇见内心的风景</p>
+            <div className="space-y-1">
+              <p className="font-display text-[2rem] font-bold text-[#263145]">MoodWave</p>
+              <p className="text-[13px] font-medium text-slate-500">记录情绪的潮汐，遇见内心的风景</p>
             </div>
           </div>
 
@@ -118,39 +138,41 @@ function LoginForm() {
           <div className="pointer-events-none absolute right-10 top-10 h-72 w-72 rounded-full bg-[#c9fff3]/60 blur-3xl" />
           <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-64 bg-[radial-gradient(circle_at_center,_rgba(189,174,255,0.32),_transparent_58%)]" />
 
-          <div className="relative z-10 flex flex-1 flex-col justify-center">
-            <div className="max-w-[620px] space-y-5">
-              <div className="space-y-3">
-                <p className="inline-flex rounded-full bg-white/70 px-4 py-2 text-sm font-semibold text-[#ff7894] shadow-[0_10px_24px_rgba(255,190,205,0.16)]">
+          <div className="relative z-10 flex min-h-0 flex-col justify-between pt-2">
+            <div className="max-w-[760px] space-y-3">
+              <div className="space-y-2">
+                <p className="inline-flex rounded-full bg-white/70 px-4 py-2 text-[13px] font-semibold text-[#ff7894] shadow-[0_10px_24px_rgba(255,190,205,0.16)]">
                   先被温柔接住
                 </p>
-                <h1 className="max-w-[10ch] font-display text-[clamp(2.1rem,3.2vw,3.4rem)] font-bold leading-[1.18] tracking-[-0.035em] text-[#121b33]">
-                  不用急着解释
-                  <span className="block">自己怎么了，</span>
-                  <span className="block text-[#ff7894]">先让灵音陪你</span>
-                  <span className="block text-[#ff7894]">浮一会儿。</span>
+                <h1 className="font-['Sora','PingFang_SC',sans-serif] text-[clamp(1.75rem,2.2vw,2.45rem)] font-semibold leading-[1.15] tracking-[-0.055em] text-[#18233b]">
+                  <span className="block whitespace-nowrap">不用急着解释自己怎么了，</span>
+                  <span className="block whitespace-nowrap bg-gradient-to-r from-[#ff8ea6] via-[#ff86a2] to-[#ff7594] bg-clip-text text-transparent">
+                    先让灵音陪你浮一会儿。
+                  </span>
                 </h1>
-                <p className="max-w-xl text-base leading-7 text-slate-600">
+                <p className="max-w-[60ch] text-[14px] leading-6 text-slate-600">
                   先登录，再把今天的心情交给一个更柔软的入口。你可以从一句话开始，也可以先安静看着它陪你慢慢落地。
                 </p>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
                 <CompanionHeroMascot
                   character="cat"
-                  subtitle="这次先把登录页主视觉换成更接近 iOS 原型气质的小灵体宠物，后续再继续补正式 Lottie 动画。"
+                  compact
+                  className="rounded-[30px] p-4"
+                  subtitle="先不用把情绪说完整，靠近一点，让这只小灵体陪你慢慢落下来。"
                 />
 
-                <div className="rounded-[30px] border border-white/80 bg-white/74 p-4 shadow-[0_20px_56px_rgba(255,190,205,0.16)] backdrop-blur-2xl">
+                <div className="rounded-[28px] border border-white/80 bg-white/74 p-4 shadow-[0_20px_56px_rgba(255,190,205,0.16)] backdrop-blur-2xl">
                   <p className="text-sm font-semibold text-[#ff7894]">登录后你会看到</p>
-                  <div className="mt-3 space-y-2.5">
+                  <div className="mt-3 space-y-2">
                     {companionHighlights.map((item, index) => (
-                      <div key={item} className="rounded-[22px] bg-[#fffafb] p-3.5 ring-1 ring-[#f7e2e8]">
+                      <div key={item} className="rounded-[18px] bg-[#fffafb] p-3 ring-1 ring-[#f7e2e8]">
                         <div className="flex items-center gap-3">
-                          <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-r from-[#ffbfd0] to-[#8de1d5] text-xs font-semibold text-white">
+                          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-r from-[#ffbfd0] to-[#8de1d5] text-[11px] font-semibold text-white">
                             {index + 1}
                           </span>
-                          <p className="text-sm font-medium leading-6 text-slate-700">{item}</p>
+                          <p className="text-[13px] font-medium leading-5 text-slate-700">{item}</p>
                         </div>
                       </div>
                     ))}
@@ -158,11 +180,11 @@ function LoginForm() {
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="relative z-10 mt-6 hidden max-w-xl items-center gap-3 rounded-full bg-white/58 px-4 py-3 text-sm font-medium text-slate-500 shadow-[0_16px_36px_rgba(255,214,224,0.14)] backdrop-blur-xl 2xl:flex">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#fff1f5] text-[#ff7894]">♡</span>
-            <span>登录后就能保留聊天历史、伙伴记忆和更完整的陪伴闭环。</span>
+            <div className="relative z-10 mt-2 flex max-w-[700px] items-center gap-3 rounded-[22px] bg-white/60 px-4 py-2 text-[13px] text-slate-500 shadow-[0_16px_36px_rgba(255,214,224,0.14)] backdrop-blur-xl">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fff1f5] text-[#ff7894]">♡</span>
+              <span className="leading-5">登录后就能保留聊天历史、伙伴记忆和更完整的陪伴闭环。</span>
+            </div>
           </div>
         </section>
 
@@ -306,11 +328,7 @@ function LoginForm() {
                 {[
                   {
                     label: "微信登录",
-                    icon: (
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-[#07c160] text-white">
-                        <MessageCircle className="h-3.5 w-3.5 fill-white" />
-                      </span>
-                    ),
+                    icon: <WechatBrandIcon />,
                   },
                   {
                     label: "Apple 登录",

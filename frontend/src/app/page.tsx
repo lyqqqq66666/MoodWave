@@ -84,7 +84,7 @@ export default function LandingPage() {
                 <CompanionHeroMascot
                   character="cat"
                   className="w-full"
-                  subtitle="先把首页主视觉换成更接近 iOS 原型图的小灵体宠物，再继续往正式动画资产推进。"
+                  subtitle="把想说的话先放轻一点，让小灵音在这里陪你待一会儿。"
                 />
               </div>
 
