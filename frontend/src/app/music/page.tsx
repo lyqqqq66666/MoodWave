@@ -23,9 +23,11 @@ import {
 import { aiAPI, moodAPI, musicAPI } from "@/lib/api"
 import { getMoodOption, moodOptions } from "@/lib/moodwave"
 import type { MoodType, MusicRecommendation } from "@/lib/types"
+import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { MoodWaveShell } from "@/components/moodwave-shell"
-import { CompanionPetOrb } from "@/components/companion-avatar"
+import { CompanionAvatar } from "@/components/companion-avatar"
 import { EmptyStateGuide } from "@/components/onboarding/empty-state-guide"
+import { useIsAppPlatform } from "@/hooks/use-platform"
 import { useAuthStore } from "@/store/auth"
 import { cn } from "@/lib/utils"
 
@@ -45,10 +47,13 @@ type MoodSoundProfile = {
 type Particle = {
   x: number
   y: number
-  baseY: number
-  radius: number
+  originX: number
+  originY: number
+  angle: number
   speed: number
-  phase: number
+  radius: number
+  life: number
+  maxLife: number
   opacity: number
 }
 
@@ -233,15 +238,24 @@ function getInsightErrorMessage(error: unknown) {
   const lowerMessage = serverMessage.toLowerCase()
 
   if (maybeResponse.code === "ECONNABORTED" || lowerMessage.includes("timeout") || lowerMessage.includes("timed out") || serverMessage.includes("超时")) {
-    return "这段听后感生成得有点慢，先为你保留一版温和的本地陪伴语。"
+    return "生成有点超时，已先切换成本地陪伴语。可以点下方重新试一次。"
   }
   if (serverMessage.includes("fallback")) {
-    return "这次先展示一版备用陪伴语，稍后重新生成时会更贴近你刚刚的状态。"
+    return "AI 正在使用备用结果，陪伴语可能会更简短一些。"
   }
   if (serverMessage.includes("AI") || serverMessage.includes("DeepSeek")) {
-    return "灵音这次先把旋律接住了，听后感会先显示成本地版本。"
+    return "AI 服务暂时没有接住请求，已先保留一段本地听后感。"
   }
   return "网络有点不稳定，灵灵先送上一段本地陪伴建议。"
+}
+
+function hexToRgb(hex: string): string {
+  const cleanHex = hex.replace("#", "")
+  const num = parseInt(cleanHex, 16)
+  const r = (cleanHex.length === 3) ? ((num >> 8) & 15) * 17 : (num >> 16) & 255
+  const g = (cleanHex.length === 3) ? ((num >> 4) & 15) * 17 : (num >> 8) & 255
+  const b = (cleanHex.length === 3) ? (num & 15) * 17 : num & 255
+  return `${r}, ${g}, ${b}`
 }
 
 function MusicPageContent() {
@@ -262,6 +276,7 @@ function MusicPageContent() {
   const noiseRef = useRef<InstanceType<ToneModule["NoiseSynth"]> | null>(null)
   const reverbRef = useRef<InstanceType<ToneModule["Reverb"]> | null>(null)
   const filterRef = useRef<InstanceType<ToneModule["Filter"]> | null>(null)
+  const delayRef = useRef<InstanceType<ToneModule["PingPongDelay"]> | null>(null)
   const loopRef = useRef<{ dispose: () => void } | null>(null)
   const bassLoopRef = useRef<{ dispose: () => void } | null>(null)
   const progressRef = useRef<HTMLDivElement | null>(null)
@@ -284,14 +299,11 @@ function MusicPageContent() {
   const [isBpmPanelOpen, setIsBpmPanelOpen] = useState(false)
   const [hasMoodRecord, setHasMoodRecord] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
+  const { iosApp } = useIsAppPlatform()
   // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
   const insightRef = useRef(profile.insight)
 
   const selectedRecommendation = recommendations[selectedTrack] ?? { id: "empty", title: "", artist: "", mood_type: mood, url: "", duration: 200 }
-  const sceneChips = useMemo(
-    () => [profile.texture, `${currentBpm} BPM`, `${intensity}/10 强度`],
-    [currentBpm, intensity, profile.texture],
-  )
   const progress = useMemo(
     () => Math.min(100, (elapsedTime / Math.max(1, selectedRecommendation.duration)) * 100),
     [elapsedTime, selectedRecommendation.duration],
@@ -352,6 +364,7 @@ function MusicPageContent() {
     synthRef.current?.dispose()
     bassRef.current?.dispose()
     noiseRef.current?.dispose()
+    delayRef.current?.dispose()
     reverbRef.current?.dispose()
     filterRef.current?.dispose()
     loopRef.current = null
@@ -359,6 +372,7 @@ function MusicPageContent() {
     synthRef.current = null
     bassRef.current = null
     noiseRef.current = null
+    delayRef.current = null
     reverbRef.current = null
     filterRef.current = null
   }, [])
@@ -380,44 +394,81 @@ function MusicPageContent() {
       stopMusic()
 
       Tone.Transport.bpm.value = currentBpm
-      reverbRef.current = new Tone.Reverb({ decay: 4.5, wet: 0.42 }).toDestination()
-      filterRef.current = new Tone.Filter(420 + intensity * 70, "lowpass").connect(reverbRef.current)
+      
+      // 1. 创建空间效果器，增大 Reverb decay 形成大混响，接入 PingPongDelay
+      reverbRef.current = new Tone.Reverb({ decay: 5.6, wet: 0.45 }).toDestination()
+      delayRef.current = new Tone.PingPongDelay({
+        delayTime: "0.4s",
+        feedback: 0.58,
+        wet: 0.35,
+      }).connect(reverbRef.current)
+      
+      filterRef.current = new Tone.Filter(360 + intensity * 60, "lowpass").connect(delayRef.current)
+      
+      // 2. 增大音符包络释放时间，实现空灵持音效果
       synthRef.current = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: profile.wave },
-        envelope: { attack: 0.04, decay: 0.18, sustain: 0.42, release: 1.6 },
-        volume: -14,
+        envelope: { attack: 0.24, decay: 0.4, sustain: 0.55, release: 2.4 },
+        volume: -16,
       }).connect(filterRef.current)
+      
       bassRef.current = new Tone.MonoSynth({
         oscillator: { type: "sine" },
-        envelope: { attack: 0.08, decay: 0.2, sustain: 0.35, release: 1.8 },
-        filterEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.2, release: 1.2, baseFrequency: 120, octaves: 2 },
-        volume: -20,
+        envelope: { attack: 0.6, decay: 0.8, sustain: 0.7, release: 2.8 },
+        filterEnvelope: { attack: 0.4, decay: 0.6, sustain: 0.5, release: 2.0, baseFrequency: 80, octaves: 1.5 },
+        volume: -22,
       }).connect(reverbRef.current)
 
       if (mood === "anxious") {
         noiseRef.current = new Tone.NoiseSynth({
           noise: { type: "pink" },
-          envelope: { attack: 0.3, decay: 0.2, sustain: 0.18, release: 1.2 },
-          volume: -30,
+          envelope: { attack: 0.8, decay: 0.4, sustain: 0.3, release: 1.8 },
+          volume: -32,
         }).connect(reverbRef.current)
       }
 
-      let step = 0
-      loopRef.current = new Tone.Sequence(
-        (time, note) => {
-          synthRef.current?.triggerAttackRelease(note, "8n", time, 0.48 + intensity * 0.035)
-          if (noiseRef.current && step % 4 === 0) {
-            noiseRef.current.triggerAttackRelease("8n", time, 0.18)
-          }
-          step += 1
-        },
-        profile.scale,
-        mood === "happy" ? "8n" : "4n",
-      ).start(0)
+      const scale = profile.scale
 
-      bassLoopRef.current = new Tone.Loop((time) => {
-        bassRef.current?.triggerAttackRelease(profile.scale[0], "2n", time, 0.4)
-      }, mood === "sad" ? "1m" : "2m").start(0)
+      // 3. 重构为 Brian Eno 异步多重 Loop 机制，利用非倍数周期在相位上漂移
+      // Loop A: 高音风铃 (周期 3.2s, 35% 触发概率)
+      const loopA = new Tone.Loop((time) => {
+        if (Math.random() < 0.35 && scale.length >= 3) {
+          // 随机挑选一个高音音符
+          const randomNote = scale[Math.floor(Math.random() * (scale.length - 2)) + 2]
+          // 20% 概率向上平移一个八度
+          const finalNote = Math.random() < 0.2 ? Tone.Frequency(randomNote).transpose(12).toNote() : randomNote
+          const velocity = 0.22 + Math.random() * 0.32
+          synthRef.current?.triggerAttackRelease(finalNote, "2n", time, velocity)
+        }
+      }, "3.2s").start(0)
+
+      // Loop B: 中音和弦/旋律游走 (周期 4.5s, 45% 触发概率)
+      const loopB = new Tone.Loop((time) => {
+        if (Math.random() < 0.45) {
+          const randomNote = scale[Math.floor(Math.random() * scale.length)]
+          const velocity = 0.3 + Math.random() * 0.3
+          synthRef.current?.triggerAttackRelease(randomNote, "1n", time, velocity)
+        }
+      }, "4.5s").start(0)
+
+      // Loop C: 低音铺底 root note 与焦虑时的白噪呼吸模拟 (周期 6.8s, 80% 触发概率)
+      const loopC = new Tone.Loop((time) => {
+        if (Math.random() < 0.8) {
+          const baseNote = scale[0] // 根音
+          bassRef.current?.triggerAttackRelease(baseNote, "1m", time, 0.42)
+        }
+        if (noiseRef.current && Math.random() < 0.6) {
+          noiseRef.current.triggerAttackRelease("2n", time, 0.14)
+        }
+      }, "6.8s").start(0)
+
+      loopRef.current = {
+        dispose: () => {
+          loopA.dispose()
+          loopB.dispose()
+          loopC.dispose()
+        },
+      }
 
       Tone.Transport.start()
       setIsPlaying(true)
@@ -518,73 +569,123 @@ function MusicPageContent() {
       canvas.width = rect.width * ratio
       canvas.height = rect.height * ratio
       context.setTransform(ratio, 0, 0, ratio, 0, 0)
-      particlesRef.current = Array.from({ length: 80 }, () => ({
-        x: Math.random() * rect.width,
-        y: Math.random() * rect.height,
-        baseY: rect.height * (0.35 + Math.random() * 0.42),
-        radius: 1.4 + Math.random() * 4,
-        speed: 0.24 + Math.random() * 0.9,
-        phase: Math.random() * Math.PI * 2,
-        opacity: 0.35 + Math.random() * 0.55,
-      }))
+      
+      const centerX = rect.width * 0.5
+      const centerY = rect.height * 0.4
+
+      particlesRef.current = Array.from({ length: 90 }, () => {
+        const angle = Math.random() * Math.PI * 2
+        const speed = 0.35 + Math.random() * 1.65
+        const life = 60 + Math.random() * 120
+        return {
+          x: centerX,
+          y: centerY,
+          originX: centerX,
+          originY: centerY,
+          angle,
+          speed,
+          radius: 1.2 + Math.random() * 4.2,
+          life,
+          maxLife: life,
+          opacity: 0.35 + Math.random() * 0.55
+        }
+      })
     }
 
     const draw = (time: number) => {
       const rect = canvas.getBoundingClientRect()
       const width = rect.width
       const height = rect.height
-      const energy = isPlaying ? profile.pulse + intensity / 10 : 0.45
+      const energy = isPlaying ? profile.pulse + intensity / 10 : 0.35
       const t = time / 1000
 
+      // 1. 清理并填充微弱漫反射的暗色调疗愈底色
       context.clearRect(0, 0, width, height)
-      const background = context.createLinearGradient(0, 0, width, height)
-      background.addColorStop(0, "rgba(255,255,255,0.84)")
-      background.addColorStop(0.48, `${profile.color}33`)
-      background.addColorStop(1, `${profile.colorTo}44`)
-      context.fillStyle = background
+      context.fillStyle = "rgba(12, 10, 16, 0.96)"
       context.fillRect(0, 0, width, height)
 
-      for (let layer = 0; layer < 4; layer += 1) {
-        context.beginPath()
-        const amplitude = (18 + layer * 12) * energy
-        const yBase = height * (0.52 + layer * 0.08)
-        for (let x = 0; x <= width; x += 8) {
-          const y =
-            yBase +
-            Math.sin(x * 0.012 + t * (0.8 + layer * 0.18) + layer) * amplitude +
-            Math.cos(x * 0.006 + t * 0.75) * amplitude * 0.35
-          if (x === 0) context.moveTo(x, y)
-          else context.lineTo(x, y)
-        }
-        context.lineTo(width, height)
-        context.lineTo(0, height)
-        context.closePath()
-        const waveGradient = context.createLinearGradient(0, yBase - amplitude, width, height)
-        waveGradient.addColorStop(0, `${profile.color}${layer === 0 ? "55" : "33"}`)
-        waveGradient.addColorStop(1, `${profile.colorTo}${layer === 0 ? "66" : "28"}`)
-        context.fillStyle = waveGradient
-        context.fill()
-      }
+      const centerX = width * 0.5
+      const centerY = height * 0.4
 
-      particlesRef.current.forEach((particle) => {
-        particle.x += particle.speed * energy
-        if (particle.x > width + 20) particle.x = -20
-        const floatY = particle.baseY + Math.sin(t * particle.speed + particle.phase) * 22 * energy
-        const radius = particle.radius * (isPlaying ? 1 + Math.sin(t * 3 + particle.phase) * 0.28 : 0.86)
+      // 2. 绘制星空深处微弱漫反射极光层
+      const bgGrad = context.createRadialGradient(
+        centerX + Math.cos(t * 0.4) * 40,
+        centerY + Math.sin(t * 0.4) * 40,
+        10,
+        centerX,
+        centerY,
+        width * 0.8
+      )
+      bgGrad.addColorStop(0, `rgba(${hexToRgb(profile.color)}, 0.12)`)
+      bgGrad.addColorStop(0.5, `rgba(${hexToRgb(profile.colorTo)}, 0.06)`)
+      bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)")
+      context.fillStyle = bgGrad
+      context.fillRect(0, 0, width, height)
+
+      // 3. 启用 lighter 混合模式实现星云粒子重叠叠加
+      context.globalCompositeOperation = "lighter"
+
+      particlesRef.current.forEach((p) => {
+        p.x += Math.cos(p.angle) * p.speed * energy
+        p.y += Math.sin(p.angle) * p.speed * energy
+        p.life -= 1
+
+        const alpha = Math.max(0, p.life / p.maxLife)
+        const curRadius = p.radius * (0.45 + alpha * 0.55)
+
         context.beginPath()
-        context.arc(particle.x, floatY, Math.max(0.8, radius), 0, Math.PI * 2)
-        context.fillStyle = `${profile.color}${Math.round(particle.opacity * 255).toString(16).padStart(2, "0")}`
+        context.arc(p.x, p.y, curRadius, 0, Math.PI * 2)
+
+        context.shadowBlur = 10 * alpha
+        context.shadowColor = profile.color
+        context.fillStyle = `rgba(${hexToRgb(profile.color)}, ${alpha * p.opacity * 0.72})`
         context.fill()
+
+        // 粒子生命耗尽在中心重组复活
+        if (p.life <= 0) {
+          p.x = centerX
+          p.y = centerY
+          p.angle = Math.random() * Math.PI * 2
+          p.speed = 0.3 + Math.random() * 1.5
+          p.radius = 1.0 + Math.random() * 4.0
+          p.life = 70 + Math.random() * 110
+          p.maxLife = p.life
+          p.opacity = 0.35 + Math.random() * 0.55
+        }
       })
 
+      // 4. 恢复 normal 模式绘制共振圈和 Orb 球，重置发光阴影以保护外部 UI
+      context.globalCompositeOperation = "source-over"
+      context.shadowBlur = 0
+
+      // 绘制共振波纹涟漪
+      for (let i = 0; i < 3; i++) {
+        const ringRadius = (55 + i * 32) + Math.sin(t * 1.8 + i) * 6 * energy
+        const ringAlpha = (0.22 - i * 0.06) * (isPlaying ? 1.0 : 0.4)
+        context.beginPath()
+        context.arc(centerX, centerY, Math.max(10, ringRadius), 0, Math.PI * 2)
+        context.strokeStyle = `rgba(${hexToRgb(profile.color)}, ${ringAlpha})`
+        context.lineWidth = 1.5
+        context.stroke()
+      }
+
+      // 绘制中心呼吸球 (Orb)
+      const orbRadius = 45 + Math.sin(t * 1.6) * 5 * energy
+      const orbGradient = context.createRadialGradient(
+        centerX,
+        centerY,
+        4,
+        centerX,
+        centerY,
+        Math.max(10, orbRadius)
+      )
+      orbGradient.addColorStop(0, "rgba(255, 255, 255, 0.95)")
+      orbGradient.addColorStop(0.4, `rgba(${hexToRgb(profile.color)}, 0.8)`)
+      orbGradient.addColorStop(1, "rgba(0, 0, 0, 0)")
+
       context.beginPath()
-      const orbRadius = 60 + intensity * 5 + Math.sin(t * 1.2) * 7 * energy
-      const orbGradient = context.createRadialGradient(width * 0.5, height * 0.4, 8, width * 0.5, height * 0.4, orbRadius)
-      orbGradient.addColorStop(0, "rgba(255,255,255,0.95)")
-      orbGradient.addColorStop(0.42, `${profile.color}88`)
-      orbGradient.addColorStop(1, `${profile.colorTo}00`)
+      context.arc(centerX, centerY, Math.max(10, orbRadius), 0, Math.PI * 2)
       context.fillStyle = orbGradient
-      context.arc(width * 0.5, height * 0.4, orbRadius, 0, Math.PI * 2)
       context.fill()
 
       animationRef.current = window.requestAnimationFrame(draw)
@@ -812,9 +913,9 @@ function MusicPageContent() {
         </div>
       }
     >
-      <div className="mx-auto max-w-7xl">
+      <div className={cn("mx-auto", iosApp ? "max-w-[460px]" : "max-w-7xl")}>
         {!hasMoodRecord ? <EmptyStateGuide variant="music" className="mb-5" /> : null}
-        <section className="relative isolate flex min-h-[calc(100svh-9rem)] flex-col overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff0f5]/80 via-[#f7f5ff]/60 to-[#f0faf8]/70 p-4 sm:p-5 lg:min-h-[calc(100svh-12rem)] lg:p-6">
+        <section className={cn("relative isolate flex min-h-[calc(100svh-9rem)] flex-col overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff0f5]/80 via-[#f7f5ff]/60 to-[#f0faf8]/70 p-4 sm:p-5 lg:min-h-[calc(100svh-12rem)] lg:p-6", iosApp && "ios-floating-card min-h-[calc(100svh-10rem)] rounded-[36px] p-4")}>
           <div className="relative z-20 mb-5 flex items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/72 px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm backdrop-blur-md lg:bg-[#fff3f6]">
               <span>{moodMeta.emoji}</span>
@@ -831,27 +932,17 @@ function MusicPageContent() {
             </button>
           </div>
 
-          <div className="relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.4fr)] xl:grid-cols-[minmax(0,1.14fr)_minmax(360px,0.38fr)]">
+          <div className={cn("relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(330px,0.42fr)] xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.42fr)]", iosApp && "grid-cols-1")}>
             <div className="absolute inset-0 min-w-0 overflow-hidden lg:relative lg:inset-auto">
               <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪空间</h2>
-                  <p className="mt-2 text-sm text-slate-500">先让颜色、波纹和节奏替你把此刻放慢一点。</p>
+                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
+                  <p className="mt-2 text-sm text-slate-500">{profile.texture}</p>
                 </div>
                 <BpmControl />
               </div>
 
-              <div className="relative z-0 h-full min-h-full max-w-full overflow-hidden rounded-[36px] border border-white/55 bg-white/18 shadow-[0_24px_70px_rgba(255,203,214,0.18)] sm:aspect-[16/11] lg:h-full lg:min-h-[520px]">
-                <motion.div
-                  className="pointer-events-none absolute inset-[12%] rounded-full border border-white/24"
-                  animate={{ scale: [0.94, 1.05, 0.97], opacity: [0.14, 0.28, 0.16] }}
-                  transition={{ duration: 6.2, repeat: Infinity, ease: "easeInOut" }}
-                />
-                <motion.div
-                  className="pointer-events-none absolute inset-[22%] rounded-full border border-white/20"
-                  animate={{ scale: [1, 1.08, 1], opacity: [0.08, 0.22, 0.1] }}
-                  transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut" }}
-                />
+              <div className="relative z-0 h-full min-h-full max-w-full overflow-hidden sm:aspect-[16/11] lg:h-full lg:min-h-[520px]">
                 <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full max-w-full" />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 lg:hidden" />
                 <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3 sm:inset-x-5 sm:top-5">
@@ -871,41 +962,19 @@ function MusicPageContent() {
                     </motion.div>
                   </AnimatePresence>
                 </div>
-                <div className="pointer-events-none absolute inset-x-4 bottom-4 flex flex-wrap gap-2 sm:inset-x-5 sm:bottom-5">
-                  {sceneChips.map((chip) => (
-                    <span
-                      key={chip}
-                      className="rounded-full bg-white/70 px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-[0_10px_20px_rgba(255,208,219,0.18)] backdrop-blur-md"
-                    >
-                      {chip}
-                    </span>
-                  ))}
-                </div>
               </div>
             </div>
 
-            <aside className="relative z-10 flex min-h-[calc(100svh-15rem)] min-w-0 items-end pt-[32vh] lg:block lg:min-h-0 lg:pt-[74px]">
-              <div className="mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0">
+            <aside className={cn("relative z-10 flex min-h-[calc(100svh-15rem)] min-w-0 items-end pt-[32vh] lg:block lg:min-h-0 lg:pt-[74px]", iosApp && "min-h-0 items-stretch pt-0")}>
+              <div className={cn("mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0", iosApp && "ios-sticky-action")}>
                 <div className="flex items-center gap-4">
-                  <CompanionPetOrb
-                    character={user?.avatar_character}
-                    color={user?.character_color}
-                    mood={mood}
-                    size="md"
-                    className="shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ff7993]">正在倾听的房间</p>
-                    <p className="mt-2 truncate text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
+                  <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br text-3xl text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]", profile.album)}>
+                    ♪
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
                     <p className="mt-1 truncate text-sm text-slate-500">{selectedRecommendation.artist}</p>
                   </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  {sceneChips.map((chip) => (
-                    <span key={chip} className="rounded-full bg-white/82 px-3 py-1.5 font-semibold text-slate-500 shadow-sm ring-1 ring-white/80">
-                      {chip}
-                    </span>
-                  ))}
                 </div>
                 <BpmControl className="mt-4 md:hidden" />
 
@@ -936,7 +1005,7 @@ function MusicPageContent() {
                         {formatDuration(seekPreview ?? elapsedTime)} / {formatDuration(selectedRecommendation.duration)}
                       </div>
                     ) : null}
-                    <div className={cn("rounded-full bg-[#f0edf0] transition-all", isSeeking ? "h-2.5" : "h-1.5")}>
+                    <div className={cn("rounded-full bg-[#f0edf0] transition-all", isSeeking ? "h-3" : "h-2")}>
                       <motion.div
                         animate={{ width: `${progress}%` }}
                         transition={{ duration: isSeeking ? 0 : 0.24 }}
@@ -946,9 +1015,9 @@ function MusicPageContent() {
                     <motion.span
                       animate={{ left: `${progress}%`, scale: isSeeking ? 1.25 : 1 }}
                       transition={{ duration: isSeeking ? 0 : 0.24 }}
-                      className="absolute top-1/2 grid h-4 w-4 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-[0_8px_20px_rgba(255,143,163,0.24)] ring-2 ring-[#ff9fb4]"
+                      className="absolute top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-[0_8px_20px_rgba(255,143,163,0.34)] ring-2 ring-[#ff9fb4]"
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#8de1d5]" />
+                      <span className="h-2 w-2 rounded-full bg-[#8de1d5]" />
                     </motion.span>
                   </div>
                   <div className="mt-2 flex justify-between text-xs text-slate-500">
@@ -1011,11 +1080,11 @@ function MusicPageContent() {
           </div>
         </section>
 
-        <div className={cn("mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]", !showDetails && "hidden lg:grid")}>
-          <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
+        <div className={cn("mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]", !showDetails && !iosApp && "hidden lg:grid")}>
+          <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <CompanionPetOrb
+                  <CompanionAvatar
                     character={user?.avatar_character}
                     color={user?.character_color}
                     mood={mood}
@@ -1029,20 +1098,20 @@ function MusicPageContent() {
                   {isInsightLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircleHeart className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">灵音的听后感</h3>
+                  <h3 className="font-semibold text-slate-900">灵音伙伴的听后感</h3>
                   <p className="text-xs text-slate-500">
                     {insightStatus === "generating"
-                      ? "灵音正在听这段旋律..."
+                      ? "伙伴正在听这段旋律..."
                       : insightStatus === "retrying"
                         ? "正在重新生成更贴近的回应..."
                         : insightStatus === "error"
-                          ? "当前展示备用听后感"
-                          : "它会结合你此刻的情绪和旋律给出回应"}
+                          ? "当前展示备用陪伴语"
+                          : "角色会结合情绪与音乐给你回应"}
                   </p>
                 </div>
               </div>
               <p className="mt-4 min-h-[84px] whitespace-pre-wrap text-sm leading-7 text-slate-600">
-                {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把旋律、情绪和陪伴感慢慢整理成一句回应...")}
+                {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把你的情绪调成一段温柔的文字...")}
               </p>
               {insightError ? <p className="mt-3 text-xs text-[#ef7b73]">{insightError}</p> : null}
               <div className="mt-4 rounded-[24px] bg-gradient-to-br from-[#fff6f8] to-[#effdfa] p-4 text-sm text-slate-600">
@@ -1056,9 +1125,9 @@ function MusicPageContent() {
                   重新生成陪伴语
                 </button>
               </div>
-          </section>
+          </IOSGlassCard>
 
-          <section className="rounded-[32px] bg-white/84 p-5 shadow-[0_18px_46px_rgba(255,208,219,0.2)] ring-1 ring-white/70">
+          <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
               <h3 className="font-semibold text-slate-900">推荐歌曲</h3>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {recommendations.map((track, index) => (
@@ -1082,7 +1151,7 @@ function MusicPageContent() {
                   </button>
                 ))}
               </div>
-          </section>
+          </IOSGlassCard>
         </div>
       </div>
       <AnimatePresence>
