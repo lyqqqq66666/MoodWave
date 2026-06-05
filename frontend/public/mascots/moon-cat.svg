@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="moonBody" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(222 158) rotate(55) scale(252 240)">
+      <stop stop-color="#FFF9E6"/>
+      <stop offset="0.42" stop-color="#E6DFFF"/>
+      <stop offset="0.78" stop-color="#CDEFF4"/>
+      <stop offset="1" stop-color="#FFF5EC"/>
+    </radialGradient>
+    <linearGradient id="moonWave" x1="150" y1="304" x2="360" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9DFFF"/>
+      <stop offset="0.54" stop-color="#F7D8E8"/>
+      <stop offset="1" stop-color="#BCE8E4"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="256" cy="418" rx="114" ry="34" fill="#E8DDF5" fill-opacity=".48"/>
+  <path d="M174 112C184 72 216 54 256 54C296 54 328 72 338 112L310 150C294 127 275 117 256 117C237 117 218 127 202 150L174 112Z" fill="#ECE4FF"/>
+  <path d="M338 112C328 72 296 54 256 54C216 54 184 72 174 112L202 150C218 127 237 117 256 117C275 117 294 127 310 150L338 112Z" fill="#D8D0FF"/>
+  <circle cx="256" cy="236" r="138" fill="url(#moonBody)"/>
+  <path d="M148 294C183 270 223 284 256 300C289 316 327 332 364 306V334C336 359 301 374 256 374C211 374 176 360 148 334V294Z" fill="url(#moonWave)"/>
+  <path d="M388 119C381 99 389 82 404 73C387 72 373 83 367 100C363 111 364 124 373 134C377 130 384 125 388 119Z" fill="#FFF1C2"/>
+  <ellipse cx="214" cy="224" rx="18" ry="24" fill="#3B3D4E"/>
+  <ellipse cx="298" cy="224" rx="18" ry="24" fill="#3B3D4E"/>
+  <ellipse cx="214" cy="216" rx="6" ry="9" fill="white"/>
+  <ellipse cx="298" cy="216" rx="6" ry="9" fill="white"/>
+  <ellipse cx="186" cy="255" rx="24" ry="14" fill="#DDBAF7" fill-opacity=".7"/>
+  <ellipse cx="326" cy="255" rx="24" ry="14" fill="#DDBAF7" fill-opacity=".7"/>
+  <path d="M244 264C248 270 254 273 256 273C258 273 264 270 268 264" stroke="#6D6579" stroke-width="7" stroke-linecap="round"/>
+  <path d="M238 284C244 292 250 296 256 296C262 296 268 292 274 284" stroke="#6D6579" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="214" cy="374" rx="32" ry="25" fill="#E0F5F3"/>
+  <ellipse cx="298" cy="374" rx="32" ry="25" fill="#E0F5F3"/>
+</svg>

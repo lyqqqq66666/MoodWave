@@ -7,7 +7,6 @@ import { aiAPI, authAPI, companionAPI } from "@/lib/api"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
 import {
-  CompanionAvatar,
   CompanionPetOrb,
   companionCharacters,
   companionColors,
@@ -765,7 +764,7 @@ export default function CompanionPage() {
           <section className="w-full overflow-hidden rounded-[38px] bg-white/86 shadow-[0_24px_80px_rgba(255,206,216,0.24)] ring-1 ring-white/75 md:grid md:grid-cols-[0.9fr_1.1fr]">
             <div className="grid place-items-center bg-gradient-to-br from-[#fff7fa] via-[#effdfa] to-[#fff7df] p-8 text-center">
               <div className="rounded-[52px] bg-white/70 p-6 shadow-[0_18px_46px_rgba(255,181,194,0.18)]">
-                <CompanionAvatar character={character} color={color} mood={latestMood} size="lg" />
+                <CompanionPetOrb character={character} color={color} mood={latestMood} size="lg" showLabel />
               </div>
               <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/82 px-4 py-2 text-sm font-semibold text-[#ff718b]">
                 <Sparkles className="h-4 w-4" />
@@ -1016,7 +1015,7 @@ export default function CompanionPage() {
                   const isTyping = fromAssistant && isStreaming && !message.content
                   return (
                     <div key={message.id} className={cn("flex gap-3", fromAssistant ? "justify-start" : "justify-end")}>
-                      {fromAssistant ? <CompanionAvatar character={character} color={color} mood={latestMood} size="sm" /> : null}
+                      {fromAssistant ? <CompanionPetOrb character={character} color={color} mood={latestMood} size="sm" /> : null}
                       <div className={cn("max-w-[78%]", !fromAssistant && "text-right")}>
                         <div className={cn("rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm", fromAssistant ? "bg-white text-slate-700" : "bg-[#ff9fb4] text-white")}>
                           {message.content ? (

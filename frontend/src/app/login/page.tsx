@@ -124,8 +124,10 @@ function LoginForm() {
                 <p className="inline-flex rounded-full bg-white/70 px-4 py-2 text-sm font-semibold text-[#ff7894] shadow-[0_10px_24px_rgba(255,190,205,0.16)]">
                   先被温柔接住
                 </p>
-                <h1 className="max-w-2xl font-display text-5xl font-bold leading-tight text-[#121b33]">
-                  不用急着解释自己怎么了，先让灵音陪你浮一会儿。
+                <h1 className="max-w-[11ch] font-display text-[clamp(2.6rem,4vw,4rem)] font-bold leading-[1.15] tracking-[-0.03em] text-[#121b33]">
+                  不用急着解释
+                  <span className="block">自己怎么了，</span>
+                  <span className="block text-[#ff7894]">先让灵音陪你浮一会儿。</span>
                 </h1>
                 <p className="max-w-xl text-lg leading-8 text-slate-600">
                   先登录，再把今天的心情交给一个更柔软的入口。你可以从一句话开始，也可以先安静看着它陪你慢慢落地。
@@ -135,7 +137,7 @@ function LoginForm() {
               <div className="grid gap-4 lg:grid-cols-[1.16fr_0.84fr]">
                 <CompanionHeroMascot
                   character="cat"
-                  subtitle="这是一只更接近 iOS 原型气质的小灵音：轻轻悬浮、先陪伴、再慢慢回应。"
+                  subtitle="这次先把登录页主视觉换成更接近 iOS 原型气质的小灵体宠物，后续再继续补正式 Lottie 动画。"
                 />
 
                 <div className="rounded-[34px] border border-white/80 bg-white/74 p-5 shadow-[0_24px_80px_rgba(255,190,205,0.18)] backdrop-blur-2xl">

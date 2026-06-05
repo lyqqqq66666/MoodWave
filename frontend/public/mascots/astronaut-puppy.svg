@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="pupBody" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(222 156) rotate(55) scale(252 242)">
+      <stop stop-color="#FFF8E3"/>
+      <stop offset="0.42" stop-color="#E4ECFF"/>
+      <stop offset="0.76" stop-color="#D8F2F1"/>
+      <stop offset="1" stop-color="#FFF6EF"/>
+    </radialGradient>
+    <linearGradient id="pupWave" x1="150" y1="304" x2="362" y2="382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DDE6FF"/>
+      <stop offset="0.54" stop-color="#E6DBFF"/>
+      <stop offset="1" stop-color="#BFEBDD"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="256" cy="418" rx="114" ry="34" fill="#DFE6F3" fill-opacity=".48"/>
+  <path d="M176 132C171 94 196 74 225 84L236 160C210 156 183 156 176 132Z" fill="#E4EBFF"/>
+  <path d="M336 132C341 94 316 74 287 84L276 160C302 156 329 156 336 132Z" fill="#D5DEFF"/>
+  <circle cx="256" cy="236" r="138" fill="url(#pupBody)"/>
+  <path d="M150 294C183 271 226 283 256 300C286 317 329 330 362 306V334C335 358 301 374 256 374C211 374 177 359 150 334V294Z" fill="url(#pupWave)"/>
+  <rect x="198" y="108" width="116" height="72" rx="36" fill="white" fill-opacity=".28" stroke="white" stroke-opacity=".75" stroke-width="8"/>
+  <ellipse cx="214" cy="222" rx="18" ry="24" fill="#3B3D4E"/>
+  <ellipse cx="298" cy="222" rx="18" ry="24" fill="#3B3D4E"/>
+  <ellipse cx="214" cy="214" rx="6" ry="9" fill="white"/>
+  <ellipse cx="298" cy="214" rx="6" ry="9" fill="white"/>
+  <ellipse cx="186" cy="255" rx="24" ry="14" fill="#D3DFFF" fill-opacity=".72"/>
+  <ellipse cx="326" cy="255" rx="24" ry="14" fill="#D3DFFF" fill-opacity=".72"/>
+  <path d="M244 262C248 268 254 271 256 271C258 271 264 268 268 262" stroke="#6D6579" stroke-width="7" stroke-linecap="round"/>
+  <path d="M238 282C244 291 250 296 256 296C262 296 268 291 274 282" stroke="#6D6579" stroke-width="8" stroke-linecap="round"/>
+  <ellipse cx="214" cy="374" rx="32" ry="25" fill="#E5F3F1"/>
+  <ellipse cx="298" cy="374" rx="32" ry="25" fill="#E5F3F1"/>
+</svg>

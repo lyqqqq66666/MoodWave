@@ -65,9 +65,10 @@ export default function LandingPage() {
                 <p className="inline-flex rounded-full bg-white/84 px-4 py-2 text-sm font-semibold text-[#ff708b] ring-1 ring-white/80">
                   先被接住，再慢慢理解自己
                 </p>
-                <h1 className="font-display text-[clamp(2.5rem,7vw,5rem)] font-semibold leading-[1.04] tracking-tight text-[#202636]">
-                  当你说不清楚自己怎么了，
-                  <span className="block bg-gradient-to-r from-[#ff8fa7] via-[#f7b4c7] to-[#79d5c8] bg-clip-text text-transparent">
+                <h1 className="mx-auto max-w-[12ch] font-display text-[clamp(2.4rem,5.2vw,4.6rem)] font-semibold leading-[1.14] tracking-[-0.03em] text-[#202636] md:max-w-[14ch]">
+                  <span className="block">当你说不清楚</span>
+                  <span className="block">自己怎么了，</span>
+                  <span className="mt-2 block bg-gradient-to-r from-[#ff8fa7] via-[#f7b4c7] to-[#79d5c8] bg-clip-text text-transparent">
                     让灵音先陪你坐一会儿。
                   </span>
                 </h1>
@@ -80,7 +81,7 @@ export default function LandingPage() {
                 <CompanionHeroMascot
                   character="cat"
                   className="w-full"
-                  subtitle="首页主视觉先用轻量悬浮舞台承接正式动画资产，后续可以直接平滑替换成 Lottie 角色。"
+                  subtitle="先把首页主视觉换成更接近 iOS 原型图的小灵体宠物，再继续往正式动画资产推进。"
                 />
               </div>
 
