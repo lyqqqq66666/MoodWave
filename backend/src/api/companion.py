@@ -1000,3 +1000,43 @@ async def generate_memories(
             "msg": f"生成记忆失败: {str(e)[:100]}",
             "data": None,
         }, status_code=200)
+
+
+# ==================== 角色配置端点 ====================
+
+@router.get("/companion/characters")
+async def list_characters():
+    """
+    获取灵音伙伴角色列表（P2 资产层）
+
+    返回完整角色配置（name / species / sceneTitle / orbitPills / expressions 等），
+    供前端首页、登录页、伙伴页共用同一套悬浮宠物语言。
+
+    不需要登录即可访问。
+
+    Returns:
+        { code, msg, data: [{id, name, species, ...}, ...] }
+    """
+    from src.services.ai_service import CHARACTER_PERSONAS
+
+    chars = []
+    seen = set()
+    for cid, persona in CHARACTER_PERSONAS.items():
+        if cid == "star" or cid in seen:
+            continue  # "star" 是旧兼容 ID，跳过
+        seen.add(cid)
+        chars.append({
+            "id": cid,
+            "name": persona["name"],
+            "species": persona.get("species", ""),
+            "style": persona["style"],
+            "sceneTitle": persona.get("sceneTitle", ""),
+            "orbitPills": persona.get("orbitPills", []),
+            "expressions": persona.get("expressions", []),
+        })
+
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": chars,
+    }
