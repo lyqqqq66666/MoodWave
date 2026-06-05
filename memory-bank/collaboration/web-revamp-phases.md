@@ -123,3 +123,45 @@
 - 语音转写失败时，页面会明确显示失败状态或原因
 - AI 分析阶段会先显示进度条和处理中说明，不会瞬间直接出现报告
 - 前后端静态检查通过后再提交推送到 `codex/web-current`
+
+## Phase 4
+
+### 时间
+
+- 2026-06-06
+
+### Codex 汇报
+
+- 开始执行 `P1` 前半段，先完成登录后首页重排与登录页左侧灵音形象升级。
+- 更新 [frontend/src/app/dashboard/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/dashboard/page.tsx)：
+  - 收掉首页拥挤卡片感
+  - 删除低优先级的“重新查看新手引导”
+  - 把主入口收敛为 `写下此刻 / 看看趋势 / 找伙伴聊聊`
+  - 缩短说明文案，让首页更像治愈型应用首页而不是信息面板
+- 更新 [frontend/src/app/login/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/login/page.tsx)：
+  - 把左侧主视觉切成更接近 iOS 原型气质的悬浮灵体宠物舞台
+  - 清理残留的 `今晚` 文案
+  - 让左侧文案和说明卡片围绕“先陪伴、再记录、再整理”展开
+- 更新 [frontend/src/components/companion-avatar.tsx](/private/tmp/moodwave-web-current/frontend/src/components/companion-avatar.tsx)：
+  - 为 Hero 形象加入轻量悬浮、呼吸、轨道文案气泡等动画
+  - 保持为纯前端可替换方案，后续可平滑替换成正式 `Lottie` 资产
+- 顺手推进 [frontend/src/app/music/page.tsx](/private/tmp/moodwave-web-current/frontend/src/app/music/page.tsx) 的 `P1-5` 第一轮：
+  - 把“AI 服务暂时没有接住请求”这类技术感异常文案换成更柔和的产品表达
+  - 缩小播放进度条圆点，减轻播放器感
+  - 把标题和听后感区的文案收拢到“情绪空间”方向
+
+### WorkBuddy 汇报
+
+- 本阶段无需新增接口开发，主要保持 Dashboard / Login 依赖链路稳定
+- 后续 `P1-3` / `P1-5` 需要继续配合伙伴角色配置与音乐页接口稳定性
+
+### 当前阶段目标
+
+- 完成 `P1-1` 与 `P1-2` 的视觉方向落地，并推进 `P1-5` 第一轮收口，为后续伙伴页和音乐页重构打基础
+
+### 阶段测试要求
+
+- 登录页左侧不再是旧的静态吉祥物观感
+- 登录后首页主入口明确，不再保留低优先级引导入口
+- 音乐页不再直接暴露生硬技术异常文案，进度条控制更轻一点
+- 前端检查通过后再提交推送到 `codex/web-current`

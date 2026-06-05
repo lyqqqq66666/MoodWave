@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { ArrowRight, HeartHandshake, Music4, PenLine, Sparkles, TrendingUp } from "lucide-react"
+import { HeartHandshake, Music4, PenLine, Sparkles, TrendingUp } from "lucide-react"
 import { aiAPI, moodAPI } from "@/lib/api"
 import { buildDailyMessage, getGreetingForHour, getMoodOption } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
@@ -163,71 +163,75 @@ export default function DashboardPage() {
     <MoodWaveShell title={greeting.greeting}>
       <DashboardTooltip />
       <div className="mx-auto grid max-w-6xl gap-6">
-        <section className="rounded-[38px] bg-white/82 p-6 shadow-[0_24px_70px_rgba(255,206,216,0.18)] ring-1 ring-white/75 md:p-8">
-          <div className="grid gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
-            <div className="space-y-5">
+        <section className="overflow-hidden rounded-[38px] bg-[linear-gradient(145deg,rgba(255,255,255,0.88),rgba(255,248,243,0.94))] p-6 shadow-[0_24px_70px_rgba(255,206,216,0.18)] ring-1 ring-white/75 md:p-8">
+          <div className="grid gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+            <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full bg-[#fff1f5] px-4 py-2 text-sm font-semibold text-[#ff708b]">
                 <Sparkles className="h-4 w-4" />
-                今日主任务
+                今日主入口
               </div>
               <div>
                 <p className="text-sm text-slate-500">{greeting.signoff}</p>
                 <h2 className="mt-2 font-display text-3xl font-semibold leading-tight text-[#1f2635] md:text-4xl">
-                  今天先照顾好此刻的心情，
-                  <span className="block text-[#ff7894]">别急着一次把所有事想完。</span>
+                  先把今天的心情轻轻放下来，
+                  <span className="block text-[#ff7894]">剩下的事情再慢慢处理。</span>
                 </h2>
                 <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 md:text-base">
-                  你只需要从一个小入口开始。先记录、再整理、再决定要不要继续和伙伴聊下去。
+                  MoodWave 今天只想帮你做好三件事：先记录此刻、回看情绪趋势、需要时再去找灵音聊聊。
                 </p>
               </div>
-              <Link
-                href="/mood"
-                className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-base font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.28)]"
-              >
-                <PenLine className="h-5 w-5" />
-                写下此刻
-              </Link>
-            </div>
-
-            <div className="rounded-[34px] bg-gradient-to-br from-[#fff7fa] via-white to-[#eefdfa] p-5 shadow-[0_16px_46px_rgba(255,206,216,0.16)]">
-              <div className="flex items-center gap-4">
-                <CompanionAvatar
-                  character={user?.avatar_character}
-                  color={user?.character_color}
-                  mood={primaryMood}
-                  size="md"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#ff718b]">来自灵音的今日陪伴</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {token ? "登录后会结合你的最近记录生成寄语" : "游客模式下先使用本地寄语兜底"}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-5 text-sm leading-7 text-slate-700 md:text-base">
-                {dailyMessage || (isDailyMessageLoading ? "灵音正在准备今天的寄语..." : buildDailyMessage(primaryMood))}
-              </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/mood"
+                  className="inline-flex min-h-[56px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-base font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.28)]"
+                >
+                  <PenLine className="h-5 w-5" />
+                  写下此刻
+                </Link>
                 <Link
                   href="/analytics"
-                  className="rounded-[24px] bg-white/86 p-4 ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5"
+                  className="inline-flex min-h-[56px] items-center justify-center rounded-full bg-white/88 px-6 text-sm font-semibold text-slate-700 ring-1 ring-[#f3dfe5] shadow-[0_12px_28px_rgba(255,216,225,0.14)]"
                 >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                    <TrendingUp className="h-4 w-4 text-[#ff7894]" />
-                    看看趋势
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">回头看看最近的起伏，找找情绪节奏。</p>
+                  看看趋势
                 </Link>
-                <Link
-                  href={token ? "/companion" : "/login?redirect=/companion"}
-                  className="rounded-[24px] bg-white/86 p-4 ring-1 ring-[#f8e7eb] transition hover:-translate-y-0.5"
-                >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                    <HeartHandshake className="h-4 w-4 text-[#62bda9]" />
-                    找伙伴聊聊
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff7fa] via-white to-[#eefdfa] p-6 shadow-[0_16px_46px_rgba(255,206,216,0.16)]">
+              <div className="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-[#dff7f1] blur-3xl" />
+              <div className="pointer-events-none absolute left-0 top-8 h-24 w-24 rounded-full bg-[#ffe0e8] blur-3xl" />
+              <div className="relative">
+                <div className="flex items-center gap-4">
+                  <CompanionAvatar
+                    character={user?.avatar_character}
+                    color={user?.character_color}
+                    mood={primaryMood}
+                    size="md"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#ff718b]">来自灵音的今日陪伴</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {token ? "会结合你最近的情绪记录慢慢生成今天的寄语" : "游客模式下先使用本地寄语兜底"}
+                    </p>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">如果今晚还想说点什么，灵音会继续陪你。</p>
-                </Link>
+                </div>
+                <p className="mt-5 text-sm leading-7 text-slate-700 md:text-base">
+                  {dailyMessage || (isDailyMessageLoading ? "灵音正在准备今天的寄语..." : buildDailyMessage(primaryMood))}
+                </p>
+                <div className="mt-5 rounded-[26px] bg-white/78 p-4 ring-1 ring-white/80">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">如果你还想继续说下去</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">可以把刚刚没来得及讲完的部分交给灵音。</p>
+                    </div>
+                    <Link
+                      href={token ? "/companion" : "/login?redirect=/companion"}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#fff1f5] px-4 text-sm font-semibold text-[#ff718b]"
+                    >
+                      找伙伴聊聊
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -283,13 +287,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="rounded-[32px] bg-white/80 p-6 shadow-[0_18px_48px_rgba(255,216,225,0.18)] ring-1 ring-white/70">
-            <h3 className="text-xl font-semibold text-slate-900">今晚的轻量路径</h3>
-            <p className="mt-1 text-sm text-slate-500">如果不想被太多入口打断，就按这三个动作慢慢来。</p>
+            <h3 className="text-xl font-semibold text-slate-900">今天可以这样慢慢来</h3>
+            <p className="mt-1 text-sm text-slate-500">把入口收轻一点，只留下真正会用到的三步。</p>
             <div className="mt-5 grid gap-3">
               {[
                 { icon: PenLine, href: "/mood", title: "先记录", helper: "用一句话、一次语音或一张图留下今天。" },
                 { icon: Music4, href: "/music", title: "去缓一缓", helper: "把此刻情绪换成更适合你的陪伴节奏。" },
-                { icon: HeartHandshake, href: token ? "/companion" : "/login?redirect=/companion", title: "继续聊聊", helper: token ? "需要的时候，再把心事交给灵音。" : "登录后解锁伙伴长期记忆和对话。" },
+                { icon: HeartHandshake, href: token ? "/companion" : "/login?redirect=/companion", title: "继续聊聊", helper: token ? "需要的时候，再把心事交给灵音。" : "登录后可以保留伙伴记忆和对话。" },
               ].map((item) => {
                 const Icon = item.icon
                 return (
@@ -309,13 +313,18 @@ export default function DashboardPage() {
                 )
               })}
             </div>
-            <Link
-              href="/onboarding?restart=1"
-              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#ff718b] transition hover:text-[#e95d78]"
-            >
-              重新查看新手引导
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <div className="mt-5 rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f8e7eb]">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <TrendingUp className="h-4 w-4 text-[#ff7894]" />
+                最近的心情走向
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                不需要每天都看很多分析，只要在想回头看看自己的时候，再打开趋势页就够了。
+              </p>
+              <Link href="/analytics" className="mt-3 inline-flex text-sm font-semibold text-[#ff718b]">
+                去趋势页看看
+              </Link>
+            </div>
           </div>
         </section>
       </div>

@@ -12,9 +12,9 @@ import { hasCompletedOnboarding } from "@/lib/onboarding"
 type Mode = "login" | "register"
 
 const companionHighlights = [
-  "先记录，再决定要不要继续说下去。",
-  "说不清楚也没关系，灵音会陪你慢慢理。",
-  "不需要打起精神，先让今天轻一点。",
+  "先把模糊的情绪接住。",
+  "再慢慢整理今天真正卡住的点。",
+  "最后把陪伴、趋势和音乐留给你自己选择。",
 ]
 
 export default function LoginPage() {
@@ -125,21 +125,21 @@ function LoginForm() {
                   先被温柔接住
                 </p>
                 <h1 className="max-w-2xl font-display text-5xl font-bold leading-tight text-[#121b33]">
-                  不用证明自己没事，先让小灵音陪你待一会儿。
+                  不用急着解释自己怎么了，先让灵音陪你浮一会儿。
                 </h1>
                 <p className="max-w-xl text-lg leading-8 text-slate-600">
-                  先登录，再把今天的心情交给一个更柔软的入口。你可以从一句话开始，也可以只是安静看着它陪你。
+                  先登录，再把今天的心情交给一个更柔软的入口。你可以从一句话开始，也可以先安静看着它陪你慢慢落地。
                 </p>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="grid gap-4 lg:grid-cols-[1.16fr_0.84fr]">
                 <CompanionHeroMascot
                   character="cat"
-                  subtitle="小灵音会用更轻的方式陪你整理今天的心情，不急着给答案。"
+                  subtitle="这是一只更接近 iOS 原型气质的小灵音：轻轻悬浮、先陪伴、再慢慢回应。"
                 />
 
                 <div className="rounded-[34px] border border-white/80 bg-white/74 p-5 shadow-[0_24px_80px_rgba(255,190,205,0.18)] backdrop-blur-2xl">
-                  <p className="text-sm font-semibold text-[#ff7894]">登录后你会得到</p>
+                  <p className="text-sm font-semibold text-[#ff7894]">登录后你会看到</p>
                   <div className="mt-4 space-y-3">
                     {companionHighlights.map((item, index) => (
                       <div key={item} className="rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f7e2e8]">
@@ -214,7 +214,7 @@ function LoginForm() {
               </h1>
               <p className="mt-3 text-sm leading-6 text-slate-500">
                 {mode === "login"
-                  ? "今晚的感受可以从这里继续，不必重新解释一遍。"
+                  ? "你留下过的情绪、陪伴和节奏，都会从这里继续。"
                   : "只需要几步，就能把你的记录、陪伴和记忆留在这里。"}
               </p>
             </div>

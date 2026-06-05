@@ -1,5 +1,6 @@
 "use client"
 
+import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { MoodType } from "@/lib/types"
 import {
@@ -164,6 +165,11 @@ export function CompanionHeroMascot({
   subtitle,
 }: CompanionHeroMascotProps) {
   const companion = getCompanionCharacter(character)
+  const orbitBadges = [
+    { label: "陪你理一理", className: "left-4 top-10", delay: 0 },
+    { label: "先轻一点", className: "right-4 top-16", delay: 0.4 },
+    { label: "慢慢说也可以", className: "bottom-6 left-8", delay: 0.8 },
+  ]
 
   return (
     <div
@@ -172,19 +178,51 @@ export function CompanionHeroMascot({
         className,
       )}
     >
-      <div className="pointer-events-none absolute left-8 top-8 h-20 w-20 rounded-full blur-2xl" style={{ backgroundColor: companion.halo }} />
-      <div className="pointer-events-none absolute bottom-6 right-10 h-24 w-24 rounded-full bg-white/60 blur-3xl" />
+      <motion.div
+        className="pointer-events-none absolute left-8 top-8 h-20 w-20 rounded-full blur-2xl"
+        style={{ backgroundColor: companion.halo }}
+        animate={{ scale: [0.92, 1.06, 0.94], opacity: [0.55, 0.8, 0.58] }}
+        transition={{ duration: 5.4, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="pointer-events-none absolute bottom-6 right-10 h-24 w-24 rounded-full bg-white/60 blur-3xl"
+        animate={{ y: [0, -10, 0], opacity: [0.35, 0.7, 0.4] }}
+        transition={{ duration: 6.2, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[radial-gradient(circle_at_center,_rgba(255,191,208,0.18),_transparent_70%)]" />
+
+      {orbitBadges.map((badge) => (
+        <motion.span
+          key={badge.label}
+          className={cn(
+            "pointer-events-none absolute rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-[0_10px_20px_rgba(255,204,214,0.16)] backdrop-blur-sm",
+            badge.className,
+          )}
+          animate={{ y: [0, -8, 0], rotate: [0, 1.5, 0] }}
+          transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: badge.delay }}
+        >
+          {badge.label}
+        </motion.span>
+      ))}
+
       <div className="relative flex flex-col items-center gap-4 text-center">
-        <div
+        <motion.div
           className="relative grid h-56 w-56 place-items-center rounded-[42%_58%_52%_48%/46%_48%_52%_54%] shadow-[0_24px_70px_rgba(255,181,194,0.24)]"
           style={{ background: `radial-gradient(circle at 30% 25%, rgba(255,255,255,0.88), transparent 26%), linear-gradient(145deg, ${companion.gradient[0]}, ${companion.gradient[1]} 54%, ${companion.gradient[2]})` }}
+          animate={{ y: [0, -12, 0], rotate: [0, -1.5, 0.8, 0], scale: [1, 1.02, 1] }}
+          transition={{ duration: 5.8, repeat: Infinity, ease: "easeInOut" }}
         >
           <span className="absolute inset-[9%] rounded-[inherit] bg-white/24" />
+          <motion.span
+            className="absolute inset-[14%] rounded-[inherit] border border-white/35"
+            animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.98, 1.02, 0.98] }}
+            transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
+          />
           <MascotShape character={companion.id} size="hero" />
           <span className="absolute -bottom-3 left-1/2 min-w-[88px] -translate-x-1/2 rounded-full bg-white/84 px-4 py-2 text-xs font-semibold text-slate-600 shadow-[0_10px_24px_rgba(255,181,194,0.18)]">
             {companion.name}
           </span>
-        </div>
+        </motion.div>
         <div className="space-y-1">
           <p className="text-sm font-semibold text-[#ff7894]">{companion.tagline}</p>
           <p className="max-w-xs text-sm leading-6 text-slate-600">{subtitle || companion.personality}</p>

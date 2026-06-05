@@ -233,13 +233,13 @@ function getInsightErrorMessage(error: unknown) {
   const lowerMessage = serverMessage.toLowerCase()
 
   if (maybeResponse.code === "ECONNABORTED" || lowerMessage.includes("timeout") || lowerMessage.includes("timed out") || serverMessage.includes("超时")) {
-    return "生成有点超时，已先切换成本地陪伴语。可以点下方重新试一次。"
+    return "这段听后感生成得有点慢，先为你保留一版温和的本地陪伴语。"
   }
   if (serverMessage.includes("fallback")) {
-    return "AI 正在使用备用结果，陪伴语可能会更简短一些。"
+    return "这次先展示一版备用陪伴语，稍后重新生成时会更贴近你刚刚的状态。"
   }
   if (serverMessage.includes("AI") || serverMessage.includes("DeepSeek")) {
-    return "AI 服务暂时没有接住请求，已先保留一段本地听后感。"
+    return "灵音这次先把旋律接住了，听后感会先显示成本地版本。"
   }
   return "网络有点不稳定，灵灵先送上一段本地陪伴建议。"
 }
@@ -831,8 +831,8 @@ function MusicPageContent() {
             <div className="absolute inset-0 min-w-0 overflow-hidden lg:relative lg:inset-auto">
               <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
-                  <p className="mt-2 text-sm text-slate-500">{profile.texture}</p>
+                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪空间</h2>
+                  <p className="mt-2 text-sm text-slate-500">先让颜色、波纹和节奏替你把此刻放慢一点。</p>
                 </div>
                 <BpmControl />
               </div>
@@ -900,7 +900,7 @@ function MusicPageContent() {
                         {formatDuration(seekPreview ?? elapsedTime)} / {formatDuration(selectedRecommendation.duration)}
                       </div>
                     ) : null}
-                    <div className={cn("rounded-full bg-[#f0edf0] transition-all", isSeeking ? "h-3" : "h-2")}>
+                    <div className={cn("rounded-full bg-[#f0edf0] transition-all", isSeeking ? "h-2.5" : "h-1.5")}>
                       <motion.div
                         animate={{ width: `${progress}%` }}
                         transition={{ duration: isSeeking ? 0 : 0.24 }}
@@ -910,9 +910,9 @@ function MusicPageContent() {
                     <motion.span
                       animate={{ left: `${progress}%`, scale: isSeeking ? 1.25 : 1 }}
                       transition={{ duration: isSeeking ? 0 : 0.24 }}
-                      className="absolute top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-[0_8px_20px_rgba(255,143,163,0.34)] ring-2 ring-[#ff9fb4]"
+                      className="absolute top-1/2 grid h-4 w-4 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-[0_8px_20px_rgba(255,143,163,0.24)] ring-2 ring-[#ff9fb4]"
                     >
-                      <span className="h-2 w-2 rounded-full bg-[#8de1d5]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#8de1d5]" />
                     </motion.span>
                   </div>
                   <div className="mt-2 flex justify-between text-xs text-slate-500">
@@ -993,20 +993,20 @@ function MusicPageContent() {
                   {isInsightLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircleHeart className="h-5 w-5" />}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">灵音伙伴的听后感</h3>
+                  <h3 className="font-semibold text-slate-900">灵音的听后感</h3>
                   <p className="text-xs text-slate-500">
                     {insightStatus === "generating"
-                      ? "伙伴正在听这段旋律..."
+                      ? "灵音正在听这段旋律..."
                       : insightStatus === "retrying"
                         ? "正在重新生成更贴近的回应..."
                         : insightStatus === "error"
-                          ? "当前展示备用陪伴语"
-                          : "角色会结合情绪与音乐给你回应"}
+                          ? "当前展示备用听后感"
+                          : "它会结合你此刻的情绪和旋律给出回应"}
                   </p>
                 </div>
               </div>
               <p className="mt-4 min-h-[84px] whitespace-pre-wrap text-sm leading-7 text-slate-600">
-                {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把你的情绪调成一段温柔的文字...")}
+                {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把旋律、情绪和陪伴感慢慢整理成一句回应...")}
               </p>
               {insightError ? <p className="mt-3 text-xs text-[#ef7b73]">{insightError}</p> : null}
               <div className="mt-4 rounded-[24px] bg-gradient-to-br from-[#fff6f8] to-[#effdfa] p-4 text-sm text-slate-600">
