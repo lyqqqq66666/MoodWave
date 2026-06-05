@@ -120,11 +120,15 @@ async def upload_voice(
         duration = round(len(contents) / 32000, 1)  # 估算：16kHz mono 16bit ≈ 32KB/s
 
         voice_text = ""
+        voice_error = None
         try:
             transcription = await transcribe_voice(abs_path)
             voice_text = transcription.get("text", "")
+            if transcription.get("error"):
+                voice_error = transcription.get("error")
         except Exception as e:
-            print(f"[upload] 语音转录失败（不影响上传）: {e}")
+            voice_error = str(e)
+            logger.warning(f"[upload] 语音转录失败（不影响上传）: {e}")
 
         return {
             "code": 0,
@@ -136,6 +140,8 @@ async def upload_voice(
                 "size": len(contents),
                 "voice_text": voice_text,
                 "duration": duration,
+                "voice_status": "error" if voice_error else ("ok" if voice_text else "empty"),
+                "voice_error": voice_error,
             },
         }
 

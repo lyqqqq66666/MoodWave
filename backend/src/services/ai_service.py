@@ -418,26 +418,57 @@ QWEN_VL_MODEL = os.getenv("QWEN_VL_MODEL", "qwen3-vl-plus")
 QWEN_ASR_MODEL = os.getenv("QWEN_ASR_MODEL", "qwen3-asr-flash")
 
 
-async def analyze_images(images_base64: list[str]) -> dict:
+async def analyze_images(images: list[dict]) -> dict:
     """
     使用 qwen3-vl-plus 分析图片内容
 
     Args:
-        images_base64: 图片的 base64 列表
+        images: [{"url": str, "mime_type": str}, ...] 图片 URL 和 MIME 类型列表
 
     Returns:
         dict: { description: str, mood_hint: str, objects: [str] }
     """
     client = _get_dashscope_client()
 
+    if not images:
+        return {"description": "", "mood_hint": "", "objects": []}
+
     try:
-        # 构建多模态消息
+        import base64, pathlib
+
         content_parts = []
-        for img_b64 in images_base64[:3]:  # 最多3张
-            content_parts.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
-            })
+        for img in images[:3]:  # 最多3张
+            img_url = img["url"]
+            mime_type = img.get("mime_type", "image/jpeg")
+            # 处理本地文件路径
+            if img_url.startswith("/uploads/"):
+                local_path = pathlib.Path(__file__).resolve().parent.parent.parent / img_url.lstrip("/")
+                if local_path.exists():
+                    with open(local_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode()
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime_type};base64,{b64}"}
+                    })
+                else:
+                    logger.warning("analyze_images file not found: %s", local_path)
+                    continue
+            elif img_url.startswith("data:"):
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": img_url}
+                })
+            elif img_url.startswith("http"):
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": img_url}
+                })
+            else:
+                logger.warning("analyze_images unsupported url: %s", img_url)
+                continue
+
+        if not content_parts:
+            return {"description": "未能加载图片", "mood_hint": "未知", "objects": []}
 
         content_parts.append({
             "type": "text",
@@ -452,18 +483,16 @@ async def analyze_images(images_base64: list[str]) -> dict:
         )
 
         raw = response.choices[0].message.content.strip()
-        # 尝试解析 JSON
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
         raw = raw.strip()
 
-        import json
-        return json.loads(raw)
+        return json.loads(raw)  # json 已在模块顶层 import
 
     except json.JSONDecodeError:
-        return {"description": raw[:200], "mood_hint": "未知", "objects": []}
+        return {"description": raw[:200] if 'raw' in dir() else "", "mood_hint": "未知", "objects": []}
     except Exception as e:
         return {"description": "", "mood_hint": "", "objects": [], "error": str(e)}
 
@@ -654,9 +683,8 @@ async def analyze_mood_multi_modal(
                     raw = raw[4:]
             raw = raw.strip()
 
-            import json
             try:
-                result = json.loads(raw)
+                result = json.loads(raw)  # json 已在模块顶层 import
             except json.JSONDecodeError:
                 # 尝试修复被截断的 JSON
                 repaired = _repair_truncated_json(raw)
@@ -855,9 +883,8 @@ async def generate_companion_memories(
             logger.warning("generate_companion_memories empty after stripping code blocks")
             return []
 
-        import json
         try:
-            result = json.loads(raw)
+            result = json.loads(raw)  # json 已在模块顶层 import
             memories = result.get("memories", [])
             
             # 验证并标准化返回格式
@@ -1110,9 +1137,8 @@ async def generate_greeting(
                 "character": character,
             }
 
-        import json
         try:
-            result = json.loads(raw)
+            result = json.loads(raw)  # json 已在模块顶层 import
         except json.JSONDecodeError:
             logger.warning("generate_greeting JSON parse failed raw=%s", raw[:200])
             return {

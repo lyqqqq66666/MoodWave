@@ -28,18 +28,6 @@ logger = logging.getLogger("moodwave.ai_api")
 router = APIRouter()
 
 
-def build_sse_response(event_generator):
-    return StreamingResponse(
-        event_generator,
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache, no-transform",
-            "X-Accel-Buffering": "no",
-            "Connection": "keep-alive",
-        },
-    )
-
-
 # ==================== 请求/响应模型 ====================
 
 class ChatMessage(BaseModel):
@@ -182,7 +170,15 @@ async def ai_chat(
 
             await save_ai_reply()
 
-    return build_sse_response(event_generator())
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲，确保流式实时传输
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # ==================== Agent 对话接口 ====================
@@ -333,7 +329,15 @@ async def ai_chat_agent(
 
             await save_ai_reply()
 
-    return build_sse_response(event_generator())
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # ==================== Agent 状态接口 ====================
@@ -378,7 +382,8 @@ class AnalyzeMoodRequest(BaseModel):
     intensity: int = 5
     note: str = ""
     tags: Optional[List[str]] = None
-    image_analysis: Optional[str] = None   # qwen3-vl-plus 图片分析结果
+    image_analysis: Optional[str] = None   # qwen3-vl-plus 图片分析结果（前端已分析时传）
+    image_urls: Optional[List[str]] = None  # 图片 URL 列表（后端自动调用 Qwen VL 分析）
     voice_text: Optional[str] = None       # qwen3-asr-flash 语音转写结果
     history_moods: Optional[List[dict]] = None  # 近期情绪历史
     mbti: str = ""                         # 用户 MBTI
@@ -412,12 +417,32 @@ async def analyze_mood_endpoint(request: AnalyzeMoodRequest):
         }
     """
     try:
+        # 如果提供了 image_urls 但没有预分析结果，自动调用 Qwen VL 分析
+        image_analysis = request.image_analysis or ""
+        if request.image_urls and not image_analysis:
+            try:
+                from src.services.ai_service import analyze_images
+                img_list = []
+                mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                             ".gif": "image/gif", ".webp": "image/webp"}
+                for url in request.image_urls[:3]:
+                    ext = url.rsplit(".", 1)[-1].lower() if "." in url else ""
+                    mime = mime_map.get(f".{ext}", "image/jpeg")
+                    img_list.append({"url": url, "mime_type": mime})
+                if img_list:
+                    img_result = await analyze_images(img_list)
+                    if img_result.get("description") and not img_result.get("error"):
+                        image_analysis = f"图片分析：{img_result.get('description', '')}。情绪推断：{img_result.get('mood_hint', '')}"
+                        logger.info("analyze_mood_endpoint image analysis done: %s", image_analysis[:100])
+            except Exception as img_err:
+                logger.warning("analyze_mood_endpoint image analysis failed: %s", str(img_err)[:100])
+
         result = await analyze_mood_multi_modal(
             mood_type=request.mood_type,
             intensity=request.intensity,
             note=request.note,
             tags=request.tags,
-            image_analysis=request.image_analysis or "",
+            image_analysis=image_analysis,
             voice_text=request.voice_text or "",
             history_moods=request.history_moods,
             mbti=request.mbti,
@@ -444,6 +469,60 @@ async def analyze_mood_endpoint(request: AnalyzeMoodRequest):
             "code": 500,
             "msg": f"AI 服务异常，请稍后重试",
             "data": None,
+        }, status_code=200)
+
+
+# ==================== 图片分析模型 ====================
+
+class AnalyzeImagesRequest(BaseModel):
+    """图片分析请求"""
+    image_urls: list[str]  # 图片 URL 列表（如 ["/uploads/images/xxx.png"]）
+
+
+@router.post("/ai/analyze-images")
+async def analyze_images_endpoint(
+    request: AnalyzeImagesRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    使用 Qwen VL 分析上传的图片内容（独立接口，前端可在提交情绪前调用）
+
+    请求体：
+    ```json
+    {
+      "image_urls": ["/uploads/images/abc.png", "/uploads/images/def.jpg"]
+    }
+    ```
+
+    Returns:
+        { code, msg, data: { description, mood_hint, objects } }
+    """
+    import os as _os
+    from src.services.ai_service import analyze_images
+
+    try:
+        # 构建带 MIME 的图片列表
+        mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                     ".gif": "image/gif", ".webp": "image/webp"}
+        images = []
+        for url in request.image_urls[:3]:
+            ext = _os.path.splitext(url)[1].lower()
+            mime = mime_map.get(ext, "image/jpeg")
+            images.append({"url": url, "mime_type": mime})
+
+        result = await analyze_images(images)
+
+        return {
+            "code": 0,
+            "msg": "ok" if not result.get("error") else "图片分析部分失败",
+            "data": result,
+        }
+    except Exception as e:
+        logger.error("analyze_images_endpoint error: %s", str(e)[:200])
+        return JSONResponse({
+            "code": 500,
+            "msg": "图片分析服务暂不可用",
+            "data": {"description": "", "mood_hint": "", "objects": [], "error": str(e)},
         }, status_code=200)
 
 
