@@ -215,11 +215,11 @@ async def node_generate_reply(state: AgentState) -> dict:
             reply = "我在这里陪你，想说什么都可以告诉我。"
 
     except asyncio.TimeoutError:
-        logger.warning("node_generate_reply timeout")
-        reply = "我感觉到了你的情绪，让我想想怎么帮你... 你能再多说一点吗？"
+        logger.warning("node_generate_reply timeout, trying simplified call")
+        reply = await _try_simplified_reply(client, state)
     except Exception as e:
-        logger.error("node_generate_reply error: %s", str(e)[:200])
-        reply = "我在这里陪着你，想聊聊吗？"
+        logger.error("node_generate_reply error: %s, trying simplified call", str(e)[:200])
+        reply = await _try_simplified_reply(client, state)
 
     return {
         "reply": reply,
@@ -227,6 +227,51 @@ async def node_generate_reply(state: AgentState) -> dict:
         "nodes_executed": state.get("nodes_executed", []) + ["generate_reply"],
         "status_messages": state.get("status_messages", []) + ["💬 正在生成疗愈建议..."],
     }
+
+
+async def _try_simplified_reply(client, state: dict) -> str:
+    """降级方案：用更简单的 prompt + 更长超时重试一次"""
+    from src.services.ai_service import _mood_label, _build_character_prompt, MODEL
+
+    character = state.get("avatar_character", "cat")
+    mood_type = state.get("mood_type", "neutral")
+    user_message = state.get("user_message", "")
+    character_prompt = _build_character_prompt(character)
+
+    system_prompt = f"""你是 MoodWave 灵音的 AI 情绪伙伴。
+{character_prompt}
+风格：温暖、有同理心，像一个关心你的朋友。不说教、不评判。语言简洁自然。
+当前用户情绪：{_mood_label(mood_type)}"""
+
+    try:
+        response = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message or "你好"},
+                ],
+                stream=False,
+                max_tokens=200,
+                temperature=0.85,
+                extra_body={"thinking": {"type": "disabled"}},
+            ),
+            timeout=20.0,
+        )
+        reply = response.choices[0].message.content
+        if reply and reply.strip():
+            return reply.strip()
+    except Exception as e:
+        logger.error("_try_simplified_reply also failed: %s", str(e)[:200])
+
+    # 最终兜底
+    character_names = {"cat": "喵呜", "fox": "绒绒", "planet": "星诺", "sunny": "晴晴",
+                       "astronaut": "航航", "moon": "月遥", "sakura": "樱樱"}
+    name = character_names.get(character, "小灵音")
+    mood_labels = {"happy": "开心", "calm": "平静", "anxious": "焦虑", "angry": "生气",
+                   "sad": "难过", "neutral": "平静"}
+    mood_cn = mood_labels.get(mood_type, "平静")
+    return f"我是{name}，感觉到你现在的状态是{mood_cn}的。我在认真听你说，你可以多告诉我一些，或者我为你推荐一首适合现在的音乐？"
 
 
 async def node_recommend_music(state: AgentState) -> dict:
