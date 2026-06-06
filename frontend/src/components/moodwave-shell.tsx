@@ -51,9 +51,9 @@ export function MoodWaveShell({
   const avatarUrl = user?.avatar_url || null
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800 lg:h-screen lg:overflow-hidden">
-      <div className="mx-auto flex min-h-screen max-w-[1600px] flex-col overflow-x-hidden lg:h-screen lg:flex-row lg:overflow-hidden">
-        <aside className="hidden w-[248px] shrink-0 border-r border-white/60 bg-white/72 px-6 py-8 backdrop-blur-xl lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:overflow-y-auto">
+    <div className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,210,221,0.8),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(180,242,232,0.65),_transparent_28%),radial-gradient(circle_at_bottom_center,_rgba(212,200,255,0.45),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff8f2_100%)] text-slate-800">
+      <div className="mx-auto flex h-full max-w-[1600px] flex-col overflow-hidden lg:flex-row">
+        <aside className="hidden h-full w-[248px] shrink-0 border-r border-white/60 bg-white/72 px-6 py-8 backdrop-blur-xl lg:flex lg:flex-col lg:overflow-y-auto">
           <MoodWaveLogo href="/dashboard" />
           <nav className="mt-10 space-y-2">
             {sideNavItems.map((item) => {
@@ -108,10 +108,10 @@ export function MoodWaveShell({
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden lg:h-screen">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header
             className={cn(
-              "sticky top-0 z-20 shrink-0 items-center justify-between border-b border-white/60 bg-white/70 px-5 py-4 backdrop-blur-xl lg:px-10",
+              "sticky top-0 z-20 shrink-0 items-center justify-between bg-transparent px-5 py-1 lg:min-h-[56px] lg:px-10",
               "hidden lg:flex",
             )}
           >
@@ -126,7 +126,7 @@ export function MoodWaveShell({
               <button
                 type="button"
                 onClick={() => setNotice("通知中心即将上线，今天先把重要心情留在这里。")}
-                className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow-[0_8px_24px_rgba(255,192,203,0.18)] transition hover:text-slate-800"
+                className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-slate-500 shadow-[0_8px_24px_rgba(255,192,203,0.14)] transition hover:text-slate-800"
                 aria-label="通知"
               >
                 <Bell className="h-4 w-4" />
@@ -153,15 +153,15 @@ export function MoodWaveShell({
             </div>
           </header>
           {notice ? (
-            <div className="mx-4 mt-4 rounded-[22px] border border-[#d6f3ea] bg-white/88 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(255,216,225,0.16)] md:mx-6 lg:mx-10">
+            <div className="mx-4 mt-2 rounded-[22px] border border-[#d6f3ea] bg-white/88 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(255,216,225,0.16)] md:mx-6 lg:mx-10">
               {notice}
             </div>
           ) : null}
 
           <main
             className={cn(
-              "min-w-0 flex-1 overflow-x-hidden px-4 pb-28 pt-5 md:px-6 lg:min-h-0 lg:overflow-y-auto lg:px-10 lg:pb-10",
-              appMode && "pt-[calc(env(safe-area-inset-top)+14px)]",
+              "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-28 pt-1 md:px-6 lg:px-10 lg:pb-10 lg:pt-1",
+              appMode && "pt-[calc(env(safe-area-inset-top)+6px)]",
               contentClassName,
             )}
           >
