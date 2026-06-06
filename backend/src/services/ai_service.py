@@ -11,6 +11,7 @@ import os
 import json
 import asyncio
 import logging
+import re
 from typing import AsyncGenerator, Optional, List
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -457,6 +458,7 @@ def _fallback_analysis(mood_type: str, intensity: int) -> dict:
     result = templates.get(mood_type, templates["neutral"]).copy()
     if intensity >= 8:
         result["suggestion"] += " 由于情绪强度较高，优先照顾自己的感受。"
+    result["_fallback"] = True
     return result
 
 
@@ -783,6 +785,57 @@ async def analyze_mood_multi_modal(
 def _fallback_multi_modal(mood_type: str, intensity: int, note: str = "") -> dict:
     """多模态分析降级模板"""
     fallback = _fallback_analysis(mood_type, intensity)
+    note = (note or "").strip()
+    track_match = re.search(r"收听[「\"]([^」\"]+)[」\"]", note)
+    track_title = track_match.group(1) if track_match else ""
+    music_context = "治愈音乐房间" in note or "听后感" in note or "旋律" in note or "收听" in note
+
+    if music_context:
+        summary_map = {
+            "happy": "这段旋律在帮你把开心留久一点。",
+            "calm": "这段旋律正在把你的呼吸放慢。",
+            "anxious": "这段旋律像在帮你一圈圈松开紧绷。",
+            "angry": "这段旋律正在把胸口的热量往外散开。",
+            "sad": "这段旋律像给低落铺了一层柔软的毯子。",
+            "neutral": "这段旋律给平稳的一天添了一点光。",
+        }
+        insight_map = {
+            "happy": "你不需要再额外证明快乐，这首歌更像是在提醒你把轻松好好留住。",
+            "calm": "你现在的平静不是空白，而是一种能让身体慢慢回到自己节奏里的力量。",
+            "anxious": "你并不是非得立刻解决所有事，这段节奏更适合陪你先把心跳和呼吸重新对齐。",
+            "angry": "情绪里的力量还在，但这段旋律更适合帮你先把边界感和身体的紧绷拆开一点。",
+            "sad": "难过没有被催着结束，这样的旋律更像是在告诉你，可以先被好好接住。",
+            "neutral": "平稳不代表没有内容，这首歌像在替你把那些细小的感觉轻轻托出来。",
+        }
+        suggestion_map = {
+            "happy": "如果愿意，可以趁这段旋律还在，把今天最想留下的一幕顺手记下来。",
+            "calm": "可以跟着现在的节奏做三次慢呼吸，让这种放松感在身体里再停一会儿。",
+            "anxious": "先别急着跳回待办里，跟着这段旋律慢慢呼气几次，再决定下一步要做什么。",
+            "angry": "等这段旋律播完前，先只做一件让身体降温的小事，比如起身走一圈或松开肩膀。",
+            "sad": "可以先让这首歌陪你待完整首，不用着急把低落解释清楚。",
+            "neutral": "可以借这段旋律给今天留一个小小的停顿，比如喝口水、看看窗外，或记下一句话。",
+        }
+        title_suffix = f"《{track_title}》" if track_title else "这段旋律"
+        return {
+            "summary": summary_map.get(mood_type, summary_map["neutral"]).replace("这段旋律", title_suffix),
+            "insight": insight_map.get(mood_type, insight_map["neutral"]),
+            "suggestion": suggestion_map.get(mood_type, suggestion_map["neutral"]),
+            "music_recommendation": {
+                "mood": fallback["music_mood"],
+                "bpm": 72 if mood_type == "calm" else 112,
+                "title": track_title or "定制氛围音乐",
+                "texture": "柔和和弦 + 慢速波纹" if mood_type == "calm" else "情绪陪伴旋律",
+            },
+            "radar_data": [
+                {"mood": "开心", "score": 80 if mood_type == "happy" else 40},
+                {"mood": "平静", "score": 80 if mood_type == "calm" else 50},
+                {"mood": "焦虑", "score": 70 if mood_type == "anxious" else 20},
+                {"mood": "愤怒", "score": 70 if mood_type == "angry" else 15},
+                {"mood": "悲伤", "score": 70 if mood_type == "sad" else 20},
+                {"mood": "平淡", "score": 70 if mood_type == "neutral" else 40},
+            ],
+            "_fallback": True,
+        }
     return {
         "summary": fallback["summary"],
         "insight": fallback["insight"],
@@ -801,6 +854,7 @@ def _fallback_multi_modal(mood_type: str, intensity: int, note: str = "") -> dic
             {"mood": "悲伤", "score": 70 if mood_type == "sad" else 20},
             {"mood": "平淡", "score": 70 if mood_type == "neutral" else 40},
         ],
+        "_fallback": True,
     }
 
 

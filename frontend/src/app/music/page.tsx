@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useRef, useState, type PointerEvent } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react"
 import { useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import {
@@ -82,30 +82,16 @@ function resolveTrackPlaybackUrl(url: string) {
   return resolveAssetUrl(url)
 }
 
-function getInsightErrorMessage(error: unknown) {
-  const maybeResponse = error as {
-    code?: string
-    message?: string
-    response?: { data?: { msg?: string; message?: string; detail?: string } }
-  }
-  const serverMessage =
-    maybeResponse.response?.data?.msg ||
-    maybeResponse.response?.data?.message ||
-    maybeResponse.response?.data?.detail ||
-    maybeResponse.message ||
-    ""
-  const lowerMessage = serverMessage.toLowerCase()
+function buildLocalMusicInsight(
+  fallbackInsight: string,
+  track: MusicRecommendation,
+) {
+  const scene = track.scene || "这段旋律里"
+  const texture = track.texture || "这份节奏"
+  const description = track.description || ""
+  const trackTitle = track.title ? `《${track.title}》` : "这段旋律"
 
-  if (maybeResponse.code === "ECONNABORTED" || lowerMessage.includes("timeout") || lowerMessage.includes("timed out") || serverMessage.includes("超时")) {
-    return "生成有点超时，已先切换成本地陪伴语。可以点下方重新试一次。"
-  }
-  if (serverMessage.includes("fallback")) {
-    return "AI 正在使用备用结果，陪伴语可能会更简短一些。"
-  }
-  if (serverMessage.includes("AI") || serverMessage.includes("DeepSeek")) {
-    return "AI 服务暂时没有接住请求，已先保留一段本地听后感。"
-  }
-  return "网络有点不稳定，灵灵先送上一段本地陪伴建议。"
+  return `${trackTitle}像把你带进${scene}，${texture}正在慢慢贴近你。${description ? `${description} ` : ""}${fallbackInsight}`
 }
 
 function BpmControl({
@@ -234,7 +220,14 @@ function MusicPageContent() {
   const progress = effectiveDuration > 0 ? Math.min(100, (elapsedTime / effectiveDuration) * 100) : 0
   const baseTrackBpm = selectedRecommendation.bpm || profile.bpm
   const playbackRate = Math.min(1.45, Math.max(0.72, currentBpm / Math.max(1, baseTrackBpm)))
-  const currentGradient = selectedRecommendation.cover_gradient?.length ? selectedRecommendation.cover_gradient : [profile.color, profile.colorTo]
+  const currentGradient = useMemo(
+    () => (selectedRecommendation.cover_gradient?.length ? selectedRecommendation.cover_gradient : [profile.color, profile.colorTo]),
+    [profile.color, profile.colorTo, selectedRecommendation.cover_gradient],
+  )
+  const localMusicInsight = useMemo(
+    () => buildLocalMusicInsight(profile.insight, selectedRecommendation),
+    [profile.insight, selectedRecommendation],
+  )
 
   const loadAIInsight = useCallback(async (signal?: AbortSignal) => {
     setIsInsightLoading(true)
@@ -268,21 +261,23 @@ function MusicPageContent() {
         profile.insight
       insightRef.current = nextInsight
       setAiInsight(nextInsight)
-      setInsightStatus(isFallback ? "error" : "idle")
-      if (isFallback) {
-        setInsightError("AI 暂时给了备用陪伴语，稍后重新生成可能会更贴近你。")
+      setInsightStatus("idle")
+      setInsightError("")
+      if (isFallback && !nextInsight.trim()) {
+        setAiInsight(localMusicInsight)
+        insightRef.current = localMusicInsight
       }
     } catch (error) {
       const errName = (error as Error).name
       if (errName === "AbortError" || errName === "CanceledError") return
-      setAiInsight(profile.insight)
-      insightRef.current = profile.insight
+      setAiInsight(localMusicInsight)
+      insightRef.current = localMusicInsight
       setInsightStatus("error")
-      setInsightError(getInsightErrorMessage(error))
+      setInsightError("灵音先根据这段旋律陪你坐一会儿，晚一点再重新生成也可以。")
     } finally {
       setIsInsightLoading(false)
     }
-  }, [intensity, mood, moodMeta.label, profile.insight, profile.title, selectedRecommendation.title, user?.mbti, user?.zodiac])
+  }, [intensity, localMusicInsight, mood, moodMeta.label, profile.insight, profile.title, selectedRecommendation, user?.mbti, user?.zodiac])
 
   const showToast = useCallback((message: string) => {
     setMusicToast(message)
@@ -789,6 +784,8 @@ function MusicPageContent() {
   }, [currentGradient, isPlaying, mood, profile.color, profile.colorTo])
 
   useEffect(() => {
+    const audio = audioRef.current
+    const objectUrls = objectUrlsRef.current
     return () => {
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current)
@@ -796,12 +793,11 @@ function MusicPageContent() {
       if (animationRef.current) {
         window.cancelAnimationFrame(animationRef.current)
       }
-      const audio = audioRef.current
       if (audio) {
         audio.pause()
         audio.removeAttribute("src")
       }
-      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+      objectUrls.forEach((url) => URL.revokeObjectURL(url))
       if (audioContextRef.current) {
         void audioContextRef.current.close()
       }
@@ -1207,7 +1203,7 @@ function MusicPageContent() {
                     : insightStatus === "retrying"
                       ? "正在重新生成更贴近的回应..."
                       : insightStatus === "error"
-                        ? "当前展示备用陪伴语"
+                        ? "灵音先根据这段旋律陪着你"
                         : "角色会结合情绪与音乐给你回应"}
                 </p>
               </div>
@@ -1215,7 +1211,7 @@ function MusicPageContent() {
             <p className="mt-4 min-h-[84px] whitespace-pre-wrap text-sm leading-7 text-slate-600">
               {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把你的情绪调成一段温柔的文字...")}
             </p>
-            {insightError ? <p className="mt-3 text-xs text-[#ef7b73]">{insightError}</p> : null}
+            {insightError ? <p className="mt-3 text-xs text-slate-500">{insightError}</p> : null}
             <div className="mt-4 rounded-[24px] bg-gradient-to-br from-[#fff6f8] to-[#effdfa] p-4 text-sm text-slate-600">
               <Sparkles className="mb-2 h-4 w-4 text-[#ff8fa3]" />
               <button

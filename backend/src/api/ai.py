@@ -448,8 +448,7 @@ async def analyze_mood_endpoint(request: AnalyzeMoodRequest):
             mbti=request.mbti,
             zodiac=request.zodiac,
         )
-        # 如果返回的是 fallback 结果（没有 radar_data 的 summary 字段来自 fallback 模板），标记为 fallback
-        is_fallback = result.get("summary", "").startswith("你今天")
+        is_fallback = bool(result.pop("_fallback", False))
         return JSONResponse({
             "code": 0,
             "msg": "ok" if not is_fallback else "AI 暂不可用，已使用本地分析模板",
