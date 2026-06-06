@@ -48,6 +48,14 @@ export interface MusicRecommendation {
   mood_type: MoodType
   url: string
   duration: number
+  bpm?: number
+  texture?: string
+  scene?: string
+  description?: string
+  seed?: number
+  audio_mode?: 'procedural' | 'external'
+  cover_gradient?: string[]
+  visual_preset?: 'bloom' | 'ripple' | 'drift' | 'ember' | 'starlight'
 }
 
 export interface AnalyticsResponse {

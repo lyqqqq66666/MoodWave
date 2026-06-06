@@ -21,6 +21,7 @@ from src.core.models import (
     CompanionConversation, CompanionMessage,
 )
 from src.services.ai_service import CHARACTER_PERSONAS
+from src.services.music_catalog import get_companion_music_recommendation
 
 logger = logging.getLogger("moodwave.companion_tools")
 
@@ -314,28 +315,12 @@ MUSIC_PARAMS = {
 
 def recommend_music_params(mood_type: str, intensity: int = 5) -> dict:
     """
-    根据情绪类型和强度生成音乐推荐参数
+    根据情绪类型和强度生成音乐推荐
 
     Returns:
-        dict: { mood, bpm, energy, texture, style, intensity_adjusted }
+        dict: { mood, title, artist, bpm, energy, texture, scene, url, ... }
     """
-    base = MUSIC_PARAMS.get(mood_type, MUSIC_PARAMS["neutral"])
-
-    # 强度调整：高强度 → 略微加快 BPM，低强度 → 略微放慢
-    bpm_adjusted = base["bpm"]
-    if intensity >= 8:
-        bpm_adjusted = min(base["bpm"] + 10, 140)
-    elif intensity <= 3:
-        bpm_adjusted = max(base["bpm"] - 10, 55)
-
-    return {
-        "mood": mood_type,
-        "bpm": bpm_adjusted,
-        "energy": base["energy"],
-        "texture": base["texture"],
-        "style": base["style"],
-        "intensity_adjusted": intensity >= 8 or intensity <= 3,
-    }
+    return get_companion_music_recommendation(mood_type, intensity)
 
 
 # ==================== 会话消息保存 ====================

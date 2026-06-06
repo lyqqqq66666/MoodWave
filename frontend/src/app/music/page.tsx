@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState, type PointerEvent } from "react"
 import { useSearchParams } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import {
@@ -20,9 +20,20 @@ import {
   Volume2,
   Waves,
 } from "lucide-react"
-import { aiAPI, moodAPI, musicAPI } from "@/lib/api"
-import { getMoodOption, moodOptions } from "@/lib/moodwave"
-import type { MoodType, MusicRecommendation } from "@/lib/types"
+import { aiAPI, moodAPI, musicAPI, resolveAssetUrl } from "@/lib/api"
+import { getMoodOption } from "@/lib/moodwave"
+import {
+  fallbackRecommendations,
+  formatDuration,
+  hexToRgb,
+  moodProfiles,
+  normalizeFavoriteIds,
+  normalizeRecommendations,
+  parseIntensity,
+  parseMood,
+  renderProceduralTrackToWav,
+} from "@/lib/music-room"
+import type { MusicRecommendation } from "@/lib/types"
 import { IOSGlassCard } from "@/components/ios/ios-glass-card"
 import { MoodWaveShell } from "@/components/moodwave-shell"
 import { CompanionAvatar } from "@/components/companion-avatar"
@@ -31,206 +42,44 @@ import { useIsAppPlatform } from "@/hooks/use-platform"
 import { useAuthStore } from "@/store/auth"
 import { cn } from "@/lib/utils"
 
-type MoodSoundProfile = {
-  bpm: number
-  scale: string[]
-  wave: "sine" | "triangle" | "sawtooth" | "square"
-  pulse: number
-  color: string
-  colorTo: string
-  album: string
-  title: string
-  texture: string
-  insight: string
-}
-
-type Particle = {
-  x: number
-  y: number
-  originX: number
-  originY: number
-  angle: number
-  speed: number
-  radius: number
-  life: number
-  maxLife: number
-  opacity: number
-  isGlowing: boolean
-}
-
 type ToneModule = typeof import("tone/build/esm/index")
 type InsightStatus = "idle" | "generating" | "retrying" | "error"
 
-const moodProfiles: Record<MoodType, MoodSoundProfile> = {
-  happy: {
-    bpm: 112,
-    scale: ["C4", "E4", "G4", "B4", "C5", "E5"],
-    wave: "triangle",
-    pulse: 1.15,
-    color: "#FFD166",
-    colorTo: "#EF8D7B",
-    album: "from-[#ffe59a] via-[#ffd2dc] to-[#9ee7d7]",
-    title: "晴朗的午后",
-    texture: "明亮琶音 + 轻快节拍",
-    insight: "开心的能量适合被延长一点，试着把今天的小确幸留进歌里。",
-  },
-  calm: {
-    bpm: 72,
-    scale: ["D4", "F#4", "A4", "C#5", "E5"],
-    wave: "sine",
-    pulse: 0.78,
-    color: "#90E0EF",
-    colorTo: "#CBC3E3",
-    album: "from-[#bfefff] via-[#eadffd] to-[#f8dce6]",
-    title: "宁静的午后",
-    texture: "柔和和弦 + 慢速波纹",
-    insight: "平静正在帮你恢复秩序，保持现在的呼吸频率就很好。",
-  },
-  anxious: {
-    bpm: 94,
-    scale: ["A3", "C4", "E4", "G4", "B4"],
-    wave: "sine",
-    pulse: 1.35,
-    color: "#8ECAE6",
-    colorTo: "#FFE66D",
-    album: "from-[#cdefff] via-[#fff1a8] to-[#ffd5dc]",
-    title: "轻轻降噪",
-    texture: "低频铺底 + 温和白噪",
-    insight: "焦虑像很多同时亮起的小灯，我们先让它们一盏一盏暗下来。",
-  },
-  angry: {
-    bpm: 86,
-    scale: ["E3", "G3", "B3", "D4", "E4"],
-    wave: "sawtooth",
-    pulse: 1.28,
-    color: "#EF8D7B",
-    colorTo: "#F4A261",
-    album: "from-[#ffb49f] via-[#ffd09e] to-[#bfead0]",
-    title: "热量慢慢散开",
-    texture: "暖色低音 + 释放型脉冲",
-    insight: "愤怒说明边界正在发声，先把热量安全地交给节奏。",
-  },
-  sad: {
-    bpm: 58,
-    scale: ["F3", "A3", "C4", "E4", "G4"],
-    wave: "sine",
-    pulse: 0.62,
-    color: "#C7E8CA",
-    colorTo: "#A8DADC",
-    album: "from-[#d9f2d6] via-[#c8eef3] to-[#efe2ff]",
-    title: "给低落一条毯子",
-    texture: "低频长音 + 下沉粒子",
-    insight: "难过不需要马上被修好，先让音乐陪你把它安放下来。",
-  },
-  neutral: {
-    bpm: 76,
-    scale: ["G3", "B3", "D4", "G4", "A4"],
-    wave: "triangle",
-    pulse: 0.88,
-    color: "#F5F5DC",
-    colorTo: "#E0E0E0",
-    album: "from-[#f8f4d8] via-[#e9eef0] to-[#dff3e9]",
-    title: "普通日子的微光",
-    texture: "均匀颗粒 + 轻柔律动",
-    insight: "平淡也有自己的纹理，今天可以用一首轻音乐慢慢扫过。",
-  },
+type VisualParticle = {
+  orbit: number
+  angle: number
+  speed: number
+  size: number
+  alpha: number
+  drift: number
+  wobble: number
+  hueMix: number
 }
 
-const moodChords: Record<MoodType, string[][]> = {
-  happy: [["C4", "E4", "G4", "B4"], ["F3", "A3", "C4", "E4"], ["G3", "B3", "D4", "F4"]],
-  calm: [["G3", "B3", "D4", "F#4"], ["C3", "E3", "G3", "B3"], ["D3", "F#3", "A3", "C#4"]],
-  anxious: [["A3", "D4", "E4", "G4"], ["G3", "C4", "D4", "F#4"], ["E3", "A3", "B3", "D4"]],
-  angry: [["D3", "F3", "A3", "C4"], ["G3", "Bb3", "D4", "F4"], ["A2", "D3", "E3", "G3"]],
-  sad: [["F3", "Ab3", "C4", "Eb4"], ["C3", "Eb3", "G3", "Bb3"], ["Bb2", "D3", "F3", "Ab3"]],
-  neutral: [["E3", "G3", "B3", "D4"], ["A3", "C4", "E4", "G4"], ["D3", "F3", "A3", "C4"]]
-}
-
-const fallbackRecommendations: Record<MoodType, MusicRecommendation[]> = {
-  happy: [
-    { id: "happy-1", title: "星空下的草莓", artist: "MoodWave AI", mood_type: "happy", url: "", duration: 214 },
-    { id: "happy-2", title: "阳光小跳步", artist: "MoodWave AI", mood_type: "happy", url: "", duration: 188 },
-    { id: "happy-3", title: "午后汽水", artist: "MoodWave AI", mood_type: "happy", url: "", duration: 205 },
-  ],
-  calm: [
-    { id: "calm-1", title: "宁静的午后", artist: "MoodWave AI", mood_type: "calm", url: "", duration: 225 },
-    { id: "calm-2", title: "云朵慢步", artist: "MoodWave AI", mood_type: "calm", url: "", duration: 196 },
-    { id: "calm-3", title: "浅海呼吸", artist: "MoodWave AI", mood_type: "calm", url: "", duration: 242 },
-  ],
-  anxious: [
-    { id: "anxious-1", title: "轻轻降噪", artist: "MoodWave AI", mood_type: "anxious", url: "", duration: 210 },
-    { id: "anxious-2", title: "把线团松开", artist: "MoodWave AI", mood_type: "anxious", url: "", duration: 230 },
-    { id: "anxious-3", title: "慢慢数到十", artist: "MoodWave AI", mood_type: "anxious", url: "", duration: 201 },
-  ],
-  angry: [
-    { id: "angry-1", title: "热量慢慢散开", artist: "MoodWave AI", mood_type: "angry", url: "", duration: 219 },
-    { id: "angry-2", title: "柔软边界", artist: "MoodWave AI", mood_type: "angry", url: "", duration: 184 },
-    { id: "angry-3", title: "暖风出口", artist: "MoodWave AI", mood_type: "angry", url: "", duration: 206 },
-  ],
-  sad: [
-    { id: "sad-1", title: "给低落一条毯子", artist: "MoodWave AI", mood_type: "sad", url: "", duration: 236 },
-    { id: "sad-2", title: "雨后的小灯", artist: "MoodWave AI", mood_type: "sad", url: "", duration: 221 },
-    { id: "sad-3", title: "慢慢浮上来", artist: "MoodWave AI", mood_type: "sad", url: "", duration: 248 },
-  ],
-  neutral: [
-    { id: "neutral-1", title: "普通日子的微光", artist: "MoodWave AI", mood_type: "neutral", url: "", duration: 198 },
-    { id: "neutral-2", title: "白纸和清茶", artist: "MoodWave AI", mood_type: "neutral", url: "", duration: 212 },
-    { id: "neutral-3", title: "安静路过", artist: "MoodWave AI", mood_type: "neutral", url: "", duration: 203 },
-  ],
+type PreparedTrack = {
+  url: string
+  duration: number
 }
 
 const BPM_MIN = 40
 const BPM_MAX = 180
 
-function parseMood(value: string | null): MoodType {
-  return moodOptions.some((item) => item.value === value) ? (value as MoodType) : "calm"
-}
-
-function parseIntensity(value: string | null) {
-  const parsed = Number(value)
-  if (Number.isNaN(parsed)) return 6
-  return Math.min(10, Math.max(1, parsed))
-}
-
-function normalizeRecommendations(payload: unknown, mood: MoodType): MusicRecommendation[] {
-  const maybeWrapped = payload as { data?: unknown }
-  const source = Array.isArray(payload) ? payload : Array.isArray(maybeWrapped?.data) ? maybeWrapped.data : []
-
-  if (!Array.isArray(source) || source.length === 0) {
-    return []
+function resolveTrackPlaybackUrl(url: string) {
+  if (!url) return ""
+  if (/^https?:\/\//.test(url) || url.startsWith("blob:") || url.startsWith("data:")) {
+    return url
   }
 
-  return source.slice(0, 5).map((item, index) => {
-    const record = item as Partial<MusicRecommendation> & { mood?: MoodType }
-    return {
-      id: String(record.id ?? `${mood}-${index}`),
-      title: record.title ?? fallbackRecommendations[mood][index % fallbackRecommendations[mood].length].title,
-      artist: record.artist ?? "MoodWave AI",
-      mood_type: record.mood_type ?? record.mood ?? mood,
-      url: record.url ?? "",
-      duration: record.duration ?? 200,
+  // `/audio/...` 这类前端 public 静态资源应当跟随当前页面 origin，
+  // 不能走后端 API_URL，否则本地开发时会误打到 :8000 导致 404。
+  if (url.startsWith("/audio/")) {
+    if (typeof window !== "undefined") {
+      return new URL(url, window.location.origin).toString()
     }
-  })
-}
+    return url
+  }
 
-function normalizeFavoriteIds(payload: unknown) {
-  const maybeWrapped = payload as { data?: unknown }
-  const source = Array.isArray(payload) ? payload : Array.isArray(maybeWrapped?.data) ? maybeWrapped.data : []
-  if (!Array.isArray(source)) return new Set<string>()
-
-  return new Set(
-    source
-      .map((item) => {
-        const record = item as { music_id?: string | number; id?: string | number }
-        return String(record.music_id ?? record.id ?? "")
-      })
-      .filter(Boolean),
-  )
-}
-
-function formatDuration(seconds: number) {
-  const minutes = Math.floor(seconds / 60)
-  const rest = String(seconds % 60).padStart(2, "0")
-  return `${minutes}:${rest}`
+  return resolveAssetUrl(url)
 }
 
 function getInsightErrorMessage(error: unknown) {
@@ -259,13 +108,75 @@ function getInsightErrorMessage(error: unknown) {
   return "网络有点不稳定，灵灵先送上一段本地陪伴建议。"
 }
 
-function hexToRgb(hex: string): string {
-  const cleanHex = hex.replace("#", "")
-  const num = parseInt(cleanHex, 16)
-  const r = (cleanHex.length === 3) ? ((num >> 8) & 15) * 17 : (num >> 16) & 255
-  const g = (cleanHex.length === 3) ? ((num >> 4) & 15) * 17 : (num >> 8) & 255
-  const b = (cleanHex.length === 3) ? (num & 15) * 17 : num & 255
-  return `${r}, ${g}, ${b}`
+function BpmControl({
+  className = "",
+  currentBpm,
+  isOpen,
+  onToggle,
+  onChange,
+}: {
+  className?: string
+  currentBpm: number
+  isOpen: boolean
+  onToggle: () => void
+  onChange: (value: number) => void
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex min-h-10 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:text-[#ff7894]"
+        aria-expanded={isOpen}
+        aria-label="调节节奏速度"
+      >
+        <Volume2 className="h-4 w-4 text-[#8bded4]" />
+        <span>{currentBpm} BPM</span>
+      </button>
+      {isOpen ? (
+        <div className="absolute right-0 top-12 z-40 w-[min(280px,calc(100vw-2rem))] rounded-[26px] border border-white/80 bg-white/96 p-4 shadow-[0_18px_48px_rgba(255,181,194,0.24)] backdrop-blur-xl">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-800">节奏偏好</p>
+            <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-[#ff7894]">{currentBpm}</span>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-slate-500">会同步影响当前音轨的播放速度，让房间更贴近你现在的呼吸和心跳。</p>
+          <input
+            type="range"
+            min={BPM_MIN}
+            max={BPM_MAX}
+            step={1}
+            value={currentBpm}
+            onChange={(event) => onChange(Number(event.target.value))}
+            className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5]"
+            style={{ accentColor: "#ff8fa3" }}
+            aria-label="BPM 滑块"
+          />
+          <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+            <span>{BPM_MIN}</span>
+            <span>{BPM_MAX}</span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onChange(currentBpm - 1)}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#fff4f7] text-sm font-semibold text-slate-600 transition hover:text-[#ff7894]"
+            >
+              <Minus className="h-4 w-4" />
+              1
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange(currentBpm + 1)}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#effdfa] text-sm font-semibold text-slate-600 transition hover:text-[#42b9aa]"
+            >
+              <Plus className="h-4 w-4" />
+              1
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function MusicPageContent() {
@@ -275,50 +186,55 @@ function MusicPageContent() {
   const intensity = parseIntensity(searchParams.get("intensity"))
   const moodMeta = getMoodOption(mood)
   const profile = moodProfiles[mood]
-  const baseBpm = useMemo(() => Math.min(BPM_MAX, Math.max(BPM_MIN, profile.bpm + intensity * 2)), [intensity, profile.bpm])
+  const { iosApp } = useIsAppPlatform()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const particlesRef = useRef<Particle[]>([])
-  const animationRef = useRef<number | null>(null)
-  const toneRef = useRef<ToneModule | null>(null)
-  const synthRef = useRef<InstanceType<ToneModule["PolySynth"]> | null>(null)
-  const bassRef = useRef<InstanceType<ToneModule["MonoSynth"]> | null>(null)
-  const noiseRef = useRef<InstanceType<ToneModule["NoiseSynth"]> | null>(null)
-  const reverbRef = useRef<InstanceType<ToneModule["Reverb"]> | null>(null)
-  const filterRef = useRef<InstanceType<ToneModule["Filter"]> | null>(null)
-  const delayRef = useRef<InstanceType<ToneModule["PingPongDelay"]> | null>(null)
-  const analyserRef = useRef<InstanceType<ToneModule["Analyser"]> | null>(null)
-  const loopRef = useRef<{ dispose: () => void } | null>(null)
-  const bassLoopRef = useRef<{ dispose: () => void } | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const progressRef = useRef<HTMLDivElement | null>(null)
+  const particlesRef = useRef<VisualParticle[]>([])
+  const animationRef = useRef<number | null>(null)
+  const freqDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
+  const timeDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserNodeRef = useRef<AnalyserNode | null>(null)
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const toneRef = useRef<ToneModule | null>(null)
+  const preparedTracksRef = useRef<Map<string, PreparedTrack>>(new Map())
+  const pendingTracksRef = useRef<Map<string, Promise<PreparedTrack>>>(new Map())
+  const objectUrlsRef = useRef<string[]>([])
+  const insightRef = useRef(profile.insight)
+  const toastTimerRef = useRef<number | null>(null)
+  const isSwitchingTrackRef = useRef(false)
+  const advanceTrackRef = useRef<(() => void) | null>(null)
 
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [recommendations, setRecommendations] = useState<MusicRecommendation[]>([])
+  const [recommendations, setRecommendations] = useState<MusicRecommendation[]>(fallbackRecommendations[mood])
   const [selectedTrack, setSelectedTrack] = useState(0)
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [liked, setLiked] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isTrackPreparing, setIsTrackPreparing] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [mediaDuration, setMediaDuration] = useState(0)
+  const [isSeeking, setIsSeeking] = useState(false)
+  const [seekPreview, setSeekPreview] = useState<number | null>(null)
   const [aiInsight, setAiInsight] = useState(profile.insight)
   const [isInsightLoading, setIsInsightLoading] = useState(false)
   const [insightStatus, setInsightStatus] = useState<InsightStatus>("idle")
   const [insightError, setInsightError] = useState("")
-  const [isSeeking, setIsSeeking] = useState(false)
-  const [seekPreview, setSeekPreview] = useState<number | null>(null)
   const [musicToast, setMusicToast] = useState("")
-  const [currentBpm, setCurrentBpm] = useState(baseBpm)
+  const [currentBpm, setCurrentBpm] = useState(profile.bpm)
   const [isBpmPanelOpen, setIsBpmPanelOpen] = useState(false)
   const [hasMoodRecord, setHasMoodRecord] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
-  const { iosApp } = useIsAppPlatform()
-  // 用 ref 避免 aiInsight 进入 useCallback deps 导致的无限 abort 循环
-  const insightRef = useRef(profile.insight)
+  const [audioError, setAudioError] = useState("")
 
-  const selectedRecommendation = recommendations[selectedTrack] ?? { id: "empty", title: "", artist: "", mood_type: mood, url: "", duration: 200 }
-  const progress = useMemo(
-    () => Math.min(100, (elapsedTime / Math.max(1, selectedRecommendation.duration)) * 100),
-    [elapsedTime, selectedRecommendation.duration],
-  )
+  const selectedRecommendation = recommendations[selectedTrack] ?? fallbackRecommendations[mood][0]
+  const effectiveDuration = mediaDuration || selectedRecommendation.duration || 0
+  const progress = effectiveDuration > 0 ? Math.min(100, (elapsedTime / effectiveDuration) * 100) : 0
+  const baseTrackBpm = selectedRecommendation.bpm || profile.bpm
+  const playbackRate = Math.min(1.45, Math.max(0.72, currentBpm / Math.max(1, baseTrackBpm)))
+  const currentGradient = selectedRecommendation.cover_gradient?.length ? selectedRecommendation.cover_gradient : [profile.color, profile.colorTo]
 
   const loadAIInsight = useCallback(async (signal?: AbortSignal) => {
     setIsInsightLoading(true)
@@ -358,7 +274,6 @@ function MusicPageContent() {
       }
     } catch (error) {
       const errName = (error as Error).name
-      // axios AbortController 会抛 CanceledError，不是 AbortError
       if (errName === "AbortError" || errName === "CanceledError") return
       setAiInsight(profile.insight)
       insightRef.current = profile.insight
@@ -369,145 +284,173 @@ function MusicPageContent() {
     }
   }, [intensity, mood, moodMeta.label, profile.insight, profile.title, selectedRecommendation.title, user?.mbti, user?.zodiac])
 
-  const disposeTone = useCallback(() => {
-    loopRef.current?.dispose()
-    bassLoopRef.current?.dispose()
-    synthRef.current?.dispose()
-    bassRef.current?.dispose()
-    noiseRef.current?.dispose()
-    delayRef.current?.dispose()
-    reverbRef.current?.dispose()
-    filterRef.current?.dispose()
-    analyserRef.current?.dispose()
-    loopRef.current = null
-    bassLoopRef.current = null
-    synthRef.current = null
-    bassRef.current = null
-    noiseRef.current = null
-    delayRef.current = null
-    reverbRef.current = null
-    filterRef.current = null
-    analyserRef.current = null
+  const showToast = useCallback((message: string) => {
+    setMusicToast(message)
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+    toastTimerRef.current = window.setTimeout(() => setMusicToast(""), 2500)
   }, [])
 
-  const stopMusic = useCallback(() => {
-    const Tone = toneRef.current
-    Tone?.Transport.stop()
-    Tone?.Transport.cancel()
-    disposeTone()
-    setIsPlaying(false)
-  }, [disposeTone])
+  const getPlaybackRate = useCallback((track: MusicRecommendation, bpm: number) => {
+    const base = track.bpm || moodProfiles[track.mood_type].bpm
+    return Math.min(1.45, Math.max(0.72, bpm / Math.max(1, base)))
+  }, [])
 
-  const startMusic = useCallback(async () => {
-    setIsLoading(true)
-    try {
+  const ensureAudioGraph = useCallback(async () => {
+    const audio = audioRef.current
+    if (!audio) return null
+
+    if (!audioContextRef.current) {
+      const audioContext = new AudioContext()
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.86
+      const source = audioContext.createMediaElementSource(audio)
+      source.connect(analyser)
+      analyser.connect(audioContext.destination)
+
+      audioContextRef.current = audioContext
+      analyserNodeRef.current = analyser
+      mediaSourceRef.current = source
+      freqDataRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>
+      timeDataRef.current = new Uint8Array(analyser.fftSize) as Uint8Array<ArrayBuffer>
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume()
+    }
+
+    return {
+      context: audioContextRef.current,
+      analyser: analyserNodeRef.current,
+    }
+  }, [])
+
+  const waitForMetadata = useCallback((audio: HTMLAudioElement) => new Promise<void>((resolve, reject) => {
+    if (audio.readyState >= 1 && Number.isFinite(audio.duration)) {
+      resolve()
+      return
+    }
+    const handleLoaded = () => {
+      cleanup()
+      resolve()
+    }
+    const handleError = () => {
+      cleanup()
+      reject(new Error("音轨元数据加载失败"))
+    }
+    const cleanup = () => {
+      audio.removeEventListener("loadedmetadata", handleLoaded)
+      audio.removeEventListener("error", handleError)
+    }
+    audio.addEventListener("loadedmetadata", handleLoaded)
+    audio.addEventListener("error", handleError)
+  }), [])
+
+  const prepareTrack = useCallback(async (track: MusicRecommendation) => {
+    const key = `${track.id}-${track.duration}-${track.seed}-${track.audio_mode ?? "procedural"}`
+    const cached = preparedTracksRef.current.get(key)
+    if (cached) return cached
+
+    const pending = pendingTracksRef.current.get(key)
+    if (pending) return pending
+
+    const promise = (async () => {
+      if (track.audio_mode === "external" && track.url) {
+        const prepared = {
+          url: resolveTrackPlaybackUrl(track.url),
+          duration: track.duration,
+        }
+        preparedTracksRef.current.set(key, prepared)
+        return prepared
+      }
+
+      setIsTrackPreparing(true)
       const Tone = toneRef.current ?? (await import("tone/build/esm/index"))
       toneRef.current = Tone
-      await Tone.start()
-      stopMusic()
+      const rendered = await renderProceduralTrackToWav(Tone, track, mood, intensity)
+      const objectUrl = URL.createObjectURL(rendered.blob)
+      objectUrlsRef.current.push(objectUrl)
+      const prepared = {
+        url: objectUrl,
+        duration: rendered.duration || track.duration,
+      }
+      preparedTracksRef.current.set(key, prepared)
+      return prepared
+    })()
 
-      Tone.Transport.bpm.value = currentBpm
-      
-      // 1. 创建音频分析器连接至 Master，抓取 FFT 数据以同步画面
-      analyserRef.current = new Tone.Analyser("fft", 32)
-      
-      // 2. 空间效果器连线：Synth -> Filter -> PingPongDelay -> Reverb -> Analyser -> Destination
-      reverbRef.current = new Tone.Reverb({ decay: 6.2, wet: 0.45 }).connect(analyserRef.current)
-      analyserRef.current.toDestination()
+    pendingTracksRef.current.set(key, promise)
+    try {
+      return await promise
+    } finally {
+      pendingTracksRef.current.delete(key)
+      setIsTrackPreparing(false)
+    }
+  }, [intensity, mood])
 
-      delayRef.current = new Tone.PingPongDelay({
-        delayTime: "4n", // 用乐符时间相应，实现 BPM 变化即时变速
-        feedback: 0.58,
-        wet: 0.35,
-      }).connect(reverbRef.current)
-      
-      filterRef.current = new Tone.Filter(350 + intensity * 60, "lowpass").connect(delayRef.current)
-      
-      // 3. 采用温暖包络的 PolySynth (弹奏和弦) 与 MonoSynth (低音铺底)
-      synthRef.current = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: profile.wave },
-        envelope: { attack: 0.35, decay: 0.5, sustain: 0.65, release: 2.8 },
-        volume: -18,
-      }).connect(filterRef.current)
-      
-      bassRef.current = new Tone.MonoSynth({
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.8, decay: 1.0, sustain: 0.75, release: 3.2 },
-        filterEnvelope: { attack: 0.6, decay: 0.8, sustain: 0.6, release: 2.4, baseFrequency: 65, octaves: 1.2 },
-        volume: -24,
-      }).connect(reverbRef.current)
+  const loadTrack = useCallback(async (
+    track: MusicRecommendation,
+    options?: { autoplay?: boolean; restart?: boolean; preserveCurrentTime?: boolean; bpmOverride?: number; interruptCurrent?: boolean },
+  ) => {
+    const audio = audioRef.current
+    if (!audio) return
 
-      if (mood === "anxious") {
-        noiseRef.current = new Tone.NoiseSynth({
-          noise: { type: "pink" },
-          envelope: { attack: 1.2, decay: 0.6, sustain: 0.4, release: 2.2 },
-          volume: -34,
-        }).connect(reverbRef.current)
+    setAudioError("")
+    setIsLoading(true)
+
+    try {
+      if (options?.interruptCurrent) {
+        audio.pause()
+        audio.currentTime = 0
+        setElapsedTime(0)
       }
 
-      const scale = profile.scale
-      const chords = moodChords[mood]
+      const prepared = await prepareTrack(track)
+      const shouldReplaceSource = audio.src !== prepared.url
+      const previousTime = audio.currentTime
 
-      // 4. 重构节拍循环周期（全为乐符单位如 4n, 2n, 1m），当用户拖动 BPM 时，速率瞬间响应
-      // Loop A: 高音风铃 (周期 4n, 35% 触发概率)
-      const loopA = new Tone.Loop((time) => {
-        if (Math.random() < 0.35 && scale.length >= 3) {
-          const randomNote = scale[Math.floor(Math.random() * (scale.length - 2)) + 2]
-          const finalNote = Math.random() < 0.25 ? Tone.Frequency(randomNote).transpose(12).toNote() : randomNote
-          const velocity = 0.18 + Math.random() * 0.28
-          synthRef.current?.triggerAttackRelease(finalNote, "4n", time, velocity)
-        }
-      }, "4n").start(0)
-
-      // Loop B: 中音旋律游走 (周期 2n, 45% 触发概率)
-      const loopB = new Tone.Loop((time) => {
-        if (Math.random() < 0.45) {
-          const randomNote = scale[Math.floor(Math.random() * scale.length)]
-          const velocity = 0.24 + Math.random() * 0.24
-          synthRef.current?.triggerAttackRelease(randomNote, "2n", time, velocity)
-        }
-      }, "2n").start(0)
-
-      // Loop C: 真正的治愈七和弦 Pad 乐垫背景 (周期 1m，即一个小节，85% 触发概率)
-      const loopC = new Tone.Loop((time) => {
-        if (Math.random() < 0.85 && chords.length > 0) {
-          const chosenChord = chords[Math.floor(Math.random() * chords.length)]
-          // 弹奏柔和的背景和弦垫（Pad）
-          synthRef.current?.triggerAttackRelease(chosenChord, "1m", time, 0.28)
-          
-          // 低音 MonoSynth 负责弹奏和弦根音，稳固基调
-          bassRef.current?.triggerAttackRelease(chosenChord[0], "1m", time, 0.38)
-        }
-        if (noiseRef.current && Math.random() < 0.6) {
-          noiseRef.current.triggerAttackRelease("1n", time, 0.15)
-        }
-      }, "1m").start(0)
-
-      loopRef.current = {
-        dispose: () => {
-          loopA.dispose()
-          loopB.dispose()
-          loopC.dispose()
-        },
+      if (shouldReplaceSource) {
+        audio.pause()
+        audio.src = prepared.url
+        audio.crossOrigin = track.audio_mode === "external" ? "anonymous" : ""
+        audio.load()
+        await waitForMetadata(audio)
       }
 
-      Tone.Transport.start()
-      setIsPlaying(true)
-      setElapsedTime(0)
+      const nextPlaybackRate = getPlaybackRate(track, options?.bpmOverride ?? currentBpm)
+      audio.playbackRate = nextPlaybackRate
+      setMediaDuration(Number.isFinite(audio.duration) && audio.duration > 0 ? Math.round(audio.duration) : prepared.duration)
+
+      if (options?.restart) {
+        audio.currentTime = 0
+      } else if (options?.preserveCurrentTime && !shouldReplaceSource && previousTime > 0) {
+        audio.currentTime = previousTime
+      }
+
+      if (options?.autoplay) {
+        await ensureAudioGraph()
+        await audio.play()
+      }
+    } catch (error) {
+      setAudioError(error instanceof Error ? error.message : "音轨准备失败，请稍后重试。")
+      showToast("音轨还没有顺利生成，先稍等一下下。")
     } finally {
       setIsLoading(false)
     }
-  }, [currentBpm, intensity, mood, profile, stopMusic])
+  }, [currentBpm, ensureAudioGraph, getPlaybackRate, prepareTrack, showToast, waitForMetadata])
+
+  const loadSelectedTrack = useCallback(async (options?: { autoplay?: boolean; restart?: boolean }) => {
+    await loadTrack(selectedRecommendation, options)
+  }, [loadTrack, selectedRecommendation])
 
   useEffect(() => {
-    setCurrentBpm(baseBpm)
-  }, [baseBpm])
-
-  useEffect(() => {
-    setRecommendations([])
+    setRecommendations(fallbackRecommendations[mood])
     setSelectedTrack(0)
     setLiked(false)
     setElapsedTime(0)
+    setMediaDuration(0)
+    setCurrentBpm(profile.bpm)
 
     let active = true
     Promise.allSettled([musicAPI.recommend(mood), musicAPI.favorites()]).then((results) => {
@@ -517,7 +460,7 @@ function MusicPageContent() {
       if (recommendResult.status === "fulfilled") {
         setRecommendations(normalizeRecommendations(recommendResult.value.data, mood))
       } else {
-        setRecommendations([])
+        setRecommendations(fallbackRecommendations[mood])
       }
 
       if (favoritesResult.status === "fulfilled") {
@@ -530,7 +473,7 @@ function MusicPageContent() {
     return () => {
       active = false
     }
-  }, [mood])
+  }, [mood, profile.bpm])
 
   useEffect(() => {
     let active = true
@@ -551,31 +494,69 @@ function MusicPageContent() {
 
   useEffect(() => {
     setLiked(favoriteIds.has(selectedRecommendation.id))
-  }, [favoriteIds, selectedRecommendation.id])
+    setMediaDuration(selectedRecommendation.duration)
+    setElapsedTime(0)
+    setCurrentBpm(selectedRecommendation.bpm || moodProfiles[selectedRecommendation.mood_type].bpm)
+  }, [favoriteIds, selectedRecommendation])
 
   useEffect(() => {
-    if (!isPlaying) return
-    const timer = window.setInterval(() => {
-      setElapsedTime((current) => {
-        if (current + 1 >= selectedRecommendation.duration) {
-          setSelectedTrack((trackIndex) => (trackIndex + 1) % recommendations.length)
-          return 0
-        }
-        return current + 1
-      })
-    }, 1000)
-
-    return () => window.clearInterval(timer)
-  }, [isPlaying, recommendations.length, selectedRecommendation.duration])
+    const audio = audioRef.current
+    if (!audio) return
+    audio.playbackRate = playbackRate
+  }, [playbackRate])
 
   useEffect(() => {
     const controller = new AbortController()
     void loadAIInsight(controller.signal)
+    return () => controller.abort()
+  }, [loadAIInsight])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const handleLoaded = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        setMediaDuration(Math.round(audio.duration))
+      }
+    }
+
+    const handleTimeUpdate = () => {
+      if (!isSeeking) {
+        setElapsedTime(audio.currentTime)
+      }
+    }
+
+    const handlePlay = () => setIsPlaying(true)
+    const handlePause = () => setIsPlaying(false)
+    const handleEnded = () => {
+      setIsPlaying(false)
+      setElapsedTime(0)
+      advanceTrackRef.current?.()
+    }
+    const handleError = () => {
+      setAudioError("当前音轨播放失败，可能是素材还没准备好。")
+      setIsPlaying(false)
+    }
+
+    audio.addEventListener("loadedmetadata", handleLoaded)
+    audio.addEventListener("durationchange", handleLoaded)
+    audio.addEventListener("timeupdate", handleTimeUpdate)
+    audio.addEventListener("play", handlePlay)
+    audio.addEventListener("pause", handlePause)
+    audio.addEventListener("ended", handleEnded)
+    audio.addEventListener("error", handleError)
 
     return () => {
-      controller.abort()
+      audio.removeEventListener("loadedmetadata", handleLoaded)
+      audio.removeEventListener("durationchange", handleLoaded)
+      audio.removeEventListener("timeupdate", handleTimeUpdate)
+      audio.removeEventListener("play", handlePlay)
+      audio.removeEventListener("pause", handlePause)
+      audio.removeEventListener("ended", handleEnded)
+      audio.removeEventListener("error", handleError)
     }
-  }, [loadAIInsight])
+  }, [isSeeking, recommendations.length])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -590,158 +571,206 @@ function MusicPageContent() {
       canvas.width = rect.width * ratio
       canvas.height = rect.height * ratio
       context.setTransform(ratio, 0, 0, ratio, 0, 0)
-      
-      const centerX = rect.width * 0.5
-      const centerY = rect.height * 0.4
 
-      particlesRef.current = Array.from({ length: 50 }, () => {
-        const angle = Math.random() * Math.PI * 2
-        const speed = 0.35 + Math.random() * 1.65
-        const life = 60 + Math.random() * 120
-        return {
-          x: centerX,
-          y: centerY,
-          originX: centerX,
-          originY: centerY,
-          angle,
-          speed,
-          radius: 1.2 + Math.random() * 4.2,
-          life,
-          maxLife: life,
-          opacity: 0.35 + Math.random() * 0.55,
-          isGlowing: Math.random() < 0.22
-        }
-      })
+      const particleCount = Math.min(120, Math.max(72, Math.round(rect.width / 10)))
+      particlesRef.current = Array.from({ length: particleCount }, (_, index) => ({
+        orbit: 55 + (index % 18) * 11 + Math.random() * 36,
+        angle: Math.random() * Math.PI * 2,
+        speed: 0.0012 + Math.random() * 0.0038,
+        size: 1.1 + Math.random() * 3.4,
+        alpha: 0.16 + Math.random() * 0.44,
+        drift: 0.4 + Math.random() * 1.6,
+        wobble: 10 + Math.random() * 36,
+        hueMix: Math.random(),
+      }))
     }
 
-    const draw = (time: number) => {
+    const draw = (timestamp: number) => {
       const rect = canvas.getBoundingClientRect()
       const width = rect.width
       const height = rect.height
-      const t = time / 1000
+      const centerX = width * 0.5
+      const centerY = height * 0.48
+      const t = timestamp * 0.001
 
-      // 1. 获取音频分析器的实时分贝值，转换为归一化的跳动能量
-      let audioVol = 0.12
-      if (analyserRef.current && isPlaying) {
-        try {
-          const rawValues = analyserRef.current.getValue() as Float32Array
+      let bass = 0.12
+      let mids = 0.12
+      let treble = 0.1
+      let overall = 0.14
+
+      const analyser = analyserNodeRef.current
+      const freqData = freqDataRef.current
+      const timeData = timeDataRef.current
+
+      if (analyser && freqData && timeData) {
+        analyser.getByteFrequencyData(freqData)
+        analyser.getByteTimeDomainData(timeData)
+
+        const bassEnd = Math.max(8, Math.floor(freqData.length * 0.12))
+        const midEnd = Math.max(bassEnd + 1, Math.floor(freqData.length * 0.45))
+        const highEnd = Math.max(midEnd + 1, Math.floor(freqData.length * 0.86))
+
+        const averageRange = (start: number, end: number) => {
           let sum = 0
           let count = 0
-          for (let i = 0; i < rawValues.length; i++) {
-            const val = rawValues[i]
-            if (val > -120) {
-              const norm = Math.max(0, (val + 90) / 90) // 将 -90dB 至 0dB 归一化
-              sum += norm
-              count++
-            }
+          for (let index = start; index < end; index += 1) {
+            sum += freqData[index]
+            count += 1
           }
-          if (count > 0) {
-            audioVol = sum / count
-          }
-        } catch (e) {
-          // 降级使用静态脉冲
+          return count > 0 ? sum / count / 255 : 0
         }
-      }
-      
-      // energy 作为整体更新速率与收缩幅度，随音乐能量实时起伏
-      const energy = isPlaying ? 0.35 + audioVol * 2.2 : 0.18
 
-      // 2. 清理并填充高颜值的浅色渐变极光背景（不再是死板的纯黑）
+        bass = averageRange(0, bassEnd)
+        mids = averageRange(bassEnd, midEnd)
+        treble = averageRange(midEnd, highEnd)
+        overall = averageRange(0, freqData.length)
+      } else {
+        bass = 0.16 + Math.sin(t * 1.4) * 0.05
+        mids = 0.14 + Math.sin(t * 1.8 + 0.8) * 0.04
+        treble = 0.11 + Math.sin(t * 2.2 + 1.4) * 0.03
+        overall = 0.15 + Math.sin(t * 1.6) * 0.03
+      }
+
       context.clearRect(0, 0, width, height)
+
       const background = context.createLinearGradient(0, 0, width, height)
-      background.addColorStop(0, "rgba(255, 255, 255, 0.94)")
-      background.addColorStop(0.5, `${profile.color}24`) // 浅马卡龙色过渡
-      background.addColorStop(1, `${profile.colorTo}34`)
+      background.addColorStop(0, "rgba(255,250,252,0.98)")
+      background.addColorStop(0.46, `rgba(${hexToRgb(currentGradient[0])}, 0.22)`)
+      background.addColorStop(1, `rgba(${hexToRgb(currentGradient[Math.min(1, currentGradient.length - 1)])}, 0.14)`)
       context.fillStyle = background
       context.fillRect(0, 0, width, height)
 
-      const centerX = width * 0.5
-      const centerY = height * 0.4
-
-      // 3. 绘制星空深处微弱漫反射的极光层
-      const bgGrad = context.createRadialGradient(
-        centerX + Math.cos(t * 0.4) * 40,
-        centerY + Math.sin(t * 0.4) * 40,
-        10,
-        centerX,
-        centerY,
-        width * 0.8
-      )
-      bgGrad.addColorStop(0, `rgba(${hexToRgb(profile.color)}, 0.18)`)
-      bgGrad.addColorStop(0.5, `rgba(${hexToRgb(profile.colorTo)}, 0.08)`)
-      bgGrad.addColorStop(1, "rgba(0, 0, 0, 0)")
-      context.fillStyle = bgGrad
-      context.fillRect(0, 0, width, height)
-
-      // 4. 启用 lighter 混合模式进行发光星沙粒子渲染
-      context.globalCompositeOperation = "lighter"
-
-      particlesRef.current.forEach((p) => {
-        p.x += Math.cos(p.angle) * p.speed * (energy * 1.4)
-        p.y += Math.sin(p.angle) * p.speed * (energy * 1.4)
-        p.life -= 1
-
-        const alpha = Math.max(0, p.life / p.maxLife)
-        const curRadius = p.radius * (0.45 + alpha * 0.55) * (0.8 + audioVol * 0.8)
-
+      const drawAuroraBlob = (x: number, y: number, radiusX: number, radiusY: number, color: string, alpha: number, rotation: number) => {
+        context.save()
+        context.translate(x, y)
+        context.rotate(rotation)
+        context.scale(radiusX, radiusY)
+        const gradient = context.createRadialGradient(0, 0, 0.05, 0, 0, 1)
+        gradient.addColorStop(0, `rgba(${hexToRgb(color)}, ${alpha})`)
+        gradient.addColorStop(1, "rgba(255,255,255,0)")
+        context.fillStyle = gradient
         context.beginPath()
-        context.arc(p.x, p.y, curRadius, 0, Math.PI * 2)
-
-        if (p.isGlowing) {
-          context.shadowBlur = 10 * alpha
-          context.shadowColor = profile.color
-        } else {
-          context.shadowBlur = 0
-        }
-        context.fillStyle = `rgba(${hexToRgb(profile.color)}, ${alpha * p.opacity * 0.72})`
+        context.arc(0, 0, 1, 0, Math.PI * 2)
         context.fill()
+        context.restore()
+      }
 
-        // 粒子生命耗尽在中心重组复活
-        if (p.life <= 0) {
-          p.x = centerX
-          p.y = centerY
-          p.angle = Math.random() * Math.PI * 2
-          p.speed = 0.3 + Math.random() * 1.5
-          p.radius = 1.0 + Math.random() * 4.0
-          p.life = 70 + Math.random() * 110
-          p.maxLife = p.life
-          p.opacity = 0.35 + Math.random() * 0.55
-          p.isGlowing = Math.random() < 0.22
+      drawAuroraBlob(centerX - width * 0.18 + Math.sin(t * 0.42) * 30, centerY - 80, 220 + bass * 110, 140 + mids * 80, currentGradient[0], 0.2, Math.sin(t * 0.24) * 0.8)
+      drawAuroraBlob(centerX + width * 0.2 + Math.cos(t * 0.38) * 36, centerY + 40, 200 + treble * 90, 130 + overall * 95, currentGradient[currentGradient.length - 1], 0.18, Math.cos(t * 0.19) * -0.7)
+      drawAuroraBlob(centerX, centerY + 120, 260 + overall * 100, 100 + bass * 70, profile.colorTo, 0.1, Math.sin(t * 0.16) * 0.4)
+
+      context.save()
+      context.globalCompositeOperation = "screen"
+      context.lineCap = "round"
+
+      if (freqData) {
+        const ribbonBins = Math.min(48, freqData.length)
+        const drawRibbon = (baseY: number, amplitude: number, color: string, direction: 1 | -1) => {
+          context.beginPath()
+          for (let index = 0; index < ribbonBins; index += 1) {
+            const sample = freqData[index] / 255
+            const x = (index / (ribbonBins - 1)) * width
+            const wave = Math.sin(index * 0.42 + t * (1.2 + direction * 0.15)) * 12 * overall
+            const y = baseY + direction * (sample * amplitude + wave)
+            if (index === 0) {
+              context.moveTo(x, y)
+            } else {
+              const prevX = ((index - 1) / (ribbonBins - 1)) * width
+              const controlX = (prevX + x) / 2
+              context.quadraticCurveTo(controlX, y, x, y)
+            }
+          }
+          context.strokeStyle = `rgba(${hexToRgb(color)}, ${0.22 + overall * 0.35})`
+          context.lineWidth = 2.2 + amplitude * 0.012
+          context.stroke()
         }
+
+        drawRibbon(height * 0.32, 96 + bass * 95, currentGradient[0], -1)
+        drawRibbon(height * 0.66, 84 + treble * 90, currentGradient[currentGradient.length - 1], 1)
+
+        const spokeCount = Math.min(56, freqData.length)
+        for (let index = 0; index < spokeCount; index += 1) {
+          const sample = freqData[index] / 255
+          const angle = (index / spokeCount) * Math.PI * 2 + t * 0.08
+          const inner = 74 + Math.sin(t * 1.8 + index * 0.12) * 6
+          const outer = inner + 26 + sample * (mood === "angry" ? 90 : 72)
+          context.beginPath()
+          context.moveTo(centerX + Math.cos(angle) * inner, centerY + Math.sin(angle) * inner)
+          context.lineTo(centerX + Math.cos(angle) * outer, centerY + Math.sin(angle) * outer)
+          const blend = index % 2 === 0 ? currentGradient[0] : currentGradient[currentGradient.length - 1]
+          context.strokeStyle = `rgba(${hexToRgb(blend)}, ${0.08 + sample * 0.34})`
+          context.lineWidth = 1 + sample * 2.2
+          context.stroke()
+        }
+      }
+
+      particlesRef.current.forEach((particle, index) => {
+        particle.angle += particle.speed * (0.8 + overall * 1.6)
+        const pulse = 1 + Math.sin(t * particle.drift + index * 0.12) * 0.12
+        const radius = particle.orbit * pulse
+        const x = centerX + Math.cos(particle.angle) * radius + Math.sin(t * particle.speed * 16 + index) * particle.wobble * 0.12
+        const y = centerY + Math.sin(particle.angle) * radius * 0.58 + Math.cos(t * particle.speed * 14 + index) * particle.wobble * 0.1
+        const glowColor = particle.hueMix > 0.5 ? currentGradient[0] : currentGradient[currentGradient.length - 1]
+        const size = particle.size * (0.8 + treble * 1.2)
+        context.beginPath()
+        context.arc(x, y, size, 0, Math.PI * 2)
+        context.fillStyle = `rgba(${hexToRgb(glowColor)}, ${particle.alpha * (0.45 + overall * 0.9)})`
+        context.fill()
       })
 
-      // 5. 恢复 normal 模式绘制共振涟漪和 Orb 呼吸球，重置发光阴影以保护外部 UI
-      context.globalCompositeOperation = "source-over"
-      context.shadowBlur = 0
+      context.restore()
 
-      // 绘制共振波纹涟漪，其半径和震动受实时音量 audioVol 和能量 energy 联合驱动
-      for (let i = 0; i < 3; i++) {
-        const ringRadius = (55 + i * 32) + Math.sin(t * 1.8 + i) * 6 * energy + (audioVol * 45)
-        const ringAlpha = (0.22 - i * 0.06) * (isPlaying ? 1.0 : 0.4)
+      if (timeData) {
+        context.save()
         context.beginPath()
-        context.arc(centerX, centerY, Math.max(10, ringRadius), 0, Math.PI * 2)
-        context.strokeStyle = `rgba(${hexToRgb(profile.color)}, ${ringAlpha})`
-        context.lineWidth = 1.5
+        const loopRadius = 104 + bass * 36
+        for (let index = 0; index < timeData.length; index += 1) {
+          const normalized = (timeData[index] - 128) / 128
+          const angle = (index / timeData.length) * Math.PI * 2
+          const radius = loopRadius + normalized * (12 + mids * 30)
+          const x = centerX + Math.cos(angle) * radius
+          const y = centerY + Math.sin(angle) * radius * 0.82
+          if (index === 0) {
+            context.moveTo(x, y)
+          } else {
+            context.lineTo(x, y)
+          }
+        }
+        context.closePath()
+        context.strokeStyle = `rgba(${hexToRgb(profile.color)}, ${0.18 + overall * 0.42})`
+        context.lineWidth = 2.4
+        context.stroke()
+        context.restore()
+      }
+
+      for (let index = 0; index < 4; index += 1) {
+        const radius = 62 + index * 26 + bass * 38 + Math.sin(t * (1.2 + index * 0.24)) * 6
+        context.beginPath()
+        context.arc(centerX, centerY, radius, 0, Math.PI * 2)
+        context.strokeStyle = `rgba(${hexToRgb(index % 2 === 0 ? profile.color : profile.colorTo)}, ${0.08 - index * 0.012 + overall * 0.12})`
+        context.lineWidth = 1.4
         context.stroke()
       }
 
-      // 绘制中心呼吸球 (Orb)
-      const orbRadius = (45 + Math.sin(t * 1.6) * 5 * energy) + (audioVol * 25)
-      const orbGradient = context.createRadialGradient(
-        centerX,
-        centerY,
-        4,
-        centerX,
-        centerY,
-        Math.max(10, orbRadius)
-      )
-      orbGradient.addColorStop(0, "rgba(255, 255, 255, 0.95)")
-      orbGradient.addColorStop(0.4, `rgba(${hexToRgb(profile.color)}, 0.8)`)
-      orbGradient.addColorStop(1, "rgba(0, 0, 0, 0)")
+      const orbRadius = 54 + bass * 28 + Math.sin(t * 1.6) * (4 + overall * 10)
+      const orbGradient = context.createRadialGradient(centerX, centerY, 6, centerX, centerY, orbRadius)
+      orbGradient.addColorStop(0, "rgba(255,255,255,0.98)")
+      orbGradient.addColorStop(0.35, `rgba(${hexToRgb(profile.color)}, ${0.78 + mids * 0.16})`)
+      orbGradient.addColorStop(0.72, `rgba(${hexToRgb(profile.colorTo)}, ${0.36 + treble * 0.24})`)
+      orbGradient.addColorStop(1, "rgba(255,255,255,0)")
 
       context.beginPath()
-      context.arc(centerX, centerY, Math.max(10, orbRadius), 0, Math.PI * 2)
+      context.arc(centerX, centerY, orbRadius, 0, Math.PI * 2)
       context.fillStyle = orbGradient
+      context.fill()
+
+      const coreGradient = context.createRadialGradient(centerX, centerY, 2, centerX, centerY, orbRadius * 0.62)
+      coreGradient.addColorStop(0, "rgba(255,255,255,1)")
+      coreGradient.addColorStop(0.5, `rgba(${hexToRgb(profile.color)}, 0.52)`)
+      coreGradient.addColorStop(1, "rgba(255,255,255,0)")
+      context.beginPath()
+      context.arc(centerX, centerY, orbRadius * 0.64, 0, Math.PI * 2)
+      context.fillStyle = coreGradient
       context.fill()
 
       animationRef.current = window.requestAnimationFrame(draw)
@@ -757,84 +786,122 @@ function MusicPageContent() {
         window.cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [intensity, isPlaying, profile])
+  }, [currentGradient, isPlaying, mood, profile.color, profile.colorTo])
 
   useEffect(() => {
     return () => {
-      stopMusic()
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current)
+      }
+      if (animationRef.current) {
+        window.cancelAnimationFrame(animationRef.current)
+      }
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute("src")
+      }
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url))
+      if (audioContextRef.current) {
+        void audioContextRef.current.close()
+      }
     }
-  }, [stopMusic])
+  }, [])
 
-  function togglePlay() {
-    if (recommendations.length === 0) return
+  async function togglePlay() {
+    const audio = audioRef.current
+    if (!audio) return
+
     if (isPlaying) {
-      stopMusic()
+      audio.pause()
       return
     }
-    void startMusic()
+
+    await loadSelectedTrack({ autoplay: true })
   }
 
-  function nextTrack() {
-    setSelectedTrack((current) => (current + 1) % recommendations.length)
-    setElapsedTime(0)
+  const switchTrack = useCallback(async (nextIndex: number, options?: { autoplay?: boolean }) => {
+    const nextRecommendation = recommendations[nextIndex]
+    if (!nextRecommendation || isSwitchingTrackRef.current) return
+
+    isSwitchingTrackRef.current = true
+    try {
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.currentTime = 0
+      }
+      setIsPlaying(false)
+      setSelectedTrack(nextIndex)
+      setElapsedTime(0)
+      setMediaDuration(nextRecommendation.duration)
+      setCurrentBpm(nextRecommendation.bpm || moodProfiles[nextRecommendation.mood_type].bpm)
+
+      if (options?.autoplay || isPlaying) {
+        await loadTrack(nextRecommendation, {
+          autoplay: true,
+          restart: true,
+          interruptCurrent: true,
+          bpmOverride: nextRecommendation.bpm || moodProfiles[nextRecommendation.mood_type].bpm,
+        })
+      }
+    } finally {
+      isSwitchingTrackRef.current = false
+    }
+  }, [isPlaying, loadTrack, recommendations])
+
+  useEffect(() => {
+    advanceTrackRef.current = () => {
+      void switchTrack((selectedTrack + 1) % recommendations.length, { autoplay: true })
+    }
+  }, [recommendations.length, selectedTrack, switchTrack])
+
+  async function nextTrack() {
+    const nextIndex = (selectedTrack + 1) % recommendations.length
+    await switchTrack(nextIndex, { autoplay: isPlaying })
   }
 
-  function prevTrack() {
-    setSelectedTrack((current) => (current - 1 + recommendations.length) % recommendations.length)
-    setElapsedTime(0)
+  async function prevTrack() {
+    const prevIndex = (selectedTrack - 1 + recommendations.length) % recommendations.length
+    await switchTrack(prevIndex, { autoplay: isPlaying })
   }
 
   function shuffleTracks() {
-    setRecommendations((current) => {
-      const shuffled = [...current]
-      for (let index = shuffled.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(Math.random() * (index + 1))
-        ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
-      }
-      return shuffled
-    })
+    const shuffled = [...recommendations]
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1))
+      ;[shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]]
+    }
+    setRecommendations(shuffled)
     setSelectedTrack(0)
     setElapsedTime(0)
+    setMediaDuration(shuffled[0]?.duration ?? 0)
+    showToast("歌单已经轻轻洗牌，换一段新的陪伴吧。")
   }
 
-  function updateBpm(value: number) {
-    const nextBpm = Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(value)))
-    setCurrentBpm(nextBpm)
-
-    const Tone = toneRef.current
-    if (Tone?.Transport) {
-      const bpmSignal = Tone.Transport.bpm as unknown as {
-        rampTo?: (value: number, rampTime: number) => void
-        value: number
-      }
-      if (bpmSignal.rampTo) {
-        bpmSignal.rampTo(nextBpm, 0.1)
-      } else {
-        bpmSignal.value = nextBpm
-      }
-    }
+  function seekToSeconds(seconds: number) {
+    const audio = audioRef.current
+    if (!audio || !Number.isFinite(effectiveDuration) || effectiveDuration <= 0) return
+    const safeSeconds = Math.max(0, Math.min(seconds, effectiveDuration))
+    audio.currentTime = safeSeconds
+    setElapsedTime(safeSeconds)
   }
 
-  const seekTo = useCallback((percent: number) => {
-    const safePercent = Math.min(1, Math.max(0, percent))
-    const targetTime = Math.round(selectedRecommendation.duration * safePercent)
-    setElapsedTime(targetTime)
-    const Tone = toneRef.current
-    if (Tone?.Transport) {
-      ;(Tone.Transport as unknown as { seconds: number }).seconds = targetTime
-    }
-  }, [selectedRecommendation.duration])
+  function seekToPercent(percent: number) {
+    seekToSeconds(effectiveDuration * Math.min(1, Math.max(0, percent)))
+  }
 
-  const getSeekPercent = useCallback((clientX: number) => {
+  function getSeekPercent(clientX: number) {
     const rect = progressRef.current?.getBoundingClientRect()
     if (!rect || rect.width === 0) return progress / 100
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-  }, [progress])
+  }
 
   function updateSeekFromPointer(event: PointerEvent<HTMLDivElement>) {
     const percent = getSeekPercent(event.clientX)
-    setSeekPreview(Math.round(selectedRecommendation.duration * percent))
-    seekTo(percent)
+    const preview = Math.round(effectiveDuration * percent)
+    setSeekPreview(preview)
+    seekToSeconds(preview)
   }
 
   function beginSeek(event: PointerEvent<HTMLDivElement>) {
@@ -894,69 +961,7 @@ function MusicPageContent() {
   }
 
   function shareTrack() {
-    // TODO: 后期接入通讯录好友分享
-    setMusicToast("分享功能即将上线，先把这段旋律悄悄收藏起来吧。")
-    window.setTimeout(() => setMusicToast(""), 2500)
-  }
-
-  function BpmControl({ className = "" }: { className?: string }) {
-    return (
-      <div className={cn("relative", className)}>
-        <button
-          type="button"
-          onClick={() => setIsBpmPanelOpen((value) => !value)}
-          className="flex min-h-10 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-white/80 transition hover:-translate-y-0.5 hover:text-[#ff7894]"
-          aria-expanded={isBpmPanelOpen}
-          aria-label="调节 BPM"
-        >
-          <Volume2 className="h-4 w-4 text-[#8bded4]" />
-          <span>{currentBpm} BPM</span>
-        </button>
-        {isBpmPanelOpen ? (
-          <div className="absolute right-0 top-12 z-40 w-[min(280px,calc(100vw-2rem))] rounded-[26px] border border-white/80 bg-white/96 p-4 shadow-[0_18px_48px_rgba(255,181,194,0.24)] backdrop-blur-xl">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-800">节奏速度</p>
-              <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-[#ff7894]">{currentBpm}</span>
-            </div>
-            <input
-              type="range"
-              min={BPM_MIN}
-              max={BPM_MAX}
-              step={1}
-              value={currentBpm}
-              onChange={(event) => updateBpm(Number(event.target.value))}
-              className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5]"
-              style={{ accentColor: "#ff8fa3" }}
-              aria-label="BPM 滑块"
-            />
-            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-              <span>{BPM_MIN}</span>
-              <span>{BPM_MAX}</span>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => updateBpm(currentBpm - 1)}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#fff4f7] text-sm font-semibold text-slate-600 transition hover:text-[#ff7894]"
-                aria-label="降低 BPM"
-              >
-                <Minus className="h-4 w-4" />
-                1
-              </button>
-              <button
-                type="button"
-                onClick={() => updateBpm(currentBpm + 1)}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[#effdfa] text-sm font-semibold text-slate-600 transition hover:text-[#42b9aa]"
-                aria-label="提高 BPM"
-              >
-                <Plus className="h-4 w-4" />
-                1
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    )
+    showToast("分享功能即将上线，先把这段旋律悄悄收藏起来吧。")
   }
 
   return (
@@ -971,7 +976,10 @@ function MusicPageContent() {
     >
       <div className={cn("mx-auto", iosApp ? "max-w-[460px]" : "max-w-7xl")}>
         {!hasMoodRecord ? <EmptyStateGuide variant="music" className="mb-5" /> : null}
+
         <section className={cn("relative isolate flex min-h-[calc(100svh-9rem)] flex-col overflow-hidden rounded-[34px] bg-gradient-to-br from-[#fff0f5]/80 via-[#f7f5ff]/60 to-[#f0faf8]/70 p-4 sm:p-5 lg:min-h-[calc(100svh-12rem)] lg:p-6", iosApp && "ios-floating-card min-h-[calc(100svh-10rem)] rounded-[36px] p-4")}>
+          <audio ref={audioRef} preload="metadata" className="hidden" />
+
           <div className="relative z-20 mb-5 flex items-center justify-between gap-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/72 px-3 py-2 text-sm font-semibold text-[#ff738b] shadow-sm backdrop-blur-md lg:bg-[#fff3f6]">
               <span>{moodMeta.emoji}</span>
@@ -988,35 +996,53 @@ function MusicPageContent() {
             </button>
           </div>
 
-          <div className={cn("relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,0.88fr)_minmax(330px,0.42fr)] xl:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.42fr)]", iosApp && "grid-cols-1")}>
+          <div className={cn("relative grid min-w-0 flex-1 items-stretch gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(340px,0.44fr)] xl:grid-cols-[minmax(0,0.96fr)_minmax(370px,0.44fr)]", iosApp && "grid-cols-1")}>
             <div className="absolute inset-0 min-w-0 overflow-hidden lg:relative lg:inset-auto">
               <div className="mb-4 hidden items-center justify-between gap-3 md:flex">
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化</h2>
-                  <p className="mt-2 text-sm text-slate-500">{profile.texture}</p>
+                  <h2 className="text-2xl font-semibold text-slate-900 md:text-3xl">情绪可视化音乐房间</h2>
+                  <p className="mt-2 text-sm text-slate-500">{selectedRecommendation.texture || profile.texture}</p>
                 </div>
-                <BpmControl />
+                <BpmControl
+                  currentBpm={currentBpm}
+                  isOpen={isBpmPanelOpen}
+                  onToggle={() => setIsBpmPanelOpen((value) => !value)}
+                  onChange={(value) => setCurrentBpm(Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(value))))}
+                />
               </div>
 
               <div className="relative z-0 h-full min-h-full max-w-full overflow-hidden sm:aspect-[16/11] lg:h-full lg:min-h-[520px]">
                 <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full max-w-full" />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/10 lg:hidden" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/8 via-transparent to-[#201a25]/10 lg:hidden" />
+
                 <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-3 sm:inset-x-5 sm:top-5">
                   <div className="hidden rounded-[24px] bg-white/68 px-4 py-3 text-sm text-slate-600 backdrop-blur-md sm:block">
-                    <p className="font-semibold text-slate-800">{profile.texture}</p>
-                    <p className="mt-1 text-xs">跟随此刻心情缓慢流动</p>
+                    <p className="font-semibold text-slate-800">{selectedRecommendation.scene || "情绪房间"}</p>
+                    <p className="mt-1 text-xs">{selectedRecommendation.description || "让音乐和颜色一起照顾此刻的自己。"}</p>
                   </div>
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={isPlaying ? "playing" : "paused"}
+                      key={isTrackPreparing ? "preparing" : isPlaying ? "playing" : "paused"}
                       initial={{ opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 8 }}
                       className="ml-auto rounded-full bg-white/72 px-3 py-2 text-xs font-semibold text-slate-600 backdrop-blur-md"
                     >
-                      {isPlaying ? "正在播放" : "等待播放"}
+                      {isTrackPreparing ? "正在编织音轨" : isPlaying ? "正在播放" : "等待播放"}
                     </motion.div>
                   </AnimatePresence>
+                </div>
+
+                <div className="pointer-events-none absolute inset-x-4 bottom-4 flex flex-wrap gap-2 sm:inset-x-5 sm:bottom-5">
+                  {[
+                    `${Math.round(playbackRate * 100)}% 速度`,
+                    `${effectiveDuration ? formatDuration(effectiveDuration) : "--:--"} 实时时长`,
+                    selectedRecommendation.visual_preset || profile.visualPreset,
+                  ].map((item) => (
+                    <span key={item} className="rounded-full bg-white/65 px-3 py-1 text-[11px] font-medium text-slate-600 backdrop-blur-md">
+                      {item}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1024,15 +1050,37 @@ function MusicPageContent() {
             <aside className={cn("relative z-10 flex min-h-[calc(100svh-15rem)] min-w-0 items-end pt-[32vh] lg:block lg:min-h-0 lg:pt-[74px]", iosApp && "min-h-0 items-stretch pt-0")}>
               <div className={cn("mx-auto w-full max-w-sm rounded-[30px] bg-white/50 p-4 shadow-[0_18px_48px_rgba(255,208,219,0.24)] backdrop-blur-2xl ring-1 ring-white/30 lg:max-w-none lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0 lg:ring-0", iosApp && "ios-sticky-action")}>
                 <div className="flex items-center gap-4">
-                  <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-gradient-to-br text-3xl text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]", profile.album)}>
+                  <div
+                    className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] text-white shadow-[0_14px_30px_rgba(255,181,194,0.22)] sm:h-20 sm:w-20 sm:rounded-[24px]"
+                    style={{
+                      background: `linear-gradient(145deg, ${currentGradient.join(", ")})`,
+                    }}
+                  >
                     ♪
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-xl font-semibold text-slate-900">{selectedRecommendation.title || profile.title}</p>
                     <p className="mt-1 truncate text-sm text-slate-500">{selectedRecommendation.artist}</p>
+                    <p className="mt-2 truncate text-xs text-slate-400">{selectedRecommendation.scene || "情绪房间"}</p>
                   </div>
                 </div>
-                <BpmControl className="mt-4 md:hidden" />
+
+                <BpmControl
+                  className="mt-4 md:hidden"
+                  currentBpm={currentBpm}
+                  isOpen={isBpmPanelOpen}
+                  onToggle={() => setIsBpmPanelOpen((value) => !value)}
+                  onChange={(value) => setCurrentBpm(Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(value))))}
+                />
+
+                <div className="mt-5 rounded-[24px] bg-white/72 px-4 py-3 text-sm text-slate-600">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-slate-800">真实播放进度</span>
+                    <span className="rounded-full bg-[#fff3f6] px-2.5 py-1 text-[11px] font-semibold text-[#ff7692]">
+                      {isTrackPreparing ? "准备中" : audioError ? "播放异常" : "实时同步"}
+                    </span>
+                  </div>
+                </div>
 
                 <div className="mt-7">
                   <div
@@ -1041,15 +1089,15 @@ function MusicPageContent() {
                     tabIndex={0}
                     aria-label="播放进度"
                     aria-valuemin={0}
-                    aria-valuemax={selectedRecommendation.duration}
-                    aria-valuenow={elapsedTime}
+                    aria-valuemax={effectiveDuration}
+                    aria-valuenow={Math.round(elapsedTime)}
                     onPointerDown={beginSeek}
                     onPointerMove={moveSeek}
                     onPointerUp={endSeek}
                     onPointerCancel={endSeek}
                     onKeyDown={(event) => {
-                      if (event.key === "ArrowLeft") seekTo((elapsedTime - 5) / selectedRecommendation.duration)
-                      if (event.key === "ArrowRight") seekTo((elapsedTime + 5) / selectedRecommendation.duration)
+                      if (event.key === "ArrowLeft") seekToPercent((elapsedTime - 5) / Math.max(1, effectiveDuration))
+                      if (event.key === "ArrowRight") seekToPercent((elapsedTime + 5) / Math.max(1, effectiveDuration))
                     }}
                     className="group relative -my-3 cursor-pointer touch-none py-3 outline-none"
                   >
@@ -1058,19 +1106,22 @@ function MusicPageContent() {
                         className="pointer-events-none absolute -top-8 rounded-full bg-slate-900/78 px-3 py-1 text-xs font-semibold text-white shadow-lg"
                         style={{ left: `${progress}%`, transform: "translateX(-50%)" }}
                       >
-                        {formatDuration(seekPreview ?? elapsedTime)} / {formatDuration(selectedRecommendation.duration)}
+                        {formatDuration(seekPreview ?? elapsedTime)} / {formatDuration(effectiveDuration)}
                       </div>
                     ) : null}
                     <div className={cn("rounded-full bg-[#f0edf0] transition-all", isSeeking ? "h-3" : "h-2")}>
                       <motion.div
                         animate={{ width: `${progress}%` }}
-                        transition={{ duration: isSeeking ? 0 : 0.24 }}
-                        className="h-full rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5]"
+                        transition={{ duration: isSeeking ? 0 : 0.18 }}
+                        className="h-full rounded-full"
+                        style={{
+                          background: `linear-gradient(90deg, ${currentGradient.join(", ")})`,
+                        }}
                       />
                     </div>
                     <motion.span
                       animate={{ left: `${progress}%`, scale: isSeeking ? 1.25 : 1 }}
-                      transition={{ duration: isSeeking ? 0 : 0.24 }}
+                      transition={{ duration: isSeeking ? 0 : 0.18 }}
                       className="absolute top-1/2 grid h-5 w-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-[0_8px_20px_rgba(255,143,163,0.34)] ring-2 ring-[#ff9fb4]"
                     >
                       <span className="h-2 w-2 rounded-full bg-[#8de1d5]" />
@@ -1078,55 +1129,53 @@ function MusicPageContent() {
                   </div>
                   <div className="mt-2 flex justify-between text-xs text-slate-500">
                     <span>{formatDuration(elapsedTime)}</span>
-                    <span>{formatDuration(selectedRecommendation.duration)}</span>
+                    <span>{formatDuration(effectiveDuration)}</span>
                   </div>
+                  {audioError ? <p className="mt-2 text-xs text-[#ef7b73]">{audioError}</p> : null}
                 </div>
 
                 <div className="mt-7 flex items-center justify-center gap-6">
                   <button
                     type="button"
-                    onClick={prevTrack}
+                    onClick={() => void prevTrack()}
                     className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-[0_10px_24px_rgba(255,181,194,0.18)] transition hover:-translate-y-0.5"
                     aria-label="上一首"
-                    title="上一首"
                   >
                     <SkipBack className="h-5 w-5 fill-current" />
                   </button>
                   <button
                     type="button"
-                    onClick={togglePlay}
+                    onClick={() => void togglePlay()}
                     disabled={isLoading}
                     className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-[#ff8fa3] to-[#8de1d5] text-white shadow-[0_16px_34px_rgba(255,143,163,0.3)] transition hover:-translate-y-0.5 disabled:cursor-wait"
                     aria-label={isPlaying ? "暂停" : "播放"}
-                    title={isPlaying ? "暂停" : "播放"}
                   >
                     {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : isPlaying ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}
                   </button>
                   <button
                     type="button"
-                    onClick={nextTrack}
+                    onClick={() => void nextTrack()}
                     className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-700 shadow-[0_10px_24px_rgba(255,181,194,0.18)] transition hover:-translate-y-0.5"
                     aria-label="下一首"
-                    title="下一首"
                   >
                     <SkipForward className="h-5 w-5 fill-current" />
                   </button>
                 </div>
 
                 <div className="mt-7 grid grid-cols-4 gap-3 text-center">
-                  <button type="button" onClick={shuffleTracks} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]" aria-label="随机播放" title="随机播放">
+                  <button type="button" onClick={shuffleTracks} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]">
                     <Shuffle className="mx-auto h-5 w-5" />
                     <span className="mt-1 block">随机</span>
                   </button>
-                  <button type="button" onClick={() => { stopMusic(); void startMusic() }} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#5fcfc2]" aria-label="重新生成" title="重新生成音乐">
+                  <button type="button" onClick={() => void loadSelectedTrack({ autoplay: isPlaying, restart: true })} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#5fcfc2]">
                     <RefreshCw className="mx-auto h-5 w-5" />
-                    <span className="mt-1 block">循环</span>
+                    <span className="mt-1 block">重置</span>
                   </button>
-                  <button type="button" onClick={shareTrack} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]" aria-label="分享" title="分享音乐">
+                  <button type="button" onClick={shareTrack} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#ff8fa3]">
                     <Share2 className="mx-auto h-5 w-5" />
                     <span className="mt-1 block">分享</span>
                   </button>
-                  <button type="button" onClick={() => setShowDetails((value) => !value)} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#62bda9]" aria-label="更多" title="听后感与歌单">
+                  <button type="button" onClick={() => setShowDetails((value) => !value)} className="rounded-[22px] bg-white/86 px-3 py-3 text-xs text-slate-500 shadow-sm transition hover:text-[#62bda9]">
                     <MessageCircleHeart className="mx-auto h-5 w-5" />
                     <span className="mt-1 block">更多</span>
                   </button>
@@ -1138,78 +1187,90 @@ function MusicPageContent() {
 
         <div className={cn("mt-5 grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]", !showDetails && !iosApp && "hidden lg:grid")}>
           <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <CompanionAvatar
-                    character={user?.avatar_character}
-                    color={user?.character_color}
-                    mood={mood}
-                    size="sm"
-                  />
-                  <div className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white text-[#ff7f96] shadow-sm">
-                    {isInsightLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircleHeart className="h-3.5 w-3.5" />}
-                  </div>
-                </div>
-                <div className="hidden h-12 w-12 items-center justify-center rounded-[20px] bg-[#fff1f5] text-[#ff7f96]">
-                  {isInsightLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircleHeart className="h-5 w-5" />}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-900">灵音伙伴的听后感</h3>
-                  <p className="text-xs text-slate-500">
-                    {insightStatus === "generating"
-                      ? "伙伴正在听这段旋律..."
-                      : insightStatus === "retrying"
-                        ? "正在重新生成更贴近的回应..."
-                        : insightStatus === "error"
-                          ? "当前展示备用陪伴语"
-                          : "角色会结合情绪与音乐给你回应"}
-                  </p>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <CompanionAvatar
+                  character={user?.avatar_character}
+                  color={user?.character_color}
+                  mood={mood}
+                  size="sm"
+                />
+                <div className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white text-[#ff7f96] shadow-sm">
+                  {isInsightLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircleHeart className="h-3.5 w-3.5" />}
                 </div>
               </div>
-              <p className="mt-4 min-h-[84px] whitespace-pre-wrap text-sm leading-7 text-slate-600">
-                {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把你的情绪调成一段温柔的文字...")}
-              </p>
-              {insightError ? <p className="mt-3 text-xs text-[#ef7b73]">{insightError}</p> : null}
-              <div className="mt-4 rounded-[24px] bg-gradient-to-br from-[#fff6f8] to-[#effdfa] p-4 text-sm text-slate-600">
-                <Sparkles className="mb-2 h-4 w-4 text-[#ff8fa3]" />
-                <button
-                  type="button"
-                  onClick={() => void loadAIInsight()}
-                  disabled={isInsightLoading}
-                  className="font-semibold text-[#ff718b] transition hover:text-[#e95d78] disabled:cursor-wait disabled:text-slate-400"
-                >
-                  重新生成陪伴语
-                </button>
+              <div>
+                <h3 className="font-semibold text-slate-900">灵音伙伴的听后感</h3>
+                <p className="text-xs text-slate-500">
+                  {insightStatus === "generating"
+                    ? "伙伴正在听这段旋律..."
+                    : insightStatus === "retrying"
+                      ? "正在重新生成更贴近的回应..."
+                      : insightStatus === "error"
+                        ? "当前展示备用陪伴语"
+                        : "角色会结合情绪与音乐给你回应"}
+                </p>
               </div>
+            </div>
+            <p className="mt-4 min-h-[84px] whitespace-pre-wrap text-sm leading-7 text-slate-600">
+              {aiInsight || (insightStatus === "retrying" ? "正在重新整理这段旋律里的情绪线索..." : "正在把你的情绪调成一段温柔的文字...")}
+            </p>
+            {insightError ? <p className="mt-3 text-xs text-[#ef7b73]">{insightError}</p> : null}
+            <div className="mt-4 rounded-[24px] bg-gradient-to-br from-[#fff6f8] to-[#effdfa] p-4 text-sm text-slate-600">
+              <Sparkles className="mb-2 h-4 w-4 text-[#ff8fa3]" />
+              <button
+                type="button"
+                onClick={() => void loadAIInsight()}
+                disabled={isInsightLoading}
+                className="font-semibold text-[#ff718b] transition hover:text-[#e95d78] disabled:cursor-wait disabled:text-slate-400"
+              >
+                重新生成陪伴语
+              </button>
+            </div>
           </IOSGlassCard>
 
           <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
-              <h3 className="font-semibold text-slate-900">推荐歌曲</h3>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {recommendations.map((track, index) => (
-                  <button
-                    key={track.id}
-                    type="button"
-                    onClick={() => setSelectedTrack(index)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-[24px] p-3 text-left transition",
-                      selectedTrack === index ? "bg-[#fff3f6] shadow-sm" : "bg-white/60 hover:bg-white",
-                    )}
-                  >
-                    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br text-lg shadow-sm", profile.album)}>
-                      ♪
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-800">{track.title}</p>
-                      <p className="truncate text-xs text-slate-500">{track.artist}</p>
-                    </div>
-                    <span className="text-xs text-slate-400">{formatDuration(track.duration)}</span>
-                  </button>
-                ))}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-900">推荐歌曲</h3>
+                <p className="mt-1 text-xs text-slate-500">为你准备了几段不同气质的陪伴旋律，换一首也会有新的房间氛围。</p>
               </div>
+              <span className="rounded-full bg-[#fff5f7] px-3 py-1 text-[11px] font-semibold text-[#ff7a95]">
+                {recommendations.length} 首
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {recommendations.map((track, index) => (
+                <button
+                  key={track.id}
+                  type="button"
+                  onClick={() => void switchTrack(index, { autoplay: isPlaying })}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-[24px] p-3 text-left transition",
+                    selectedTrack === index ? "bg-[#fff3f6] shadow-sm" : "bg-white/60 hover:bg-white",
+                  )}
+                >
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] text-lg text-white shadow-sm"
+                    style={{
+                      background: `linear-gradient(145deg, ${(track.cover_gradient?.length ? track.cover_gradient : currentGradient).join(", ")})`,
+                    }}
+                  >
+                    ♪
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-800">{track.title}</p>
+                    <p className="truncate text-xs text-slate-500">{track.artist}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-400">{track.scene || "MoodWave 情绪房间"} · {track.texture || "治愈生成音轨"}</p>
+                  </div>
+                  <span className="text-xs text-slate-400">{formatDuration(track.duration)}</span>
+                </button>
+              ))}
+            </div>
           </IOSGlassCard>
         </div>
       </div>
+
       <AnimatePresence>
         {musicToast ? (
           <motion.div

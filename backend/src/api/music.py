@@ -11,169 +11,9 @@ from typing import Optional, List
 from src.core.models import FavoriteMusic, FavoriteMusicRequest, User
 from src.db.database import get_session
 from src.api.auth import get_current_user
+from src.services.music_catalog import get_music_recommendations
 
 router = APIRouter()
-
-# 音乐推荐映射表
-# 在实际应用中，这可以从数据库或外部 API 获取
-MUSIC_RECOMMENDATIONS = {
-    "happy": [
-        {
-            "id": "happy_1",
-            "title": "星空下的草莓",
-            "artist": "MoodWave AI",
-            "mood_type": "happy",
-            "url": "https://example.com/music/happy_1.mp3",
-            "duration": 214,
-        },
-        {
-            "id": "happy_2",
-            "title": "阳光小跳步",
-            "artist": "MoodWave AI",
-            "mood_type": "happy",
-            "url": "https://example.com/music/happy_2.mp3",
-            "duration": 188,
-        },
-        {
-            "id": "happy_3",
-            "title": "午后汽水",
-            "artist": "MoodWave AI",
-            "mood_type": "happy",
-            "url": "https://example.com/music/happy_3.mp3",
-            "duration": 205,
-        },
-    ],
-    "sad": [
-        {
-            "id": "sad_1",
-            "title": "给低落一条毯子",
-            "artist": "MoodWave AI",
-            "mood_type": "sad",
-            "url": "https://example.com/music/sad_1.mp3",
-            "duration": 236,
-        },
-        {
-            "id": "sad_2",
-            "title": "雨后的小灯",
-            "artist": "MoodWave AI",
-            "mood_type": "sad",
-            "url": "https://example.com/music/sad_2.mp3",
-            "duration": 221,
-        },
-        {
-            "id": "sad_3",
-            "title": "慢慢浮上来",
-            "artist": "MoodWave AI",
-            "mood_type": "sad",
-            "url": "https://example.com/music/sad_3.mp3",
-            "duration": 248,
-        },
-    ],
-    "calm": [
-        {
-            "id": "calm_1",
-            "title": "宁静的午后",
-            "artist": "MoodWave AI",
-            "mood_type": "calm",
-            "url": "https://example.com/music/calm_1.mp3",
-            "duration": 225,
-        },
-        {
-            "id": "calm_2",
-            "title": "云朵慢步",
-            "artist": "MoodWave AI",
-            "mood_type": "calm",
-            "url": "https://example.com/music/calm_2.mp3",
-            "duration": 196,
-        },
-        {
-            "id": "calm_3",
-            "title": "浅海呼吸",
-            "artist": "MoodWave AI",
-            "mood_type": "calm",
-            "url": "https://example.com/music/calm_3.mp3",
-            "duration": 242,
-        },
-    ],
-    "anxious": [
-        {
-            "id": "anxious_1",
-            "title": "轻轻降噪",
-            "artist": "MoodWave AI",
-            "mood_type": "anxious",
-            "url": "https://example.com/music/anxious_1.mp3",
-            "duration": 210,
-        },
-        {
-            "id": "anxious_2",
-            "title": "把线团松开",
-            "artist": "MoodWave AI",
-            "mood_type": "anxious",
-            "url": "https://example.com/music/anxious_2.mp3",
-            "duration": 230,
-        },
-        {
-            "id": "anxious_3",
-            "title": "慢慢数到十",
-            "artist": "MoodWave AI",
-            "mood_type": "anxious",
-            "url": "https://example.com/music/anxious_3.mp3",
-            "duration": 201,
-        },
-    ],
-    "angry": [
-        {
-            "id": "angry_1",
-            "title": "热量慢慢散开",
-            "artist": "MoodWave AI",
-            "mood_type": "angry",
-            "url": "https://example.com/music/angry_1.mp3",
-            "duration": 219,
-        },
-        {
-            "id": "angry_2",
-            "title": "柔软边界",
-            "artist": "MoodWave AI",
-            "mood_type": "angry",
-            "url": "https://example.com/music/angry_2.mp3",
-            "duration": 184,
-        },
-        {
-            "id": "angry_3",
-            "title": "暖风出口",
-            "artist": "MoodWave AI",
-            "mood_type": "angry",
-            "url": "https://example.com/music/angry_3.mp3",
-            "duration": 206,
-        },
-    ],
-    "neutral": [
-        {
-            "id": "neutral_1",
-            "title": "普通日子的微光",
-            "artist": "MoodWave AI",
-            "mood_type": "neutral",
-            "url": "https://example.com/music/neutral_1.mp3",
-            "duration": 198,
-        },
-        {
-            "id": "neutral_2",
-            "title": "白纸和清茶",
-            "artist": "MoodWave AI",
-            "mood_type": "neutral",
-            "url": "https://example.com/music/neutral_2.mp3",
-            "duration": 212,
-        },
-        {
-            "id": "neutral_3",
-            "title": "安静路过",
-            "artist": "MoodWave AI",
-            "mood_type": "neutral",
-            "url": "https://example.com/music/neutral_3.mp3",
-            "duration": 203,
-        },
-    ],
-}
 
 
 @router.get("/music/recommend")
@@ -195,18 +35,12 @@ async def recommend_music(
     # 兼容两个参数名
     query_mood = mood_type or mood
 
-    if query_mood and query_mood in MUSIC_RECOMMENDATIONS:
-        recommendations = MUSIC_RECOMMENDATIONS[query_mood]
-    else:
-        # 没有指定或不认识的情绪类型 → 返回全部
-        recommendations = []
-        for mood_list in MUSIC_RECOMMENDATIONS.values():
-            recommendations.extend(mood_list)
+    recommendations = get_music_recommendations(query_mood, limit)
 
     return {
         "code": 0,
         "msg": "ok",
-        "data": recommendations[:limit],
+        "data": recommendations,
     }
 
 
@@ -222,7 +56,7 @@ async def get_available_moods():
         "code": 0,
         "msg": "ok",
         "data": {
-            "moods": list(MUSIC_RECOMMENDATIONS.keys()),
+            "moods": ["happy", "sad", "calm", "anxious", "angry", "neutral"],
             "description": "系统支持的情绪类型",
         },
     }

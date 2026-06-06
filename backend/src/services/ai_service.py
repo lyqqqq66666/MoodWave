@@ -170,6 +170,36 @@ SYSTEM_PROMPT_ANALYZE = """你是一个情绪分析专家，负责分析用户�
 }"""
 
 
+def _fallback_stream_reply(
+    mood_type: str,
+    intensity: int,
+    user_message: str,
+    avatar_character: str = "cat",
+) -> str:
+    persona = CHARACTER_PERSONAS.get(avatar_character, CHARACTER_PERSONAS["cat"])
+    tone_map = {
+        "happy": "这份开心很珍贵，值得再多停留一会儿。",
+        "calm": "你现在的节奏其实已经很接近放松状态了。",
+        "anxious": "先别急着一下子把所有问题都解决，我们先把呼吸放慢一点。",
+        "angry": "情绪有力量没关系，先让身体从紧绷里退半步。",
+        "sad": "难过不用立刻变好，先允许自己被温柔接住。",
+        "neutral": "平静和普通也有自己的光，可以先从最小的一步开始。",
+    }
+    action_map = {
+        "happy": "可以记下一件今天最想留住的小事，等会儿再配一首轻快的歌。",
+        "calm": "试试继续保持现在的呼吸节奏，再听一段柔和的旋律把状态稳住。",
+        "anxious": "先做三次慢呼气，再把最担心的一件事单独写出来，它会更容易处理。",
+        "angry": "先活动一下肩颈，或者离开当前场景一分钟，再用节奏慢一点的音乐降温。",
+        "sad": "先喝几口水，或者把现在最想说的一句话写下来，再让音乐陪你一会儿。",
+        "neutral": "给自己一个两分钟的小目标，比如整理桌面或慢慢走一圈，再接上音乐。",
+    }
+    base = tone_map.get(mood_type, tone_map["neutral"])
+    action = action_map.get(mood_type, action_map["neutral"])
+    intensity_suffix = "我能感觉到这股情绪现在还挺明显的。" if intensity >= 7 else "我们可以慢慢来。"
+    user_hint = f" 你刚刚提到“{user_message[:24]}”" if user_message.strip() else ""
+    return f"{base}{user_hint}{intensity_suffix}{action} {persona['name']}会继续陪着你。"
+
+
 # ==================== 核心服务函数 ====================
 
 async def stream_chat(
@@ -244,12 +274,18 @@ async def stream_chat(
 
     except asyncio.TimeoutError:
         logger.warning("stream_chat timeout mood=%s", mood_type)
-        error_payload = json.dumps({"type": "error", "content": "AI 响应超时，请稍后重试"}, ensure_ascii=False)
-        yield f"data: {error_payload}\n\n"
+        fallback_reply = _fallback_stream_reply(mood_type, intensity, user_message, avatar_character)
+        for char in fallback_reply:
+            payload = json.dumps({"type": "text", "content": char}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'content': {'source': 'fallback'}}, ensure_ascii=False)}\n\n"
     except Exception as e:
         logger.error("stream_chat error: %s", str(e)[:200])
-        error_payload = json.dumps({"type": "error", "content": str(e)}, ensure_ascii=False)
-        yield f"data: {error_payload}\n\n"
+        fallback_reply = _fallback_stream_reply(mood_type, intensity, user_message, avatar_character)
+        for char in fallback_reply:
+            payload = json.dumps({"type": "text", "content": char}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+        yield f"data: {json.dumps({'type': 'done', 'content': {'source': 'fallback'}}, ensure_ascii=False)}\n\n"
 
 
 async def analyze_mood_with_ai(

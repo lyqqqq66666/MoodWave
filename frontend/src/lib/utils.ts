@@ -18,17 +18,18 @@ export async function convertBlobToWav(blob: Blob): Promise<Blob> {
   }
 }
 
-function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
+export function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
   const numChannels = audioBuffer.numberOfChannels
   const sampleRate = audioBuffer.sampleRate
   const format = 1 // PCM
   const bitsPerSample = 16
-  const data = audioBuffer.getChannelData(0)
   const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
   const blockAlign = numChannels * (bitsPerSample / 8)
-  const dataSize = data.length * (bitsPerSample / 8)
+  const samplesPerChannel = audioBuffer.length
+  const dataSize = samplesPerChannel * blockAlign
   const buffer = new ArrayBuffer(44 + dataSize)
   const view = new DataView(buffer)
+  const channels = Array.from({ length: numChannels }, (_, index) => audioBuffer.getChannelData(index))
 
   // WAV header
   writeString(view, 0, "RIFF")
@@ -45,12 +46,14 @@ function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
   writeString(view, 36, "data")
   view.setUint32(40, dataSize, true)
 
-  // PCM samples
+  // PCM samples（按声道交错写入）
   let offset = 44
-  for (let i = 0; i < data.length; i++) {
-    const sample = Math.max(-1, Math.min(1, data[i]))
-    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
-    offset += 2
+  for (let i = 0; i < samplesPerChannel; i++) {
+    for (let channel = 0; channel < numChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, channels[channel]?.[i] ?? 0))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+      offset += 2
+    }
   }
 
   return new Blob([buffer], { type: "audio/wav" })

@@ -49,11 +49,18 @@ type SSEMessage = {
   content?: string | AgentMusicRecommendation | AgentDonePayload
 }
 type AgentMusicRecommendation = {
+  recommendation_id?: string
   mood?: string
+  title?: string
+  artist?: string
+  scene?: string
+  url?: string
+  duration?: number
   bpm?: number
   energy?: string
   texture?: string
   style?: string
+  description?: string
   intensity_adjusted?: boolean
 }
 type AgentDonePayload = {
@@ -1052,11 +1059,26 @@ export default function CompanionPage() {
                                 <p className="mt-1 font-semibold text-slate-800">{message.music_recommendation.energy || "--"}</p>
                               </div>
                               <div className="rounded-[16px] bg-[#fffafc] px-2 py-2">
-                                <p className="text-slate-400">风格</p>
-                                <p className="mt-1 font-semibold text-slate-800">{message.music_recommendation.style || "--"}</p>
+                                <p className="text-slate-400">曲目</p>
+                                <p className="mt-1 font-semibold text-slate-800">{message.music_recommendation.title || "--"}</p>
                               </div>
                             </div>
+                            {message.music_recommendation.artist ? (
+                              <p className="mt-2 text-xs font-medium text-slate-600">
+                                {message.music_recommendation.artist}
+                                {message.music_recommendation.scene ? ` · ${message.music_recommendation.scene}` : ""}
+                              </p>
+                            ) : null}
                             {message.music_recommendation.texture ? <p className="mt-2 text-xs leading-5 text-slate-500">{message.music_recommendation.texture}</p> : null}
+                            {message.music_recommendation.description ? <p className="mt-1 text-xs leading-5 text-slate-400">{message.music_recommendation.description}</p> : null}
+                            {message.music_recommendation.url ? (
+                              <Link
+                                href={`/music?mood=${message.music_recommendation.mood || "calm"}&intensity=6`}
+                                className="mt-3 inline-flex min-h-9 items-center justify-center rounded-full bg-[#fff4f7] px-3 text-xs font-semibold text-[#e85f7d] transition hover:-translate-y-0.5"
+                              >
+                                去音乐房间收听
+                              </Link>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
