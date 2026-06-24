@@ -46,7 +46,8 @@
     margin: 0;
     height: 100%;
     min-height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: linear-gradient(180deg, #fffdfa 0%, #fff6ef 100%);
     color: hsl(var(--foreground));
     font-family: "Sora", -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;

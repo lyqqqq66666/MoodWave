@@ -25,11 +25,11 @@ services:
     restart: always
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
       - PORT=8000
       - DATABASE_URL=postgresql://moodwave:${DB_PASSWORD:-moodwave123}@db:5432/moodwave
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - QWEN_VL_MODEL=qwen3-vl-plus
       - QWEN_ASR_MODEL=qwen3-asr-flash-2026-02-10
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
