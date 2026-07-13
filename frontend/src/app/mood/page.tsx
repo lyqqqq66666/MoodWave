@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ChevronDown, ChevronUp, Play, Plus, Sparkles, Trash2 } from "lucide-react"
-import { aiAPI, moodAPI, uploadAPI } from "@/lib/api"
+import { useSearchParams } from "next/navigation"
+import { ArrowRight, BarChart3, CalendarDays, ChevronDown, ChevronUp, Clock3, Feather, Flame, HeartPulse, Mic2, Music2, PenLine, Play, Plus, Sparkles, Trash2 } from "lucide-react"
+import { aiAPI, analyticsAPI, moodAPI, uploadAPI } from "@/lib/api"
 import { getMoodOption, moodOptions, moodTagOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
@@ -17,6 +18,30 @@ import { useAuthStore } from "@/store/auth"
 import { useGuestStore } from "@/store/guest"
 
 const steps = ["心情", "记录", "分析"]
+
+type MoodOverviewRecord = {
+  id: string | number
+  date: string
+  mood_type: MoodType
+  intensity: number
+  tags: string[]
+  note?: string
+  created_at?: string
+}
+
+type WeeklyTrendItem = {
+  date: string
+  mood_type: MoodType
+  count?: number
+  avg_intensity: number
+}
+
+type MoodOverviewSummary = {
+  dominant_mood?: MoodType
+  streak_days?: number
+  top_tags?: string[]
+  total_moods?: number
+}
 
 const fallbackRadar = [
   { mood: "开心", score: 58 },
@@ -33,10 +58,102 @@ function formatDateHeadline(value: string) {
   return `${Number(month)}月${Number(day)}日`
 }
 
+function unwrapApiData(payload: any) {
+  return payload?.data ?? payload
+}
+
+function normalizeTags(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean)
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
+    } catch {
+      return value.split(/[、,，]/).map((item) => item.trim()).filter(Boolean)
+    }
+  }
+  return []
+}
+
+function normalizeMoodRecord(item: any): MoodOverviewRecord | null {
+  if (!item?.mood_type || !item?.date) return null
+  return {
+    id: item.id ?? `${item.date}-${item.mood_type}-${item.intensity ?? 0}`,
+    date: String(item.date),
+    mood_type: item.mood_type,
+    intensity: Number(item.intensity) || 6,
+    tags: normalizeTags(item.tags),
+    note: item.note || "",
+    created_at: item.created_at || item.updated_at || item.date,
+  }
+}
+
+function sortMoodRecords(records: MoodOverviewRecord[]) {
+  return [...records].sort((a, b) => {
+    const createdCompare = String(b.created_at ?? b.date).localeCompare(String(a.created_at ?? a.date))
+    if (createdCompare !== 0) return createdCompare
+    return String(b.date).localeCompare(String(a.date))
+  })
+}
+
+function calculateStreakDays(records: MoodOverviewRecord[]) {
+  const dates = new Set(records.map((record) => record.date).filter(Boolean))
+  let streak = 0
+  const cursor = new Date()
+  while (dates.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
+}
+
+function buildWeeklyTrendFromRecords(records: MoodOverviewRecord[]): WeeklyTrendItem[] {
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - index))
+    return date.toISOString().slice(0, 10)
+  })
+
+  return days.map((date) => {
+    const dayRecords = records.filter((record) => record.date === date)
+    const fallbackMood = dayRecords[0]?.mood_type ?? "neutral"
+    return {
+      date,
+      mood_type: fallbackMood,
+      count: dayRecords.length,
+      avg_intensity: dayRecords.length
+        ? Math.round((dayRecords.reduce((sum, record) => sum + record.intensity, 0) / dayRecords.length) * 10) / 10
+        : 0,
+    }
+  })
+}
+
+function getDominantMood(records: MoodOverviewRecord[], fallback?: MoodType) {
+  if (fallback) return fallback
+  const counts = records.reduce<Record<string, number>>((acc, record) => {
+    acc[record.mood_type] = (acc[record.mood_type] ?? 0) + 1
+    return acc
+  }, {})
+  return (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] as MoodType | undefined) ?? "neutral"
+}
+
+function getTopTags(records: MoodOverviewRecord[], fallback?: string[]) {
+  if (fallback?.length) return fallback.slice(0, 5)
+  const counts = records.flatMap((record) => record.tags).reduce<Record<string, number>>((acc, tag) => {
+    acc[tag] = (acc[tag] ?? 0) + 1
+    return acc
+  }, {})
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([tag]) => tag)
+}
+
 export default function MoodPage() {
+  const searchParams = useSearchParams()
   const { user, token } = useAuthStore()
   const { isGuest } = useAuthGuard({ silent: true })
   const addGuestRecord = useGuestStore((state) => state.addRecord)
+  const guestRecords = useGuestStore((state) => state.records)
+  const mode = searchParams.get("mode") === "classic" ? "classic" : "overview"
+  const entryIntent = searchParams.get("entry") ?? "classic"
   const [step, setStep] = useState(1)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [selectedMood, setSelectedMood] = useState<MoodType>("calm")
@@ -61,10 +178,49 @@ export default function MoodPage() {
   const [submitNotice, setSubmitNotice] = useState("")
   const [analysisStage, setAnalysisStage] = useState("")
   const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [recentRecords, setRecentRecords] = useState<MoodOverviewRecord[]>([])
+  const [weeklyAnalytics, setWeeklyAnalytics] = useState<{ weekly_trend?: WeeklyTrendItem[] } | null>(null)
+  const [overviewSummary, setOverviewSummary] = useState<MoodOverviewSummary | null>(null)
+  const [isOverviewLoading, setIsOverviewLoading] = useState(false)
+  const [overviewError, setOverviewError] = useState("")
   const voiceUploadTokenRef = useRef(0)
   const analysisStartedAtRef = useRef(0)
 
   const selectedMoodMeta = getMoodOption(selectedMood)
+  const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const latestRecord = recentRecords[0] ?? null
+  const latestMoodMeta = getMoodOption(latestRecord?.mood_type)
+  const todayRecord = recentRecords.find((record) => record.date === todayKey) ?? null
+  const streakDays = overviewSummary?.streak_days ?? calculateStreakDays(recentRecords)
+  const dominantMood = getDominantMood(recentRecords, overviewSummary?.dominant_mood)
+  const dominantMoodMeta = getMoodOption(dominantMood)
+  const topTags = getTopTags(recentRecords, overviewSummary?.top_tags)
+  const weeklyTrend = weeklyAnalytics?.weekly_trend?.length ? weeklyAnalytics.weekly_trend : buildWeeklyTrendFromRecords(recentRecords)
+  const musicMood = todayRecord?.mood_type ?? latestRecord?.mood_type ?? "calm"
+  const musicIntensity = todayRecord?.intensity ?? latestRecord?.intensity ?? 6
+  const entryIntents: Record<string, { title: string; helper: string }> = {
+    body: {
+      title: "从体感开始记录",
+      helper: "Phase 1 先进入稳定记录流；下一阶段会替换为身体体感地图。",
+    },
+    imagery: {
+      title: "用意象记录心情",
+      helper: "先用现有文字、标签、图片和语音完成记录；意象词云会在后续阶段接上。",
+    },
+    quick: {
+      title: "快速留一句",
+      helper: "适合先写一句话，其他内容都可以跳过。",
+    },
+    voice: {
+      title: "语音碎碎念",
+      helper: "在记录步骤里使用语音录制，转写会继续进入 AI 分析。",
+    },
+    classic: {
+      title: "完整情绪记录",
+      helper: "保留原来的心情、强度、文字、图片、语音和 AI 分析流程。",
+    },
+  }
+  const currentEntryIntent = entryIntents[entryIntent] ?? entryIntents.classic
   const canContinue = useMemo(() => {
     if (step === 1) return Boolean(selectedMood)
     if (step === 2) return intensity >= 1
@@ -124,6 +280,73 @@ export default function MoodPage() {
 
     return () => window.clearInterval(timer)
   }, [isSubmitting, submitted])
+
+  useEffect(() => {
+    if (mode !== "overview") return
+    let active = true
+
+    async function loadOverview() {
+      setIsOverviewLoading(true)
+      setOverviewError("")
+
+      const guestOverviewRecords = sortMoodRecords(
+        guestRecords.map(normalizeMoodRecord).filter((record): record is MoodOverviewRecord => Boolean(record)),
+      )
+
+      if (!token || isGuest) {
+        setRecentRecords(guestOverviewRecords)
+        setWeeklyAnalytics({ weekly_trend: buildWeeklyTrendFromRecords(guestOverviewRecords) })
+        setOverviewSummary({
+          dominant_mood: getDominantMood(guestOverviewRecords),
+          streak_days: calculateStreakDays(guestOverviewRecords),
+          top_tags: getTopTags(guestOverviewRecords),
+          total_moods: guestOverviewRecords.length,
+        })
+        setIsOverviewLoading(false)
+        return
+      }
+
+      try {
+        const [moodResponse, weeklyResponse, summaryResponse] = await Promise.all([
+          moodAPI.list({ limit: 30 }),
+          analyticsAPI.weekly(),
+          analyticsAPI.summary(),
+        ])
+        if (!active) return
+
+        const moodPayload = unwrapApiData(moodResponse.data)
+        const records = sortMoodRecords(
+          (Array.isArray(moodPayload) ? moodPayload : [])
+            .map(normalizeMoodRecord)
+            .filter((record): record is MoodOverviewRecord => Boolean(record)),
+        )
+        const weeklyPayload = unwrapApiData(weeklyResponse.data) as { weekly_trend?: WeeklyTrendItem[] }
+        const summaryPayload = unwrapApiData(summaryResponse.data) as MoodOverviewSummary
+
+        setRecentRecords(records)
+        setWeeklyAnalytics(weeklyPayload)
+        setOverviewSummary(summaryPayload)
+      } catch {
+        if (!active) return
+        setRecentRecords(guestOverviewRecords)
+        setWeeklyAnalytics({ weekly_trend: buildWeeklyTrendFromRecords(guestOverviewRecords) })
+        setOverviewSummary({
+          dominant_mood: getDominantMood(guestOverviewRecords),
+          streak_days: calculateStreakDays(guestOverviewRecords),
+          top_tags: getTopTags(guestOverviewRecords),
+          total_moods: guestOverviewRecords.length,
+        })
+        setOverviewError("云端数据暂时没有连上，已先显示本地记录和可用入口。")
+      } finally {
+        if (active) setIsOverviewLoading(false)
+      }
+    }
+
+    loadOverview()
+    return () => {
+      active = false
+    }
+  }, [guestRecords, isGuest, mode, token])
 
   async function handleVoiceRecording(file: File | null, duration: number) {
     if (!file) {
@@ -318,10 +541,277 @@ export default function MoodPage() {
     }
   }
 
+  if (mode === "overview") {
+    const totalMoods = overviewSummary?.total_moods ?? recentRecords.length
+    const entryCards = [
+      {
+        key: "body",
+        title: "开始体感记录",
+        helper: "先从身体线索开始，下一阶段会升级成体感地图。",
+        icon: HeartPulse,
+        href: "/mood?mode=classic&entry=body",
+        featured: true,
+      },
+      {
+        key: "imagery",
+        title: "意象词记录",
+        helper: "用画面感和氛围词进入记录。",
+        icon: Feather,
+        href: "/mood?mode=classic&entry=imagery",
+      },
+      {
+        key: "quick",
+        title: "快速文字记录",
+        helper: "只写一句也可以被接住。",
+        icon: PenLine,
+        href: "/mood?mode=classic&entry=quick",
+      },
+      {
+        key: "voice",
+        title: "语音碎碎念",
+        helper: "直接说出来，后续转写进分析。",
+        icon: Mic2,
+        href: "/mood?mode=classic&entry=voice",
+      },
+    ]
+
+    return (
+      <MoodWaveShell title="情绪录入">
+        <div className="mx-auto max-w-6xl space-y-5">
+          <section className="overflow-hidden rounded-[34px] bg-white/84 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 md:p-7">
+            <div className="grid gap-5 lg:grid-cols-[1.12fr_0.88fr] lg:items-stretch">
+              <div className="rounded-[30px] bg-gradient-to-br from-[#fff7fa] via-white to-[#ecfffb] p-5 ring-1 ring-white/80 md:p-6">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="inline-flex min-h-9 items-center gap-2 rounded-full bg-white/80 px-3 text-xs font-semibold text-[#ff7894] shadow-sm">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      记录情绪的潮汐，遇见内心的风景
+                    </p>
+                    <h2 className="mt-4 text-2xl font-semibold tracking-normal text-[#1f2635] md:text-4xl">
+                      今天想怎样靠近自己的心情？
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+                      这里会先给你一个轻量总览，再选择最顺手的方式开始记录。体感和意象入口本阶段先接入稳定记录流，后续逐步替换为 V2 交互。
+                    </p>
+                    <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                      <Link
+                        href="/mood?mode=classic&entry=body"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)]"
+                      >
+                        <HeartPulse className="h-4 w-4" />
+                        开始体感记录
+                      </Link>
+                      <Link
+                        href="/mood?mode=classic&entry=voice"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]"
+                      >
+                        <Mic2 className="h-4 w-4 text-[#ff7894]" />
+                        语音碎碎念
+                      </Link>
+                    </div>
+                  </div>
+                  <div
+                    className="flex h-24 w-24 shrink-0 items-center justify-center self-start rounded-[30px] text-5xl shadow-[0_16px_34px_rgba(255,181,194,0.22)]"
+                    style={{ backgroundColor: latestMoodMeta.softAccent }}
+                  >
+                    {latestRecord ? latestMoodMeta.emoji : "🌙"}
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[26px] bg-white/88 p-4 ring-1 ring-[#f8e4e9]">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                      <CalendarDays className="h-4 w-4 text-[#ff9fb4]" />
+                      今日状态
+                    </div>
+                    <p className="mt-3 text-xl font-semibold text-slate-900">
+                      {todayRecord ? "已记录" : "还没记录"}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {todayRecord ? `${getMoodOption(todayRecord.mood_type).label} · ${todayRecord.intensity}/10` : "可以从一个很小的线索开始"}
+                    </p>
+                  </div>
+                  <div className="rounded-[26px] bg-white/88 p-4 ring-1 ring-[#f8e4e9]">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                      <Flame className="h-4 w-4 text-[#ffd166]" />
+                      连续记录
+                    </div>
+                    <p className="mt-3 text-xl font-semibold text-slate-900">{streakDays} 天</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {streakDays > 0 ? "这份觉察已经在累积" : "今天可以作为新的起点"}
+                    </p>
+                  </div>
+                  <div className="rounded-[26px] bg-white/88 p-4 ring-1 ring-[#f8e4e9]">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                      <Clock3 className="h-4 w-4 text-[#8de1d5]" />
+                      最近一次
+                    </div>
+                    <p className="mt-3 text-xl font-semibold text-slate-900">
+                      {latestRecord ? getMoodOption(latestRecord.mood_type).label : "暂无记录"}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {latestRecord ? `${formatDateHeadline(latestRecord.date)} · 强度 ${latestRecord.intensity}/10` : "先留下第一条心情"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <aside className="rounded-[30px] bg-white/88 p-5 shadow-[0_16px_40px_rgba(255,213,223,0.16)] ring-1 ring-white/70 md:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">本周轻量趋势</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {totalMoods > 0 ? `已沉淀 ${totalMoods} 条记录` : "还没有足够数据，先从今天开始"}
+                    </p>
+                  </div>
+                  {isOverviewLoading ? (
+                    <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-[#ff7894]">同步中</span>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 flex h-28 items-end gap-2 rounded-[24px] bg-gradient-to-b from-[#fffafb] to-[#f2fffc] p-3 ring-1 ring-[#f8e4e9]">
+                  {weeklyTrend.map((item) => {
+                    const mood = getMoodOption(item.mood_type)
+                    const height = item.avg_intensity > 0 ? Math.max(18, item.avg_intensity * 9) : 8
+                    return (
+                      <div key={item.date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                        <div
+                          className="w-full rounded-full transition-all"
+                          style={{ height, backgroundColor: item.avg_intensity > 0 ? mood.accent : "#efe8ed" }}
+                          title={`${item.date} ${item.avg_intensity || 0}/10`}
+                        />
+                        <span className="text-[10px] text-slate-400">{Number(item.date.slice(-2))}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-4 rounded-[24px] bg-[#fffafb] p-4 ring-1 ring-[#f8e4e9]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-slate-500">本月主导情绪</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">{dominantMoodMeta.label}</p>
+                    </div>
+                    <span
+                      className="grid h-12 w-12 place-items-center rounded-[20px] text-2xl"
+                      style={{ backgroundColor: dominantMoodMeta.softAccent }}
+                    >
+                      {dominantMoodMeta.emoji}
+                    </span>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {topTags.length > 0 ? (
+                      topTags.map((tag) => {
+                        const label = moodTagOptions.find((item) => item.value === tag)?.label ?? tag
+                        return (
+                          <span key={tag} className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-[#f1dfe5]">
+                            {label}
+                          </span>
+                        )
+                      })
+                    ) : (
+                      <span className="text-xs leading-6 text-slate-400">高频标签会在记录几次后出现。</span>
+                    )}
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          {overviewError ? (
+            <p className="rounded-[22px] bg-[#fff7d8] px-4 py-3 text-sm text-[#a96d1a] ring-1 ring-[#ffe9a9]">{overviewError}</p>
+          ) : null}
+
+          <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="rounded-[34px] bg-white/84 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-[#ff7894]">开始记录</p>
+                  <h3 className="mt-1 text-2xl font-semibold text-slate-900">选择一个低压力入口</h3>
+                </div>
+                <Link href="/analytics" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5] transition hover:-translate-y-0.5">
+                  <BarChart3 className="h-4 w-4 text-[#8de1d5]" />
+                  查看完整历史
+                </Link>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {entryCards.map((card) => {
+                  const Icon = card.icon
+                  return (
+                    <Link
+                      key={card.key}
+                      href={card.href}
+                      className={cn(
+                        "group flex min-h-[112px] items-center gap-4 rounded-[28px] p-4 transition hover:-translate-y-1",
+                        card.featured
+                          ? "bg-gradient-to-br from-[#ff9fb4] via-[#ffc7d2] to-[#8de1d5] text-white shadow-[0_18px_40px_rgba(255,159,180,0.28)]"
+                          : "bg-white text-slate-800 ring-1 ring-[#f6e4e9] shadow-[0_12px_28px_rgba(255,216,225,0.1)]",
+                      )}
+                    >
+                      <span className={cn("grid h-14 w-14 shrink-0 place-items-center rounded-[22px]", card.featured ? "bg-white/22" : "bg-[#fff3f6] text-[#ff7894]")}>
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-base font-semibold">{card.title}</span>
+                        <span className={cn("mt-1 block text-sm leading-6", card.featured ? "text-white/86" : "text-slate-500")}>
+                          {card.helper}
+                        </span>
+                      </span>
+                      <ArrowRight className={cn("h-4 w-4 shrink-0 transition group-hover:translate-x-1", card.featured ? "text-white" : "text-[#ff9fb4]")} />
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            <aside className="rounded-[34px] bg-gradient-to-br from-[#fff7d8] via-white to-[#effdfa] p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
+              <div className="flex items-center gap-3">
+                <span className="grid h-12 w-12 place-items-center rounded-[20px] bg-white text-[#ff7894] shadow-sm">
+                  <Music2 className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">推荐治愈音乐</p>
+                  <p className="mt-1 text-xs text-slate-500">根据最近记录进入音乐房间</p>
+                </div>
+              </div>
+              <p className="mt-5 text-sm leading-7 text-slate-600">
+                {latestRecord
+                  ? `最近一次是「${latestMoodMeta.label}」${latestRecord.intensity}/10，先给你一段更贴合当下的声音。`
+                  : "还没有记录时，先用平静模式开始，让身体慢慢放下来。"}
+              </p>
+              <Link
+                href={`/music?mood=${musicMood}&intensity=${musicIntensity}`}
+                className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)]"
+              >
+                <Play className="h-4 w-4" />
+                播放治愈音乐
+              </Link>
+            </aside>
+          </section>
+        </div>
+      </MoodWaveShell>
+    )
+  }
+
   return (
     <MoodWaveShell title="情绪录入">
       <div className="mx-auto max-w-6xl">
         <section className="rounded-[34px] bg-white/82 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8">
+          <div className="mb-5 rounded-[28px] bg-gradient-to-br from-[#fff7fa] to-[#effdfa] p-4 ring-1 ring-white/80 md:p-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#ff7894]">{currentEntryIntent.title}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-500">{currentEntryIntent.helper}</p>
+              </div>
+              <Link
+                href="/mood"
+                className="inline-flex min-h-10 items-center justify-center rounded-full bg-white px-4 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5] transition hover:-translate-y-0.5"
+              >
+                返回记录首页
+              </Link>
+            </div>
+          </div>
           <div className="mb-6 rounded-[30px] bg-gradient-to-br from-[#fff7fa] to-[#eefdfa] p-4 ring-1 ring-white/80 md:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
