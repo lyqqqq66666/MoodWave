@@ -8,10 +8,22 @@ import { aiAPI, analyticsAPI, moodAPI, uploadAPI } from "@/lib/api"
 import { getMoodOption, moodOptions, moodTagOptions } from "@/lib/moodwave"
 import { MoodType } from "@/lib/types"
 import { MoodWaveShell } from "@/components/moodwave-shell"
+import { BodySensationMap } from "@/components/body-sensation-map"
+import { CompanionPetOrb } from "@/components/companion-avatar"
 import { MoodAnalysisReport, type MoodAnalysisReportData } from "@/components/mood-analysis-report"
 import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-media-upload"
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
 import { RecordDatePicker } from "@/components/record-date-picker"
+import {
+  bodyPresets,
+  breathOptions,
+  mapBodyEntryToLegacyMood,
+  musicGoalOptions,
+  type BodyPartId,
+  type BodySensationSelection,
+  type BreathState,
+  type MusicGoal,
+} from "@/lib/body-sensation"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
 import { cn, convertBlobToWav } from "@/lib/utils"
 import { useAuthStore } from "@/store/auth"
@@ -152,7 +164,7 @@ export default function MoodPage() {
   const { isGuest } = useAuthGuard({ silent: true })
   const addGuestRecord = useGuestStore((state) => state.addRecord)
   const guestRecords = useGuestStore((state) => state.records)
-  const mode = searchParams.get("mode") === "classic" ? "classic" : "overview"
+  const mode = searchParams.get("mode") === "classic" ? "classic" : searchParams.get("mode") === "body" ? "body" : "overview"
   const entryIntent = searchParams.get("entry") ?? "classic"
   const [step, setStep] = useState(1)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -183,6 +195,11 @@ export default function MoodPage() {
   const [overviewSummary, setOverviewSummary] = useState<MoodOverviewSummary | null>(null)
   const [isOverviewLoading, setIsOverviewLoading] = useState(false)
   const [overviewError, setOverviewError] = useState("")
+  const [bodySelections, setBodySelections] = useState<BodySensationSelection[]>([])
+  const [activeBodyPart, setActiveBodyPart] = useState<BodyPartId>("chest")
+  const [bodyClickCounts, setBodyClickCounts] = useState<Partial<Record<BodyPartId, number>>>({})
+  const [breathState, setBreathState] = useState<BreathState>("steady")
+  const [musicGoal, setMusicGoal] = useState<MusicGoal>("calm_down")
   const voiceUploadTokenRef = useRef(0)
   const analysisStartedAtRef = useRef(0)
 
@@ -226,21 +243,26 @@ export default function MoodPage() {
     if (step === 2) return intensity >= 1
     return true
   }, [intensity, selectedMood, step])
+  const bodyLabelCount = useMemo(
+    () => bodySelections.reduce((count, selection) => count + selection.labels.length, 0),
+    [bodySelections],
+  )
 
-  function buildFallbackReport(): MoodAnalysisReportData {
+  function buildFallbackReport(moodType = selectedMood, moodIntensity = intensity): MoodAnalysisReportData {
+    const moodMeta = getMoodOption(moodType)
     return {
-      summary: `你此刻更接近「${selectedMoodMeta.label}」，强度大约在 ${intensity}/10。`,
-      insight: selectedMoodMeta.insight,
+      summary: `你此刻更接近「${moodMeta.label}」，强度大约在 ${moodIntensity}/10。`,
+      insight: moodMeta.insight,
       suggestion: "先把今天最具体的一件小事写下来，再给自己留十分钟缓冲。情绪已经被看见，就会轻一点。",
       music_recommendation: {
-        mood: selectedMood,
-        bpm: selectedMood === "happy" ? 104 : selectedMood === "sad" ? 62 : 76,
-        title: selectedMood === "happy" ? "晴朗的午后" : selectedMood === "sad" ? "给低落一条毯子" : "宁静的午后",
+        mood: moodType,
+        bpm: moodType === "happy" ? 104 : moodType === "sad" ? 62 : 76,
+        title: moodType === "happy" ? "晴朗的午后" : moodType === "sad" ? "给低落一条毯子" : "宁静的午后",
         texture: "柔和和弦 + 慢速波纹",
       },
       radar_data: fallbackRadar.map((point) => ({
         ...point,
-        score: point.mood === selectedMoodMeta.label ? Math.min(96, intensity * 10) : point.score,
+        score: point.mood === moodMeta.label ? Math.min(96, moodIntensity * 10) : point.score,
       })),
     }
   }
@@ -251,6 +273,43 @@ export default function MoodPage() {
     setSelectedTags((current) => (current.includes(tag) ? current : [...current, tag]))
     setCustomTag("")
     setShowCustomTag(false)
+  }
+
+  function setBodyPartActive(part: BodyPartId) {
+    setActiveBodyPart(part)
+    setBodyClickCounts((current) => ({ ...current, [part]: (current[part] ?? 0) + 1 }))
+  }
+
+  function toggleBodyLabel(part: BodyPartId, label: string) {
+    setBodySelections((current) => {
+      const totalCount = current.reduce((count, selection) => count + selection.labels.length, 0)
+      const existing = current.find((selection) => selection.part === part)
+      const existingLabels = existing?.labels ?? []
+      const active = existingLabels.includes(label)
+
+      if (!active && (existingLabels.length >= 2 || totalCount >= 6)) return current
+
+      const nextLabels = active ? existingLabels.filter((item) => item !== label) : [...existingLabels, label]
+      const withoutPart = current.filter((selection) => selection.part !== part)
+      return nextLabels.length > 0 ? [...withoutPart, { part, labels: nextLabels }] : withoutPart
+    })
+  }
+
+  function removeBodyLabel(part: BodyPartId, label: string) {
+    setBodySelections((current) =>
+      current
+        .map((selection) => (selection.part === part ? { ...selection, labels: selection.labels.filter((item) => item !== label) } : selection))
+        .filter((selection) => selection.labels.length > 0),
+    )
+  }
+
+  function applyBodyPreset(presetId: string) {
+    const preset = bodyPresets.find((item) => item.id === presetId)
+    if (!preset) return
+    setBodySelections(preset.selections)
+    setBreathState(preset.breathState)
+    setMusicGoal(preset.musicGoal)
+    setActiveBodyPart(preset.selections[0]?.part ?? "whole")
   }
 
   function clearVoiceRecording() {
@@ -541,6 +600,341 @@ export default function MoodPage() {
     }
   }
 
+  async function handleBodySubmit() {
+    if (bodyLabelCount === 0) {
+      setSubmitNotice("先选择至少一个身体线索，再交给灵音整理。")
+      return
+    }
+
+    const mapped = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal)
+    setSelectedMood(mapped.mood_type)
+    setIntensity(mapped.intensity)
+    setSelectedTags(mapped.tags)
+    setNote(mapped.note)
+    setIsSubmitting(true)
+    setSubmitNotice("")
+    setAnalysisStage("正在把身体线索翻译成情绪语言…")
+    setAnalysisProgress(12)
+    setStep(3)
+    setSubmitted(false)
+    analysisStartedAtRef.current = Date.now()
+
+    try {
+      if (isGuest) {
+        const report = buildFallbackReport(mapped.mood_type, mapped.intensity)
+        addGuestRecord({
+          date: recordDate,
+          mood_type: mapped.mood_type,
+          intensity: mapped.intensity,
+          tags: mapped.tags,
+          note: mapped.note,
+          images: [],
+        })
+        setAnalysisStage("已先保存在本地，正在给你一段轻一点的反馈…")
+        setAnalysisProgress(100)
+        setAnalysisReport(report)
+        setSubmitNotice("已保存到本地游客记录。登录后可把记录同步到云端。")
+        return
+      }
+
+      setAnalysisStage("AI 正在结合身体体感、呼吸和目标，为你生成分析…")
+      setAnalysisProgress(72)
+      const report = await aiAPI
+        .analyzeMood({
+          mood_type: mapped.mood_type,
+          intensity: mapped.intensity,
+          note: mapped.note,
+          tags: mapped.tags,
+          image_analysis: `身体体感记录：${mapped.note}`,
+          image_urls: [],
+          voice_text: "",
+          mbti: user?.mbti || "",
+          zodiac: user?.zodiac || "",
+        })
+        .then((response) => {
+          const envelope = response.data as { code?: number; msg?: string; fallback?: boolean; data?: MoodAnalysisReportData | null }
+          if (envelope?.code && envelope.code !== 0) {
+            throw new Error(envelope.msg || "AI analysis failed")
+          }
+          if (envelope?.fallback) {
+            setSubmitNotice((current) => current || "AI 暂时使用备用分析模板，记录已正常保存。")
+          }
+          const payload = envelope?.data ?? response.data
+          if (!payload) throw new Error("AI analysis empty")
+          return payload as MoodAnalysisReportData
+        })
+        .catch(() => buildFallbackReport(mapped.mood_type, mapped.intensity))
+
+      setAnalysisStage("分析完成，正在把这次身体线索整理成记录…")
+      setAnalysisProgress(92)
+      setAnalysisReport(report)
+      await moodAPI.create({
+        date: recordDate,
+        mood_type: mapped.mood_type,
+        intensity: mapped.intensity,
+        tags: mapped.tags,
+        note: mapped.note,
+        images: [],
+        image_analysis: `身体体感记录：${mapped.note}`,
+        voice_url: "",
+        voice_text: "",
+      })
+    } catch {
+      setAnalysisStage("网络有点不稳，我先把这次身体线索接住，再给你一版本地反馈。")
+      setAnalysisProgress(100)
+      setAnalysisReport(buildFallbackReport(mapped.mood_type, mapped.intensity))
+    } finally {
+      const elapsed = Date.now() - analysisStartedAtRef.current
+      const minVisibleDuration = 1800
+      if (elapsed < minVisibleDuration) {
+        await new Promise((resolve) => window.setTimeout(resolve, minVisibleDuration - elapsed))
+      }
+      setAnalysisProgress(100)
+      setIsSubmitting(false)
+      setSubmitted(true)
+    }
+  }
+
+  if (mode === "body") {
+    const mappedBodyMood = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal)
+    const mappedMoodMeta = getMoodOption(mappedBodyMood.mood_type)
+    const selectedLabels = bodySelections.flatMap((selection) => selection.labels)
+    const companionMessage =
+      breathState === "shallow" || breathState === "rapid" || selectedLabels.some((label) => ["发闷", "堵得慌", "发慌"].includes(label))
+        ? "我陪你慢一点呼吸，先不用急着解释。"
+        : selectedLabels.some((label) => ["疲惫", "无力", "发沉", "麻木"].includes(label))
+          ? "今天的电量可能不多，我们先把身体放轻一点。"
+          : bodyLabelCount > 0
+            ? "这些身体线索已经足够开始分析了。"
+            : "点击身体区域，选一两个最像的感觉就好。"
+
+    return (
+      <MoodWaveShell title="身体体感记录">
+        <div className="mx-auto max-w-6xl space-y-5">
+          <section className="rounded-[34px] bg-white/84 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 md:p-7">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <Link href="/mood" className="inline-flex min-h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]">
+                  返回记录首页
+                </Link>
+                <p className="mt-5 text-sm font-semibold text-[#ff7894]">身体体感记录</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-normal text-[#1f2635] md:text-4xl">
+                  不用先总结情绪，先看看身体哪里在说话。
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  点击身体区域，选 1-6 个体感线索。灵音会先把它们转换成旧版情绪记录，再进入现有 AI 分析和保存流程。
+                </p>
+              </div>
+              <RecordDatePicker value={recordDate} onChange={setRecordDate} className="self-start" />
+            </div>
+          </section>
+
+          {isSubmitting || submitted ? (
+            <section className="rounded-[34px] bg-white/88 p-6 text-center shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_18px_34px_rgba(255,181,194,0.28)]">
+                <Sparkles className="h-8 w-8" />
+              </div>
+              <h2 className="mt-5 text-2xl font-semibold">
+                {submitted ? "身体线索已经整理好了" : "灵音正在理解你刚刚标记的体感"}
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-slate-500">
+                {analysisStage || "正在把身体、呼吸和音乐目标转换成一份温柔的情绪报告。"}
+              </p>
+              <div className="mx-auto mt-6 max-w-2xl">
+                <div className="h-3 overflow-hidden rounded-full bg-[#f6e9ee]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffc3d0] to-[#8de1d5] transition-[width] duration-500 ease-out"
+                    style={{ width: `${analysisProgress}%` }}
+                  />
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                  <span>正在整合身体体感、呼吸状态和音乐目标</span>
+                  <span>{analysisProgress}%</span>
+                </div>
+              </div>
+              {submitNotice ? (
+                <p className="mx-auto mt-4 max-w-xl rounded-full bg-[#fff7d8] px-4 py-2 text-xs text-[#b67820]">{submitNotice}</p>
+              ) : null}
+              <div className="mx-auto mt-6 max-w-3xl">
+                {submitted ? <MoodAnalysisReport report={analysisReport ?? buildFallbackReport(mappedBodyMood.mood_type, mappedBodyMood.intensity)} /> : null}
+              </div>
+              {submitted ? (
+                <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmitted(false)
+                      setAnalysisReport(null)
+                      setSubmitNotice("")
+                      setAnalysisStage("")
+                    }}
+                    className="rounded-full border border-[#f1dbe2] bg-white px-6 py-3 text-sm font-semibold text-slate-700"
+                  >
+                    继续调整体感
+                  </button>
+                  <Link
+                    href={`/music?mood=${mappedBodyMood.mood_type}&intensity=${mappedBodyMood.intensity}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white"
+                  >
+                    <Play className="h-4 w-4" />
+                    播放治愈音乐
+                  </Link>
+                </div>
+              ) : null}
+            </section>
+          ) : (
+            <>
+              <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="rounded-[34px] bg-white/84 p-4 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
+                  <BodySensationMap
+                    selections={bodySelections}
+                    activePart={activeBodyPart}
+                    clickCounts={bodyClickCounts}
+                    onActivePartChange={setBodyPartActive}
+                    onToggleLabel={toggleBodyLabel}
+                    onRemoveLabel={removeBodyLabel}
+                  />
+                </div>
+
+                <aside className="space-y-4">
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <div className="flex items-center gap-4">
+                      <CompanionPetOrb
+                        character={user?.avatar_character}
+                        color={user?.character_color}
+                        mood={mappedBodyMood.mood_type}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">灵音陪你标记</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{companionMessage}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <p className="text-sm font-semibold text-slate-900">快捷组合</p>
+                    <div className="mt-3 grid gap-2">
+                      {bodyPresets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => applyBodyPreset(preset.id)}
+                          className="rounded-[22px] bg-[#fffafb] px-4 py-3 text-left text-sm ring-1 ring-[#f3dfe5] transition hover:-translate-y-0.5 hover:bg-white"
+                        >
+                          <span className="font-semibold text-slate-800">{preset.label}</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">{preset.helper}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-gradient-to-br from-[#fff7d8] to-[#effdfa] p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <p className="text-sm font-semibold text-slate-900">实时推断</p>
+                    <div className="mt-4 flex items-center gap-3">
+                      <span
+                        className="grid h-14 w-14 place-items-center rounded-[22px] text-3xl"
+                        style={{ backgroundColor: mappedMoodMeta.softAccent }}
+                      >
+                        {mappedMoodMeta.emoji}
+                      </span>
+                      <div>
+                        <p className="text-lg font-semibold text-slate-900">{mappedMoodMeta.label}</p>
+                        <p className="text-xs text-slate-500">强度约 {mappedBodyMood.intensity}/10</p>
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </section>
+
+              <section className="grid gap-5 lg:grid-cols-2">
+                <div className="rounded-[34px] bg-white/84 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
+                  <p className="text-sm font-semibold text-slate-900">呼吸现在更像哪一种？</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {breathOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setBreathState(option.value)}
+                        className={cn(
+                          "min-h-[74px] rounded-[24px] px-4 py-3 text-left transition",
+                          breathState === option.value
+                            ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_14px_30px_rgba(255,151,173,0.22)]"
+                            : "bg-white text-slate-700 ring-1 ring-[#f3dfe5] hover:-translate-y-0.5",
+                        )}
+                      >
+                        <span className="font-semibold">{option.label}</span>
+                        <span className={cn("mt-1 block text-xs leading-5", breathState === option.value ? "text-white/84" : "text-slate-500")}>
+                          {option.helper}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[34px] bg-white/84 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
+                  <p className="text-sm font-semibold text-slate-900">接下来希望音乐怎么陪你？</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {musicGoalOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setMusicGoal(option.value)}
+                        className={cn(
+                          "min-h-11 rounded-full px-4 text-sm font-semibold transition",
+                          musicGoal === option.value
+                            ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_24px_rgba(255,181,194,0.2)]"
+                            : "bg-white text-slate-600 ring-1 ring-[#f3dfe5] hover:-translate-y-0.5",
+                        )}
+                        title={option.helper}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-4 rounded-[22px] bg-[#fffafb] px-4 py-3 text-xs leading-6 text-slate-500 ring-1 ring-[#f8e4e9]">
+                    图片和语音补充仍在完整记录流里，本阶段体感记录先保持轻量。需要补充时可以进入完整记录。
+                  </p>
+                </div>
+              </section>
+
+              <section className="rounded-[30px] bg-white/90 p-4 shadow-[0_18px_50px_rgba(255,181,194,0.24)] ring-1 ring-white/80 backdrop-blur-xl lg:sticky lg:bottom-4 lg:z-20">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      已选择 {bodyLabelCount}/6 个体感线索
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {bodyLabelCount > 0 ? mappedBodyMood.note : "至少选择一个身体线索后即可提交。"}
+                    </p>
+                    {submitNotice ? <p className="mt-2 text-xs text-[#b67820]">{submitNotice}</p> : null}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Link
+                      href="/mood?mode=classic&entry=body"
+                      className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]"
+                    >
+                      去完整记录补充
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleBodySubmit}
+                      disabled={bodyLabelCount === 0 || isSubmitting}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      生成情绪分析
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </MoodWaveShell>
+    )
+  }
+
   if (mode === "overview") {
     const totalMoods = overviewSummary?.total_moods ?? recentRecords.length
     const entryCards = [
@@ -549,7 +943,7 @@ export default function MoodPage() {
         title: "开始体感记录",
         helper: "先从身体线索开始，下一阶段会升级成体感地图。",
         icon: HeartPulse,
-        href: "/mood?mode=classic&entry=body",
+        href: "/mood?mode=body",
         featured: true,
       },
       {
@@ -595,7 +989,7 @@ export default function MoodPage() {
                     </p>
                     <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                       <Link
-                        href="/mood?mode=classic&entry=body"
+                        href="/mood?mode=body"
                         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)]"
                       >
                         <HeartPulse className="h-4 w-4" />
