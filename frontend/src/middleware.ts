@@ -5,13 +5,11 @@ import type { NextRequest } from "next/server"
 
 // 需要登录的云端/社区路由。基础 App 页面已支持游客兜底，Web/WAP 也放行。
 const PROTECTED_PATHS = [
-  "/analytics",
   "/discovery",
 ]
 
 // App 模式下仍需登录的路由（始终保护）
 const LOGIN_REQUIRED_PATHS = [
-  "/analytics",
   "/discovery",
 ]
 
