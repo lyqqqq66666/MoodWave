@@ -63,6 +63,8 @@ export const postsAPI = {
 export const musicAPI = {
   recommend: (moodType?: string, params?: { music_goal?: string; recent_context?: string }) =>
     apiClient.get('/api/music/recommend', { params: { mood_type: moodType, ...params } }),
+  mockGenerateAsset: (data: { prompt: string; title?: string }) =>
+    apiClient.post('/api/music/assets/mock-generate', data),
   favorite: (data: any) => apiClient.post('/api/music/favorite', data),
   favorites: () => apiClient.get('/api/music/favorites'),
 }

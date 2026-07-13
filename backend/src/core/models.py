@@ -112,6 +112,25 @@ class MoodEntry(MoodEntryBase, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class MusicAsset(SQLModel, table=True):
+    """AI 音乐/上传音频资产记录"""
+    __tablename__ = "music_assets"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    title: str = Field(default="")
+    url: str = Field(default="")
+    object_key: str = Field(default="", index=True)
+    mime_type: str = Field(default="audio/wav")
+    size: int = Field(default=0)
+    duration: int = Field(default=0)
+    source: str = Field(default="mock_ai_music")  # local_library/user_upload/mock_ai_music/external_ai_music
+    provider: str = Field(default="mock")
+    prompt: str = Field(default="")
+    license_status: str = Field(default="pending")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # ==================== 请求/响应模型 ====================
 
 class MoodEntryCreate(SQLModel):

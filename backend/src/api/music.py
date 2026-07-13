@@ -5,15 +5,22 @@
 """
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlmodel import Session, select
 from typing import Optional, List
 
-from src.core.models import FavoriteMusic, FavoriteMusicRequest, User
+from src.core.models import FavoriteMusic, FavoriteMusicRequest, MusicAsset, User
 from src.db.database import get_session
 from src.api.auth import get_current_user
 from src.services.music_catalog import get_music_recommendations
+from src.services.ai_music_provider import create_mock_music_draft
 
 router = APIRouter()
+
+
+class MockMusicGenerateRequest(BaseModel):
+    prompt: str
+    title: str = "MoodWave AI 音乐草稿"
 
 
 @router.get("/music/recommend")
@@ -65,6 +72,55 @@ async def get_available_moods():
         "data": {
             "moods": ["happy", "sad", "calm", "anxious", "angry", "neutral"],
             "description": "系统支持的情绪类型",
+        },
+    }
+
+
+@router.post("/music/assets/mock-generate")
+async def mock_generate_music_asset(
+    request: MockMusicGenerateRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    创建 AI 音乐生成资产占位。
+
+    不调用真实外部 API，不上传 COS，只保存后续接入所需的元数据结构。
+    """
+    draft = create_mock_music_draft(prompt=request.prompt, title=request.title)
+    asset = MusicAsset(
+        user_id=current_user.id,
+        title=draft.title,
+        url=draft.url,
+        object_key=draft.object_key,
+        mime_type=draft.mime_type,
+        size=draft.size,
+        duration=draft.duration,
+        source=draft.source,
+        provider=draft.provider,
+        prompt=draft.prompt,
+        license_status=draft.license_status,
+    )
+    session.add(asset)
+    session.commit()
+    session.refresh(asset)
+
+    return {
+        "code": 0,
+        "msg": "mock music asset created",
+        "data": {
+            "id": asset.id,
+            "title": asset.title,
+            "url": asset.url,
+            "object_key": asset.object_key,
+            "mime_type": asset.mime_type,
+            "size": asset.size,
+            "duration": asset.duration,
+            "source": asset.source,
+            "provider": asset.provider,
+            "prompt": asset.prompt,
+            "license_status": asset.license_status,
+            "created_at": asset.created_at.isoformat() if asset.created_at else None,
         },
     }
 

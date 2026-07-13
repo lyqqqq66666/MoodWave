@@ -75,7 +75,7 @@ def create_db_and_tables():
     """
     # 导入所有数据库模型（让 SQLModel.metadata 扫描到它们）
     from src.core.models import (
-        FavoriteMusic, MoodEntry, Post, User,
+        FavoriteMusic, MoodEntry, MusicAsset, Post, User,
         CompanionConversation, CompanionMessage, CompanionMemory  # 新增灵音伙伴会话模型
     )  # noqa: F401
     SQLModel.metadata.create_all(engine)
