@@ -59,6 +59,17 @@ type MoodApiItem = {
   created_at?: string
   updated_at?: string
 }
+type InputModeFilter = "all" | "classic" | "body_map" | "imagery" | "quick"
+
+const sourceOptions: Array<{ value: InputModeFilter; label: string }> = [
+  { value: "all", label: "全部来源" },
+  { value: "classic", label: "经典记录" },
+  { value: "body_map", label: "身体体感" },
+  { value: "imagery", label: "意象词" },
+  { value: "quick", label: "快速记录" },
+]
+
+const bodyPartNames = ["头部", "肩颈", "胸口", "腹部", "手部", "整体"]
 
 function normalize(payload: unknown) {
   const wrapped = payload as { data?: unknown }
@@ -112,6 +123,13 @@ function mapMoodRecord(item: MoodApiItem): MoodRecord {
     tags: parseTags(item.tags),
     note: item.note || "",
   }
+}
+
+function getRecordSource(record: MoodRecord): InputModeFilter {
+  if (record.tags.some((tag) => tag === "身体体感" || bodyPartNames.some((part) => tag.startsWith(`${part}-`)))) return "body_map"
+  if (record.tags.some((tag) => tag === "意象词记录" || tag.startsWith("意象-"))) return "imagery"
+  if (record.tags.includes("快速记录")) return "quick"
+  return "classic"
 }
 
 function buildTrendFromRecords(records: MoodRecord[], selectedMonth: Date): TrendPoint[] {
@@ -207,6 +225,7 @@ export default function AnalyticsPage() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date())
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [selectedShareMood, setSelectedShareMood] = useState<MoodType | null>(null)
+  const [sourceFilter, setSourceFilter] = useState<InputModeFilter>("all")
   const [aiInsight, setAiInsight] = useState("")
   const [trendData, setTrendData] = useState<TrendPoint[]>([])
   const [shareData, setShareData] = useState<MoodShare[]>([])
@@ -335,8 +354,41 @@ export default function AnalyticsPage() {
     return records
       .filter((record) => record.date.startsWith(monthKey))
       .filter((record) => (selectedShareMood ? record.mood === selectedShareMood : true))
+      .filter((record) => (sourceFilter === "all" ? true : getRecordSource(record) === sourceFilter))
       .sort((a, b) => b.date.localeCompare(a.date))
-  }, [records, selectedMonth, selectedShareMood])
+  }, [records, selectedMonth, selectedShareMood, sourceFilter])
+  const v2SourceStats = useMemo(() => {
+    const stats = sourceOptions.filter((option) => option.value !== "all").map((option) => ({
+      ...option,
+      count: records.filter((record) => getRecordSource(record) === option.value).length,
+    }))
+    return stats
+  }, [records])
+  const bodyPartStats = useMemo(() => {
+    return bodyPartNames
+      .map((part) => ({
+        part,
+        count: records.reduce((count, record) => count + record.tags.filter((tag) => tag.startsWith(`${part}-`)).length, 0),
+      }))
+      .filter((item) => item.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
+  }, [records])
+  const vectorSnapshot = useMemo(() => {
+    const anxious = records.filter((record) => record.mood === "anxious").length
+    const sad = records.filter((record) => record.mood === "sad").length
+    const angry = records.filter((record) => record.mood === "angry").length
+    const calm = records.filter((record) => record.mood === "calm").length
+    const happy = records.filter((record) => record.mood === "happy").length
+    const total = Math.max(records.length, 1)
+    return [
+      { label: "焦虑", value: Math.round((anxious / total) * 100) },
+      { label: "疲惫/低落", value: Math.round((sad / total) * 100) },
+      { label: "释放需求", value: Math.round((angry / total) * 100) },
+      { label: "平静", value: Math.round((calm / total) * 100) },
+      { label: "愉悦", value: Math.round((happy / total) * 100) },
+    ]
+  }, [records])
   const monthOptions = useMemo(
     () => Array.from({ length: 12 }, (_, index) => new Date(selectedMonth.getFullYear(), index, 1)),
     [selectedMonth],
@@ -584,6 +636,86 @@ export default function AnalyticsPage() {
               </div>
             </div>
           ) : null}
+        </section>
+
+        <section className="min-w-0 overflow-hidden rounded-[34px] bg-white/82 p-4 shadow-[0_20px_60px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-7">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold text-slate-800">V2 情绪复盘信号</h2>
+              <p className="mt-1 text-sm text-slate-500">兼容旧记录；新体感、意象和快速记录会逐步沉淀在这里。</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {sourceOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSourceFilter(option.value)}
+                  className={cn(
+                    "min-h-9 rounded-full px-3 text-xs font-semibold transition",
+                    sourceFilter === option.value ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white" : "bg-[#fffafb] text-slate-500 ring-1 ring-[#f3dfe5]",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-[28px] bg-[#fffafb] p-4 ring-1 ring-[#f6e4e9]">
+              <p className="text-sm font-semibold text-slate-800">记录来源</p>
+              <div className="mt-4 space-y-3">
+                {v2SourceStats.map((item) => (
+                  <div key={item.value}>
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>{item.label}</span>
+                      <span>{item.count} 条</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-white">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5]" style={{ width: `${Math.min(100, item.count * 18)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] bg-[#fffafb] p-4 ring-1 ring-[#f6e4e9]">
+              <p className="text-sm font-semibold text-slate-800">高频体感区域</p>
+              <div className="mt-4 flex min-h-[120px] flex-wrap content-start gap-2">
+                {bodyPartStats.length ? bodyPartStats.map((item) => (
+                  <span key={item.part} className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#ff7894] shadow-sm">
+                    {item.part} · {item.count}
+                  </span>
+                )) : (
+                  <p className="text-sm leading-7 text-slate-400">体感记录会在 Phase 6 写入结构化字段；当前先从 tags 兼容统计。</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] bg-gradient-to-br from-[#fff7d8] to-[#effdfa] p-4 ring-1 ring-white/80">
+              <p className="text-sm font-semibold text-slate-800">情绪向量占位</p>
+              <div className="mt-4 space-y-2">
+                {vectorSnapshot.map((item) => (
+                  <div key={item.label} className="grid grid-cols-[72px_1fr_36px] items-center gap-2 text-xs text-slate-500">
+                    <span>{item.label}</span>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/80">
+                      <div className="h-full rounded-full bg-[#ff9fb4]" style={{ width: `${item.value}%` }} />
+                    </div>
+                    <span className="text-right">{item.value}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {["收藏", "跳过", "AI 生成"].map((label) => (
+              <div key={label} className="rounded-[24px] bg-white/84 p-4 ring-1 ring-[#f6e4e9]">
+                <p className="text-sm font-semibold text-slate-800">音乐疗愈反馈 · {label}</p>
+                <p className="mt-2 text-xs leading-6 text-slate-400">Phase 5/7 接入后，这里会显示音乐反馈趋势。</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <div className="grid min-w-0 gap-5 lg:grid-cols-[0.85fr_1.15fr]">
