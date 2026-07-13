@@ -3,6 +3,11 @@ import type { MoodType } from "./types"
 export type BodyPartId = "head" | "neck" | "chest" | "belly" | "hands" | "whole"
 export type BreathState = "rapid" | "shallow" | "steady" | "open"
 export type MusicGoal = "calm_down" | "sleep" | "energize" | "release" | "accompany"
+export type FaceExpression = {
+  mouth: "up" | "flat" | "down" | "pressed"
+  eyes: "soft" | "tired" | "tense" | "teary"
+  brows: "relaxed" | "furrowed" | "low"
+}
 
 export type BodySensationSelection = {
   part: BodyPartId
@@ -24,6 +29,7 @@ export type BodyPreset = {
   helper: string
   breathState: BreathState
   musicGoal: MusicGoal
+  expression?: FaceExpression
   selections: BodySensationSelection[]
 }
 
@@ -93,6 +99,36 @@ export const musicGoalOptions: Array<{ value: MusicGoal; label: string; helper: 
   { value: "accompany", label: "只是陪着我", helper: "不用改变也可以" },
 ]
 
+export const faceExpressionOptions = {
+  mouth: [
+    { value: "up", label: "上扬" },
+    { value: "flat", label: "平直" },
+    { value: "down", label: "下垂" },
+    { value: "pressed", label: "抿住" },
+  ],
+  eyes: [
+    { value: "soft", label: "放松" },
+    { value: "tired", label: "疲惫" },
+    { value: "tense", label: "紧张" },
+    { value: "teary", label: "想哭" },
+  ],
+  brows: [
+    { value: "relaxed", label: "舒展" },
+    { value: "furrowed", label: "皱起" },
+    { value: "low", label: "低垂" },
+  ],
+} satisfies {
+  mouth: Array<{ value: FaceExpression["mouth"]; label: string }>
+  eyes: Array<{ value: FaceExpression["eyes"]; label: string }>
+  brows: Array<{ value: FaceExpression["brows"]; label: string }>
+}
+
+export const defaultFaceExpression: FaceExpression = {
+  mouth: "flat",
+  eyes: "soft",
+  brows: "relaxed",
+}
+
 export const bodyPresets: BodyPreset[] = [
   {
     id: "busy-head",
@@ -100,6 +136,7 @@ export const bodyPresets: BodyPreset[] = [
     helper: "适合思绪很多、难以停下来的时刻",
     breathState: "shallow",
     musicGoal: "calm_down",
+    expression: { mouth: "pressed", eyes: "tense", brows: "furrowed" },
     selections: [
       { part: "head", labels: ["脑子停不下来", "思绪杂乱"] },
       { part: "chest", labels: ["发闷"] },
@@ -111,6 +148,7 @@ export const bodyPresets: BodyPreset[] = [
     helper: "适合压着一口气、不太舒展的时候",
     breathState: "shallow",
     musicGoal: "calm_down",
+    expression: { mouth: "down", eyes: "tense", brows: "low" },
     selections: [
       { part: "chest", labels: ["发闷", "堵得慌"] },
       { part: "neck", labels: ["紧绷"] },
@@ -122,6 +160,7 @@ export const bodyPresets: BodyPreset[] = [
     helper: "适合疲惫、无力、只想被安静陪着",
     breathState: "steady",
     musicGoal: "accompany",
+    expression: { mouth: "flat", eyes: "tired", brows: "low" },
     selections: [
       { part: "whole", labels: ["疲惫", "无力"] },
       { part: "head", labels: ["发沉"] },
@@ -133,6 +172,7 @@ export const bodyPresets: BodyPreset[] = [
     helper: "先标记一点模糊状态，也算有效记录",
     breathState: "steady",
     musicGoal: "accompany",
+    expression: { mouth: "flat", eyes: "soft", brows: "relaxed" },
     selections: [{ part: "whole", labels: ["麻木", "浮躁"] }],
   },
 ]
@@ -154,9 +194,13 @@ export function summarizeBodySensations(
   selections: BodySensationSelection[],
   breathState: BreathState,
   musicGoal: MusicGoal,
+  expression: FaceExpression = defaultFaceExpression,
 ) {
   const breathLabel = breathOptions.find((item) => item.value === breathState)?.label ?? "平稳"
   const goalLabel = musicGoalOptions.find((item) => item.value === musicGoal)?.label ?? "只是陪着我"
+  const mouthLabel = faceExpressionOptions.mouth.find((item) => item.value === expression.mouth)?.label ?? "平直"
+  const eyesLabel = faceExpressionOptions.eyes.find((item) => item.value === expression.eyes)?.label ?? "放松"
+  const browsLabel = faceExpressionOptions.brows.find((item) => item.value === expression.brows)?.label ?? "舒展"
   const sensationText = selections
     .filter((selection) => selection.labels.length > 0)
     .map((selection) => {
@@ -165,32 +209,39 @@ export function summarizeBodySensations(
     })
     .join("；")
 
-  return `${sensationText || "整体：说不上来"}；呼吸：${breathLabel}；想要：${goalLabel}`
+  return `${sensationText || "整体：说不上来"}；呼吸：${breathLabel}；表情：嘴巴${mouthLabel}、眼睛${eyesLabel}、眉毛${browsLabel}；想要：${goalLabel}`
 }
 
 export function mapBodyEntryToLegacyMood(
   selections: BodySensationSelection[],
   breathState: BreathState,
   musicGoal: MusicGoal,
+  expression: FaceExpression = defaultFaceExpression,
 ) {
   const labels = flattenBodyLabels(selections)
+  const mouthLabel = faceExpressionOptions.mouth.find((item) => item.value === expression.mouth)?.label ?? "平直"
+  const eyesLabel = faceExpressionOptions.eyes.find((item) => item.value === expression.eyes)?.label ?? "放松"
+  const browsLabel = faceExpressionOptions.brows.find((item) => item.value === expression.brows)?.label ?? "舒展"
   if (labels.length === 0) {
-    const summary = summarizeBodySensations(selections, breathState, musicGoal)
+    const summary = summarizeBodySensations(selections, breathState, musicGoal, expression)
     return {
       mood_type: "calm" as MoodType,
       intensity: 4,
       tags: [
         "身体体感",
         `呼吸-${breathOptions.find((item) => item.value === breathState)?.label ?? "平稳"}`,
+        `表情-嘴巴${mouthLabel}`,
+        `表情-眼睛${eyesLabel}`,
+        `表情-眉毛${browsLabel}`,
         `目标-${musicGoalOptions.find((item) => item.value === musicGoal)?.label ?? "陪伴"}`,
       ],
       note: summary,
     }
   }
   const anxiety = scoreLabels(labels, anxiousLabels) + (breathState === "rapid" ? 2 : breathState === "shallow" ? 1 : 0)
-  const sadness = scoreLabels(labels, sadLabels) + (musicGoal === "accompany" || musicGoal === "sleep" ? 1 : 0)
+  const sadness = scoreLabels(labels, sadLabels) + (musicGoal === "accompany" || musicGoal === "sleep" ? 1 : 0) + (expression.eyes === "teary" || expression.mouth === "down" ? 1 : 0)
   const anger = scoreLabels(labels, angryLabels) + (musicGoal === "release" ? 1 : 0)
-  const calm = scoreLabels(labels, calmLabels) + (breathState === "open" ? 2 : 0)
+  const calm = scoreLabels(labels, calmLabels) + (breathState === "open" ? 2 : 0) + (expression.eyes === "soft" && expression.brows === "relaxed" ? 1 : 0)
 
   const scores: Array<[MoodType, number]> = [
     ["anxious", anxiety],
@@ -204,7 +255,7 @@ export function mapBodyEntryToLegacyMood(
   const releaseBoost = musicGoal === "release" ? 1 : 0
   const intensity = Math.max(4, Math.min(8, 4 + Math.ceil(selectedCount / 2) + breathBoost + releaseBoost))
   const fallbackMood: MoodType = musicGoal === "energize" && score <= 1 ? "neutral" : moodType
-  const summary = summarizeBodySensations(selections, breathState, musicGoal)
+  const summary = summarizeBodySensations(selections, breathState, musicGoal, expression)
 
   return {
     mood_type: fallbackMood,
@@ -216,6 +267,9 @@ export function mapBodyEntryToLegacyMood(
         return selection.labels.map((label) => `${part}-${label}`)
       }),
       `呼吸-${breathOptions.find((item) => item.value === breathState)?.label ?? "平稳"}`,
+      `表情-嘴巴${mouthLabel}`,
+      `表情-眼睛${eyesLabel}`,
+      `表情-眉毛${browsLabel}`,
       `目标-${musicGoalOptions.find((item) => item.value === musicGoal)?.label ?? "陪伴"}`,
     ],
     note: summary,

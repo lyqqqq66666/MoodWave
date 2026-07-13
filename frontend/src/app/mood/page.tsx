@@ -15,13 +15,17 @@ import { MoodMediaUpload, type MoodImageAttachment } from "@/components/mood-med
 import { MoodVoiceRecorder } from "@/components/mood-voice-recorder"
 import { RecordDatePicker } from "@/components/record-date-picker"
 import {
+  bodyPartOptions,
   bodyPresets,
   breathOptions,
+  defaultFaceExpression,
+  faceExpressionOptions,
   mapBodyEntryToLegacyMood,
   musicGoalOptions,
   type BodyPartId,
   type BodySensationSelection,
   type BreathState,
+  type FaceExpression,
   type MusicGoal,
 } from "@/lib/body-sensation"
 import { useAuthGuard } from "@/hooks/useAuthGuard"
@@ -200,6 +204,7 @@ export default function MoodPage() {
   const [bodyClickCounts, setBodyClickCounts] = useState<Partial<Record<BodyPartId, number>>>({})
   const [breathState, setBreathState] = useState<BreathState>("steady")
   const [musicGoal, setMusicGoal] = useState<MusicGoal>("calm_down")
+  const [faceExpression, setFaceExpression] = useState<FaceExpression>(defaultFaceExpression)
   const voiceUploadTokenRef = useRef(0)
   const analysisStartedAtRef = useRef(0)
 
@@ -309,6 +314,7 @@ export default function MoodPage() {
     setBodySelections(preset.selections)
     setBreathState(preset.breathState)
     setMusicGoal(preset.musicGoal)
+    setFaceExpression(preset.expression ?? defaultFaceExpression)
     setActiveBodyPart(preset.selections[0]?.part ?? "whole")
   }
 
@@ -606,7 +612,7 @@ export default function MoodPage() {
       return
     }
 
-    const mapped = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal)
+    const mapped = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal, faceExpression)
     setSelectedMood(mapped.mood_type)
     setIntensity(mapped.intensity)
     setSelectedTags(mapped.tags)
@@ -696,7 +702,7 @@ export default function MoodPage() {
   }
 
   if (mode === "body") {
-    const mappedBodyMood = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal)
+    const mappedBodyMood = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal, faceExpression)
     const mappedMoodMeta = getMoodOption(mappedBodyMood.mood_type)
     const selectedLabels = bodySelections.flatMap((selection) => selection.labels)
     const companionMessage =
@@ -784,46 +790,138 @@ export default function MoodPage() {
             </section>
           ) : (
             <>
-              <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
                 <div className="rounded-[34px] bg-white/84 p-4 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
                   <BodySensationMap
                     selections={bodySelections}
                     activePart={activeBodyPart}
                     clickCounts={bodyClickCounts}
+                    expression={faceExpression}
                     onActivePartChange={setBodyPartActive}
                     onToggleLabel={toggleBodyLabel}
-                    onRemoveLabel={removeBodyLabel}
                   />
                 </div>
 
                 <aside className="space-y-4">
                   <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-lg font-semibold text-slate-900">已选身体线索</p>
+                        <p className="mt-1 text-xs text-slate-500">可点击删除，最多保留 6 个。</p>
+                      </div>
+                      <span className="rounded-full bg-[#fff3f6] px-3 py-1.5 text-xs font-semibold text-[#ff7894]">{bodyLabelCount}/6</span>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {bodySelections.some((selection) => selection.labels.length > 0) ? (
+                        bodySelections.flatMap((selection) =>
+                          selection.labels.map((label) => {
+                            const part = bodyPartOptions.find((item) => item.id === selection.part)
+                            return (
+                              <button
+                                key={`${selection.part}-${label}`}
+                                type="button"
+                                onClick={() => removeBodyLabel(selection.part, label)}
+                                className="flex min-h-11 w-full items-center justify-between rounded-full px-4 text-sm font-semibold shadow-sm ring-1 ring-white/80"
+                                style={{ backgroundColor: part?.softColor ?? "#fffafb", color: part?.color ?? "#64748b" }}
+                              >
+                                <span><span className="text-slate-500">{part?.label}</span>　{label}</span>
+                                <span className="text-slate-400">×</span>
+                              </button>
+                            )
+                          }),
+                        )
+                      ) : (
+                        <p className="rounded-[24px] bg-[#fffafb] px-4 py-4 text-sm leading-7 text-slate-400 ring-1 ring-[#f8e4e9]">
+                          先点击左侧人物的头部、胸口或肩颈，选择此刻最明显的身体感觉。
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
                     <div className="flex items-center gap-4">
-                      <CompanionPetOrb
-                        character={user?.avatar_character}
-                        color={user?.character_color}
-                        mood={mappedBodyMood.mood_type}
-                        size="sm"
-                      />
+                      <div className={cn("transition", (breathState === "shallow" || breathState === "rapid") && "animate-pulse")}>
+                        <CompanionPetOrb
+                          character={user?.avatar_character}
+                          color={user?.character_color}
+                          mood={mappedBodyMood.mood_type}
+                          size="sm"
+                        />
+                      </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">灵音陪你标记</p>
+                        <p className="text-sm font-semibold text-slate-900">灵音正在陪着你</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500">{companionMessage}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <p className="text-sm font-semibold text-slate-900">快捷组合</p>
-                    <div className="mt-3 grid gap-2">
-                      {bodyPresets.map((preset) => (
+                    <p className="text-sm font-semibold text-slate-900">此刻的呼吸状态</p>
+                    <div className="mt-4 grid grid-cols-4 overflow-hidden rounded-[22px] bg-[#fffafb] ring-1 ring-[#f3dfe5]">
+                      {breathOptions.map((option) => (
                         <button
-                          key={preset.id}
+                          key={option.value}
                           type="button"
-                          onClick={() => applyBodyPreset(preset.id)}
-                          className="rounded-[22px] bg-[#fffafb] px-4 py-3 text-left text-sm ring-1 ring-[#f3dfe5] transition hover:-translate-y-0.5 hover:bg-white"
+                          onClick={() => setBreathState(option.value)}
+                          className={cn(
+                            "min-h-12 px-2 text-xs font-semibold transition",
+                            breathState === option.value ? "bg-white text-[#ff7894] shadow-sm" : "text-slate-500",
+                          )}
+                          title={option.helper}
                         >
-                          <span className="font-semibold text-slate-800">{preset.label}</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-500">{preset.helper}</span>
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <p className="text-sm font-semibold text-slate-900">表情辅助</p>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        ["mouth", "嘴巴", faceExpressionOptions.mouth],
+                        ["eyes", "眼睛", faceExpressionOptions.eyes],
+                        ["brows", "眉毛", faceExpressionOptions.brows],
+                      ].map(([key, label, options]) => (
+                        <div key={key as string} className="grid grid-cols-[42px_1fr] items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500">{label as string}</span>
+                          <div className="grid grid-cols-4 overflow-hidden rounded-full bg-[#fffafb] ring-1 ring-[#f3dfe5]">
+                            {(options as Array<{ value: string; label: string }>).map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setFaceExpression((current) => ({ ...current, [key as keyof FaceExpression]: option.value } as FaceExpression))}
+                                className={cn(
+                                  "min-h-9 px-2 text-xs font-semibold transition",
+                                  faceExpression[key as keyof FaceExpression] === option.value ? "bg-white text-[#ff7894] shadow-sm" : "text-slate-500",
+                                )}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <p className="text-sm font-semibold text-slate-900">你希望音乐帮你</p>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      {musicGoalOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setMusicGoal(option.value)}
+                          className={cn(
+                            "min-h-[64px] rounded-[22px] px-3 py-2 text-sm font-semibold transition",
+                            musicGoal === option.value
+                              ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_24px_rgba(255,181,194,0.2)]"
+                              : "bg-[#fffafb] text-slate-600 ring-1 ring-[#f3dfe5]",
+                          )}
+                          title={option.helper}
+                        >
+                          {option.label}
                         </button>
                       ))}
                     </div>
@@ -844,61 +942,27 @@ export default function MoodPage() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <p className="text-sm font-semibold text-slate-900">快捷选择</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {bodyPresets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => applyBodyPreset(preset.id)}
+                          className="min-h-10 rounded-full bg-[#fffafb] px-3 text-xs font-semibold text-slate-600 ring-1 ring-[#f3dfe5] transition hover:-translate-y-0.5 hover:bg-white"
+                          title={preset.helper}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </aside>
               </section>
 
-              <section className="grid gap-5 lg:grid-cols-2">
-                <div className="rounded-[34px] bg-white/84 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
-                  <p className="text-sm font-semibold text-slate-900">呼吸现在更像哪一种？</p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {breathOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setBreathState(option.value)}
-                        className={cn(
-                          "min-h-[74px] rounded-[24px] px-4 py-3 text-left transition",
-                          breathState === option.value
-                            ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_14px_30px_rgba(255,151,173,0.22)]"
-                            : "bg-white text-slate-700 ring-1 ring-[#f3dfe5] hover:-translate-y-0.5",
-                        )}
-                      >
-                        <span className="font-semibold">{option.label}</span>
-                        <span className={cn("mt-1 block text-xs leading-5", breathState === option.value ? "text-white/84" : "text-slate-500")}>
-                          {option.helper}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-[34px] bg-white/84 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
-                  <p className="text-sm font-semibold text-slate-900">接下来希望音乐怎么陪你？</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {musicGoalOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setMusicGoal(option.value)}
-                        className={cn(
-                          "min-h-11 rounded-full px-4 text-sm font-semibold transition",
-                          musicGoal === option.value
-                            ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_24px_rgba(255,181,194,0.2)]"
-                            : "bg-white text-slate-600 ring-1 ring-[#f3dfe5] hover:-translate-y-0.5",
-                        )}
-                        title={option.helper}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-4 rounded-[22px] bg-[#fffafb] px-4 py-3 text-xs leading-6 text-slate-500 ring-1 ring-[#f8e4e9]">
-                    图片和语音补充仍在完整记录流里，本阶段体感记录先保持轻量。需要补充时可以进入完整记录。
-                  </p>
-                </div>
-              </section>
-
-              <section className="rounded-[30px] bg-white/90 p-4 shadow-[0_18px_50px_rgba(255,181,194,0.24)] ring-1 ring-white/80 backdrop-blur-xl lg:sticky lg:bottom-4 lg:z-20">
+              <section className="rounded-[30px] bg-white/90 p-4 shadow-[0_18px_50px_rgba(255,181,194,0.24)] ring-1 ring-white/80 backdrop-blur-xl">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">
