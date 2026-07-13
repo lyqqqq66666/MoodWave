@@ -63,6 +63,22 @@ type PreparedTrack = {
 
 const BPM_MIN = 40
 const BPM_MAX = 180
+const tuningControls = [
+  { key: "space", label: "空间感", helper: "长混响、房间感", min: 0, max: 100 },
+  { key: "brightness", label: "明亮度", helper: "高频空气感", min: 0, max: 100 },
+  { key: "warmth", label: "低频包裹", helper: "低频托底", min: 0, max: 100 },
+  { key: "density", label: "节奏密度", helper: "运动和鼓点感", min: 0, max: 100 },
+  { key: "nature", label: "自然声比例", helper: "雨声、水声、风声", min: 0, max: 100 },
+  { key: "vocal", label: "人声倾向", helper: "0 为纯音乐", min: 0, max: 100 },
+] as const
+
+const generationTemplates = [
+  { key: "sleep", label: "放松助眠", prompt: "60 BPM, soft piano, warm pad, rain ambience, no drums, gentle lullaby texture" },
+  { key: "calm", label: "慢慢平复", prompt: "72 BPM, minimal piano, low density, long reverb, breathing-like waves" },
+  { key: "energize", label: "给一点力气", prompt: "88 BPM, light guitar, soft percussion, hopeful melody, pastel mood" },
+  { key: "release", label: "安全释放", prompt: "cinematic ambient, emotional piano, gradual swell, safe catharsis, no harsh sounds" },
+  { key: "accompany", label: "只是陪着我", prompt: "lofi ambient, warm vinyl texture, soft pad, stable rhythm, companion feeling" },
+] as const
 
 function resolveTrackPlaybackUrl(url: string) {
   if (!url) return ""
@@ -214,6 +230,16 @@ function MusicPageContent() {
   const [hasMoodRecord, setHasMoodRecord] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
   const [audioError, setAudioError] = useState("")
+  const [tuningProfile, setTuningProfile] = useState<Record<(typeof tuningControls)[number]["key"], number>>({
+    space: 62,
+    brightness: mood === "sad" ? 38 : 56,
+    warmth: mood === "anxious" ? 68 : 54,
+    density: mood === "happy" ? 64 : 32,
+    nature: mood === "calm" || mood === "sad" ? 58 : 36,
+    vocal: 18,
+  })
+  const [activeTemplate, setActiveTemplate] = useState<(typeof generationTemplates)[number]["key"]>("calm")
+  const [mockGenerationState, setMockGenerationState] = useState<"idle" | "drafting" | "ready">("idle")
 
   const selectedRecommendation = recommendations[selectedTrack] ?? fallbackRecommendations[mood][0]
   const effectiveDuration = mediaDuration || selectedRecommendation.duration || 0
@@ -228,6 +254,12 @@ function MusicPageContent() {
     () => buildLocalMusicInsight(profile.insight, selectedRecommendation),
     [profile.insight, selectedRecommendation],
   )
+  const activePrompt = generationTemplates.find((template) => template.key === activeTemplate)?.prompt ?? generationTemplates[0].prompt
+  const prescriptionReasons = [
+    `${moodMeta.label}状态下先降低刺激密度`,
+    `当前强度 ${intensity}/10，推荐 ${currentBpm} BPM 附近的稳定节奏`,
+    selectedRecommendation.scene ? `场景偏向：${selectedRecommendation.scene}` : "优先使用本地治愈曲库和已保存 AI 音频",
+  ]
 
   const loadAIInsight = useCallback(async (signal?: AbortSignal) => {
     setIsInsightLoading(true)
@@ -1189,7 +1221,7 @@ function MusicPageContent() {
                   character={user?.avatar_character}
                   color={user?.character_color}
                   mood={mood}
-                  size="sm"
+                  size="md"
                 />
                 <div className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-white text-[#ff7f96] shadow-sm">
                   {isInsightLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircleHeart className="h-3.5 w-3.5" />}
@@ -1263,6 +1295,100 @@ function MusicPageContent() {
                 </button>
               ))}
             </div>
+          </IOSGlassCard>
+        </div>
+
+        <div className="mt-5 grid gap-5 xl:grid-cols-[0.95fr_1.05fr_1fr]">
+          <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-900">音乐处方</h3>
+                <p className="mt-1 text-xs text-slate-500">先用本地曲库和已有 AI 音频生成推荐解释。</p>
+              </div>
+              <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-[#ff7894]">{moodMeta.label}</span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {prescriptionReasons.map((reason) => (
+                <div key={reason} className="rounded-[22px] bg-white/72 px-4 py-3 text-sm leading-6 text-slate-600 ring-1 ring-white/80">
+                  {reason}
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 rounded-[22px] bg-gradient-to-r from-[#fff5d8] to-[#effdfa] p-4 text-sm leading-7 text-slate-600">
+              当前不会调用外部 AI 音乐 API；等 key 和账单准备好后，再把这里的处方转换为 Lyria / ElevenLabs / Mubert prompt。
+            </p>
+          </IOSGlassCard>
+
+          <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-900">调音面板</h3>
+                <p className="mt-1 text-xs text-slate-500">BPM 已接入播放速度，其余参数先作为本地调音预设。</p>
+              </div>
+              <span className="rounded-full bg-[#effdfa] px-3 py-1 text-xs font-semibold text-[#42b9aa]">Web Audio</span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {tuningControls.map((control) => (
+                <label key={control.key} className="rounded-[22px] bg-white/70 p-3 ring-1 ring-white/80">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-700">{control.label}</span>
+                    <span className="text-xs text-slate-400">{tuningProfile[control.key]}%</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">{control.helper}</p>
+                  <input
+                    type="range"
+                    min={control.min}
+                    max={control.max}
+                    value={tuningProfile[control.key]}
+                    onChange={(event) => setTuningProfile((current) => ({ ...current, [control.key]: Number(event.target.value) }))}
+                    className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5]"
+                    style={{ accentColor: "#ff8fa3" }}
+                  />
+                </label>
+              ))}
+            </div>
+          </IOSGlassCard>
+
+          <IOSGlassCard className={cn("rounded-[32px] p-5", iosApp && "bg-white/88")}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-900">AI 生成专属音乐</h3>
+                <p className="mt-1 text-xs text-slate-500">当前为 prompt 模板和 mock 状态，不会真实扣费。</p>
+              </div>
+              <Sparkles className="h-5 w-5 text-[#ff8fa3]" />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {generationTemplates.map((template) => (
+                <button
+                  key={template.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveTemplate(template.key)
+                    setMockGenerationState("idle")
+                  }}
+                  className={cn(
+                    "min-h-9 rounded-full px-3 text-xs font-semibold transition",
+                    activeTemplate === template.key ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white" : "bg-white/74 text-slate-500 ring-1 ring-white/80",
+                  )}
+                >
+                  {template.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-[22px] bg-[#fffafb] p-4 text-xs leading-6 text-slate-500 ring-1 ring-[#f6e4e9]">
+              {activePrompt}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMockGenerationState("drafting")
+                window.setTimeout(() => setMockGenerationState("ready"), 900)
+              }}
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-5 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)]"
+            >
+              {mockGenerationState === "drafting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {mockGenerationState === "ready" ? "已生成草稿占位" : mockGenerationState === "drafting" ? "正在生成草稿" : "生成专属音乐草稿"}
+            </button>
           </IOSGlassCard>
         </div>
       </div>
