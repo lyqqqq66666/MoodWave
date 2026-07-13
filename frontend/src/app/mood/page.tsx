@@ -20,6 +20,7 @@ import {
   breathOptions,
   defaultFaceExpression,
   faceExpressionOptions,
+  getCompanionBodyFeedback,
   mapBodyEntryToLegacyMood,
   musicGoalOptions,
   type BodyPartId,
@@ -704,19 +705,18 @@ export default function MoodPage() {
   if (mode === "body") {
     const mappedBodyMood = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal, faceExpression)
     const mappedMoodMeta = getMoodOption(mappedBodyMood.mood_type)
-    const selectedLabels = bodySelections.flatMap((selection) => selection.labels)
-    const companionMessage =
-      breathState === "shallow" || breathState === "rapid" || selectedLabels.some((label) => ["发闷", "堵得慌", "发慌"].includes(label))
-        ? "我陪你慢一点呼吸，先不用急着解释。"
-        : selectedLabels.some((label) => ["疲惫", "无力", "发沉", "麻木"].includes(label))
-          ? "今天的电量可能不多，我们先把身体放轻一点。"
-          : bodyLabelCount > 0
-            ? "这些身体线索已经足够开始分析了。"
-            : "点击身体区域，选一两个最像的感觉就好。"
+    const companionFeedback = getCompanionBodyFeedback(activeBodyPart, bodySelections, breathState)
+    const petLookClass = {
+      up: "-translate-y-1 rotate-[-3deg]",
+      right: "translate-x-1 rotate-[3deg]",
+      down: "translate-y-1 rotate-[2deg]",
+      left: "-translate-x-1 rotate-[-4deg]",
+      center: "",
+    }[companionFeedback.look]
 
     return (
       <MoodWaveShell title="身体体感记录">
-        <div className="mx-auto max-w-6xl space-y-5">
+        <div className="mx-auto max-w-[1500px] space-y-5">
           <section className="rounded-[34px] bg-white/84 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 md:p-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
@@ -790,8 +790,37 @@ export default function MoodPage() {
             </section>
           ) : (
             <>
-              <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-                <div className="rounded-[34px] bg-white/84 p-4 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-6">
+              <section className="grid gap-4 xl:grid-cols-[220px_minmax(380px,1fr)_330px] 2xl:grid-cols-[284px_minmax(520px,1fr)_420px]">
+                <aside className="order-2 space-y-4 xl:order-none">
+                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <p className="text-base font-semibold text-slate-900">快捷组合</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">不想慢慢选时，可以先点一个最接近的状态。</p>
+                    <div className="mt-4 space-y-3">
+                      {bodyPresets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => applyBodyPreset(preset.id)}
+                          className="flex min-h-[64px] w-full items-center justify-between rounded-[22px] bg-[#fffafb] px-4 py-3 text-left shadow-sm ring-1 ring-[#f3dfe5] transition hover:-translate-y-0.5 hover:bg-white"
+                          title={preset.helper}
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold text-slate-800">{preset.label}</span>
+                            <span className="mt-1 block text-[11px] leading-5 text-slate-500 2xl:text-xs">{preset.helper}</span>
+                          </span>
+                          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[28px] bg-gradient-to-br from-[#fff7d8] to-[#fff0f4] p-5 shadow-[0_16px_36px_rgba(255,213,223,0.14)] ring-1 ring-white/80">
+                    <p className="text-sm font-semibold text-[#b67820]">不知道点哪里？</p>
+                    <p className="mt-2 text-xs leading-6 text-[#9a6c36]">可以先点“整体”，再慢慢探索。重复点击同一区域时，灵音会提示那里可能更需要被照顾。</p>
+                  </div>
+                </aside>
+
+                <div className="order-1 rounded-[34px] bg-white/84 p-3 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-5 xl:order-none">
                   <BodySensationMap
                     selections={bodySelections}
                     activePart={activeBodyPart}
@@ -802,70 +831,90 @@ export default function MoodPage() {
                   />
                 </div>
 
-                <aside className="space-y-4">
+                <aside className="order-3 space-y-4 xl:order-none">
                   <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-lg font-semibold text-slate-900">已选身体线索</p>
-                        <p className="mt-1 text-xs text-slate-500">可点击删除，最多保留 6 个。</p>
+                        <p className="text-lg font-semibold text-slate-900">已选线索</p>
+                        <p className="mt-1 text-xs text-slate-500">按身体部位分组，可点击删除。</p>
                       </div>
-                      <span className="rounded-full bg-[#fff3f6] px-3 py-1.5 text-xs font-semibold text-[#ff7894]">{bodyLabelCount}/6</span>
+                      <button
+                        type="button"
+                        onClick={() => setBodySelections([])}
+                        className="rounded-full bg-[#fff3f6] px-3 py-1.5 text-xs font-semibold text-[#ff7894]"
+                      >
+                        清空 {bodyLabelCount}/6
+                      </button>
                     </div>
                     <div className="mt-4 space-y-2">
                       {bodySelections.some((selection) => selection.labels.length > 0) ? (
-                        bodySelections.flatMap((selection) =>
-                          selection.labels.map((label) => {
-                            const part = bodyPartOptions.find((item) => item.id === selection.part)
-                            return (
-                              <button
-                                key={`${selection.part}-${label}`}
-                                type="button"
-                                onClick={() => removeBodyLabel(selection.part, label)}
-                                className="flex min-h-11 w-full items-center justify-between rounded-full px-4 text-sm font-semibold shadow-sm ring-1 ring-white/80"
-                                style={{ backgroundColor: part?.softColor ?? "#fffafb", color: part?.color ?? "#64748b" }}
-                              >
-                                <span><span className="text-slate-500">{part?.label}</span>　{label}</span>
-                                <span className="text-slate-400">×</span>
-                              </button>
-                            )
-                          }),
-                        )
+                        bodySelections.map((selection) => {
+                          const part = bodyPartOptions.find((item) => item.id === selection.part)
+                          return (
+                            <div key={selection.part} className="rounded-[22px] bg-[#fffafb] p-3 ring-1 ring-[#f5e2e8]">
+                              <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: part?.color ?? "#64748b" }}>
+                                <span>{part?.icon}</span>
+                                <span>{part?.label}</span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {selection.labels.map((label) => (
+                                  <button
+                                    key={`${selection.part}-${label}`}
+                                    type="button"
+                                    onClick={() => removeBodyLabel(selection.part, label)}
+                                    className="inline-flex min-h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold shadow-sm ring-1 ring-white/80"
+                                    style={{ backgroundColor: part?.softColor ?? "#fffafb", color: part?.color ?? "#64748b" }}
+                                  >
+                                    {label}
+                                    <span className="text-slate-400">×</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })
                       ) : (
                         <p className="rounded-[24px] bg-[#fffafb] px-4 py-4 text-sm leading-7 text-slate-400 ring-1 ring-[#f8e4e9]">
-                          先点击左侧人物的头部、胸口或肩颈，选择此刻最明显的身体感觉。
+                          先点击中间人物的头部、胸口或肩颈，选择此刻最明显的身体感觉。
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <div className="flex items-center gap-4">
-                      <div className={cn("transition", (breathState === "shallow" || breathState === "rapid") && "animate-pulse")}>
+                  <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-white via-[#fff7fa] to-[#effdfa] p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <div className="absolute right-4 top-4 rounded-full bg-white/78 px-3 py-1 text-xs font-semibold text-[#ff7894] shadow-sm">
+                      推荐音乐
+                    </div>
+                    <div className="flex items-end gap-4">
+                      <div className={cn("shrink-0 transition duration-300", (breathState === "shallow" || breathState === "rapid") && "animate-pulse", petLookClass)}>
                         <CompanionPetOrb
                           character={user?.avatar_character}
                           color={user?.character_color}
                           mood={mappedBodyMood.mood_type}
-                          size="sm"
+                          size="md"
+                          showLabel
                         />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">灵音正在陪着你</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">{companionMessage}</p>
+                      <div className="relative min-w-0 flex-1 rounded-[24px] bg-white/92 p-4 shadow-sm ring-1 ring-[#f3dfe5]">
+                        <span className="absolute -left-2 bottom-7 h-4 w-4 rotate-45 bg-white/92 ring-1 ring-[#f3dfe5]" />
+                        <p className="relative text-sm font-semibold text-slate-900">灵音正在看着「{bodyPartOptions.find((item) => item.id === activeBodyPart)?.label}」</p>
+                        <p className="relative mt-2 text-xs leading-6 text-slate-500">{companionFeedback.message}</p>
+                        <p className="relative mt-2 rounded-[18px] bg-[#fff3f6] px-3 py-2 text-xs leading-5 text-[#ff7894]">{companionFeedback.musicHint}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <p className="text-sm font-semibold text-slate-900">此刻的呼吸状态</p>
-                    <div className="mt-4 grid grid-cols-4 overflow-hidden rounded-[22px] bg-[#fffafb] ring-1 ring-[#f3dfe5]">
+                    <p className="text-sm font-semibold text-slate-900">呼吸状态</p>
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-4">
                       {breathOptions.map((option) => (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => setBreathState(option.value)}
                           className={cn(
-                            "min-h-12 px-2 text-xs font-semibold transition",
-                            breathState === option.value ? "bg-white text-[#ff7894] shadow-sm" : "text-slate-500",
+                            "min-h-14 rounded-[18px] px-2 text-xs font-semibold transition ring-1",
+                            breathState === option.value ? "bg-white text-[#ff7894] shadow-sm ring-[#b8dbff]" : "bg-[#fffafb] text-slate-500 ring-[#f3dfe5]",
                           )}
                           title={option.helper}
                         >
@@ -876,7 +925,30 @@ export default function MoodPage() {
                   </div>
 
                   <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <p className="text-sm font-semibold text-slate-900">表情辅助</p>
+                    <p className="text-sm font-semibold text-slate-900">音乐目标</p>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      {musicGoalOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setMusicGoal(option.value)}
+                          className={cn(
+                            "min-h-[62px] rounded-[20px] px-3 py-2 text-left text-sm font-semibold transition",
+                            musicGoal === option.value
+                              ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_24px_rgba(255,181,194,0.2)]"
+                              : "bg-[#fffafb] text-slate-600 ring-1 ring-[#f3dfe5]",
+                          )}
+                          title={option.helper}
+                        >
+                          <span className="block">{option.label}</span>
+                          <span className={cn("mt-1 block text-[11px] font-medium", musicGoal === option.value ? "text-white/82" : "text-slate-400")}>{option.helper}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <details className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                    <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">表情辅助</summary>
                     <div className="mt-4 space-y-3">
                       {[
                         ["mouth", "嘴巴", faceExpressionOptions.mouth],
@@ -903,32 +975,13 @@ export default function MoodPage() {
                         </div>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <p className="text-sm font-semibold text-slate-900">你希望音乐帮你</p>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      {musicGoalOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setMusicGoal(option.value)}
-                          className={cn(
-                            "min-h-[64px] rounded-[22px] px-3 py-2 text-sm font-semibold transition",
-                            musicGoal === option.value
-                              ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_24px_rgba(255,181,194,0.2)]"
-                              : "bg-[#fffafb] text-slate-600 ring-1 ring-[#f3dfe5]",
-                          )}
-                          title={option.helper}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  </details>
 
                   <div className="rounded-[32px] bg-gradient-to-br from-[#fff7d8] to-[#effdfa] p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <p className="text-sm font-semibold text-slate-900">实时推断</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-900">实时推断</p>
+                      <span className="rounded-full bg-white/78 px-3 py-1 text-xs font-semibold text-slate-500">强度 {mappedBodyMood.intensity}/10</span>
+                    </div>
                     <div className="mt-4 flex items-center gap-3">
                       <span
                         className="grid h-14 w-14 place-items-center rounded-[22px] text-3xl"
@@ -941,56 +994,29 @@ export default function MoodPage() {
                         <p className="text-xs text-slate-500">强度约 {mappedBodyMood.intensity}/10</p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
-                    <p className="text-sm font-semibold text-slate-900">快捷选择</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {bodyPresets.map((preset) => (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          onClick={() => applyBodyPreset(preset.id)}
-                          className="min-h-10 rounded-full bg-[#fffafb] px-3 text-xs font-semibold text-slate-600 ring-1 ring-[#f3dfe5] transition hover:-translate-y-0.5 hover:bg-white"
-                          title={preset.helper}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </aside>
-              </section>
-
-              <section className="rounded-[30px] bg-white/90 p-4 shadow-[0_18px_50px_rgba(255,181,194,0.24)] ring-1 ring-white/80 backdrop-blur-xl">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      已选择 {bodyLabelCount}/6 个体感线索
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                    <p className="mt-3 text-xs leading-6 text-slate-500">
                       {bodyLabelCount > 0 ? mappedBodyMood.note : "至少选择一个身体线索后即可提交。"}
                     </p>
                     {submitNotice ? <p className="mt-2 text-xs text-[#b67820]">{submitNotice}</p> : null}
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <Link
+                        href="/mood?mode=classic&entry=body"
+                        className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]"
+                      >
+                        补充图片/语音
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleBodySubmit}
+                        disabled={bodyLabelCount === 0 || isSubmitting}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        记录并分析
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Link
-                      href="/mood?mode=classic&entry=body"
-                      className="inline-flex min-h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]"
-                    >
-                      去完整记录补充
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={handleBodySubmit}
-                      disabled={bodyLabelCount === 0 || isSubmitting}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      生成情绪分析
-                    </button>
-                  </div>
-                </div>
+                </aside>
               </section>
             </>
           )}

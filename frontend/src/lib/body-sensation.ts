@@ -21,6 +21,7 @@ export type BodyPartOption = {
   labels: string[]
   color: string
   softColor: string
+  icon: string
 }
 
 export type BodyPreset = {
@@ -41,6 +42,7 @@ export const bodyPartOptions: BodyPartOption[] = [
     labels: ["发沉", "紧绷", "脑子停不下来", "思绪杂乱", "空空的"],
     color: "#8fb6ff",
     softColor: "rgba(143,182,255,0.18)",
+    icon: "🧠",
   },
   {
     id: "neck",
@@ -49,6 +51,7 @@ export const bodyPartOptions: BodyPartOption[] = [
     labels: ["僵硬", "紧绷", "沉重", "放松发软"],
     color: "#8de1d5",
     softColor: "rgba(141,225,213,0.2)",
+    icon: "♨",
   },
   {
     id: "chest",
@@ -57,6 +60,7 @@ export const bodyPartOptions: BodyPartOption[] = [
     labels: ["堵得慌", "发闷", "发慌", "轻轻的", "舒展"],
     color: "#ff9fb4",
     softColor: "rgba(255,159,180,0.2)",
+    icon: "♥",
   },
   {
     id: "belly",
@@ -65,6 +69,7 @@ export const bodyPartOptions: BodyPartOption[] = [
     labels: ["发紧", "发空", "烦躁灼烧感", "安稳松弛"],
     color: "#ffd166",
     softColor: "rgba(255,209,102,0.2)",
+    icon: "◌",
   },
   {
     id: "hands",
@@ -73,6 +78,7 @@ export const bodyPartOptions: BodyPartOption[] = [
     labels: ["冰凉", "发麻", "握得很紧", "想抓住什么", "放松"],
     color: "#c7b8ff",
     softColor: "rgba(199,184,255,0.2)",
+    icon: "✦",
   },
   {
     id: "whole",
@@ -81,6 +87,7 @@ export const bodyPartOptions: BodyPartOption[] = [
     labels: ["疲惫", "浮躁", "麻木", "慌乱", "无力", "松弛"],
     color: "#9ed9a8",
     softColor: "rgba(158,217,168,0.22)",
+    icon: "☁",
   },
 ]
 
@@ -176,6 +183,66 @@ export const bodyPresets: BodyPreset[] = [
     selections: [{ part: "whole", labels: ["麻木", "浮躁"] }],
   },
 ]
+
+export const companionBodyFeedback: Record<BodyPartId, { message: string; musicHint: string; look: "up" | "right" | "down" | "left" | "center" }> = {
+  head: {
+    message: "我看到头部有点忙，我们先让思绪慢慢降噪。",
+    musicHint: "推荐低频柔和、旋律重复的平复音乐。",
+    look: "up",
+  },
+  neck: {
+    message: "肩颈像在替你扛东西，先让它松一点点。",
+    musicHint: "推荐带自然声和轻打击的舒缓音乐。",
+    look: "right",
+  },
+  chest: {
+    message: "胸口这里我陪你一起慢呼吸，不急着解释。",
+    musicHint: "推荐慢 BPM、长混响、少鼓点的安抚音乐。",
+    look: "right",
+  },
+  belly: {
+    message: "腹部的紧绷可以先放到音乐里，被慢慢托住。",
+    musicHint: "推荐暖色钢琴、木吉他或水声铺底。",
+    look: "down",
+  },
+  hands: {
+    message: "手也在表达紧张，我们先试着慢慢松开。",
+    musicHint: "推荐颗粒感轻、节奏稳定的陪伴音乐。",
+    look: "down",
+  },
+  whole: {
+    message: "整体状态已经被看见了，今天可以先被陪着。",
+    musicHint: "推荐柔和环境音和低刺激治愈歌单。",
+    look: "center",
+  },
+}
+
+export function getCompanionBodyFeedback(
+  activePart: BodyPartId,
+  selections: BodySensationSelection[],
+  breathState: BreathState,
+) {
+  const labels = flattenBodyLabels(selections)
+  if (breathState === "rapid" || breathState === "shallow" || labels.some((label) => ["发闷", "堵得慌", "发慌"].includes(label))) {
+    return {
+      ...companionBodyFeedback.chest,
+      message: "我陪你把呼吸放慢一点，先不用急着说清楚。",
+      musicHint: "先听慢速、低密度、像呼吸一样起伏的音乐。",
+    }
+  }
+  if (labels.some((label) => ["疲惫", "无力", "发沉", "麻木"].includes(label))) {
+    return {
+      ...companionBodyFeedback.whole,
+      message: "今天的电量可能不多，我们先把要求调低一点。",
+      musicHint: "推荐温柔陪伴型音乐，不催你振作。",
+    }
+  }
+  return selections.length > 0 ? companionBodyFeedback[activePart] : {
+    ...companionBodyFeedback[activePart],
+    message: "点一点身体上最明显的位置，我会陪你慢慢翻译它。",
+    musicHint: "选好线索后，我会给你推荐更贴合的治愈音乐。",
+  }
+}
 
 const anxiousLabels = ["脑子停不下来", "思绪杂乱", "发慌", "堵得慌", "紧绷", "慌乱", "握得很紧"]
 const sadLabels = ["空空的", "发空", "疲惫", "无力", "麻木", "发沉"]
