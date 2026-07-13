@@ -69,6 +69,18 @@ const fallbackRadar = [
   { mood: "平淡", score: 42 },
 ]
 
+const imageryWordBanks = [
+  ["乌云", "乱线", "密闭房间", "浓雾", "低气压", "死水", "碎玻璃", "空房间"],
+  ["慢流沙", "没电灯泡", "负重背包", "阴天傍晚", "浑浊湖水", "旧毛衣", "没信号"],
+  ["蜂鸣", "乱风", "碎纸屑", "摇晃水杯", "噪点雪花", "刺眼灯光"],
+  ["晚风", "湖面", "暖阳", "软云", "溪流", "萤火", "落叶", "星空"],
+  ["想放空", "想安静", "想被安抚", "想振奋", "想慢慢平复", "想被陪着"],
+]
+
+const anxiousImagery = ["乌云", "乱线", "密闭房间", "浓雾", "低气压", "蜂鸣", "乱风", "噪点雪花", "刺眼灯光"]
+const sadImagery = ["死水", "空房间", "慢流沙", "没电灯泡", "负重背包", "阴天傍晚", "浑浊湖水", "旧毛衣", "没信号"]
+const calmImagery = ["晚风", "湖面", "暖阳", "软云", "溪流", "萤火", "落叶", "星空", "想放空", "想安静", "想被安抚", "想慢慢平复", "想被陪着"]
+
 function formatDateHeadline(value: string) {
   const [year, month, day] = value.split("-")
   if (!year || !month || !day) return "今天"
@@ -163,13 +175,39 @@ function getTopTags(records: MoodOverviewRecord[], fallback?: string[]) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([tag]) => tag)
 }
 
+function mapImageryToLegacyMood(words: string[]) {
+  const anxiety = words.filter((word) => anxiousImagery.includes(word)).length
+  const sadness = words.filter((word) => sadImagery.includes(word)).length
+  const calm = words.filter((word) => calmImagery.includes(word)).length
+  const mood_type: MoodType = anxiety >= sadness && anxiety > calm ? "anxious" : sadness > anxiety && sadness >= calm ? "sad" : "calm"
+  const intensity = Math.max(4, Math.min(8, 4 + Math.ceil(words.length / 2) + (anxiety > 2 || sadness > 2 ? 1 : 0)))
+  return {
+    mood_type,
+    intensity,
+    tags: ["意象词记录", ...words.map((word) => `意象-${word}`)],
+    note: `这次选择的意象词：${words.join("、")}。`,
+  }
+}
+
+function inferQuickMood(text: string): MoodType {
+  if (/焦虑|紧张|慌|压力|烦|乱|睡不着/.test(text)) return "anxious"
+  if (/难过|低落|累|空|孤独|哭|疲惫|没电/.test(text)) return "sad"
+  if (/生气|愤怒|委屈|吵|讨厌/.test(text)) return "angry"
+  if (/开心|高兴|顺利|期待|喜欢/.test(text)) return "happy"
+  return "calm"
+}
+
 export default function MoodPage() {
   const searchParams = useSearchParams()
   const { user, token } = useAuthStore()
   const { isGuest } = useAuthGuard({ silent: true })
   const addGuestRecord = useGuestStore((state) => state.addRecord)
   const guestRecords = useGuestStore((state) => state.records)
-  const mode = searchParams.get("mode") === "classic" ? "classic" : searchParams.get("mode") === "body" ? "body" : "overview"
+  const modeParam = searchParams.get("mode")
+  const mode =
+    modeParam === "classic" || modeParam === "body" || modeParam === "imagery" || modeParam === "quick"
+      ? modeParam
+      : "overview"
   const entryIntent = searchParams.get("entry") ?? "classic"
   const [step, setStep] = useState(1)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -206,6 +244,8 @@ export default function MoodPage() {
   const [breathState, setBreathState] = useState<BreathState>("steady")
   const [musicGoal, setMusicGoal] = useState<MusicGoal>("calm_down")
   const [faceExpression, setFaceExpression] = useState<FaceExpression>(defaultFaceExpression)
+  const [imageryWords, setImageryWords] = useState<string[]>([])
+  const [imageryBankIndex, setImageryBankIndex] = useState(0)
   const voiceUploadTokenRef = useRef(0)
   const analysisStartedAtRef = useRef(0)
 
@@ -317,6 +357,40 @@ export default function MoodPage() {
     setMusicGoal(preset.musicGoal)
     setFaceExpression(preset.expression ?? defaultFaceExpression)
     setActiveBodyPart(preset.selections[0]?.part ?? "whole")
+  }
+
+  function toggleImageryWord(word: string) {
+    setImageryWords((current) => {
+      if (current.includes(word)) return current.filter((item) => item !== word)
+      if (current.length >= 5) return current
+      return [...current, word]
+    })
+  }
+
+  function handleImagerySubmit() {
+    if (imageryWords.length === 0) {
+      setSubmitNotice("先选择至少一个意象词，灵音才知道从哪里开始理解你。")
+      return
+    }
+    const mapped = mapImageryToLegacyMood(imageryWords)
+    setSelectedMood(mapped.mood_type)
+    setIntensity(mapped.intensity)
+    setSelectedTags(mapped.tags)
+    setNote(mapped.note)
+    window.setTimeout(() => void handleSubmit(), 0)
+  }
+
+  function handleQuickSubmit() {
+    const text = [note, voiceText].filter(Boolean).join(" ")
+    if (!text.trim() && images.length === 0 && !voiceFile) {
+      setSubmitNotice("写一句、传一张图或录一段语音，都可以开始快速记录。")
+      return
+    }
+    const inferredMood = inferQuickMood(text)
+    setSelectedMood(inferredMood)
+    setIntensity(text.length > 80 || voiceDuration > 30 ? 6 : 5)
+    setSelectedTags((current) => Array.from(new Set(["快速记录", ...current])))
+    window.setTimeout(() => void handleSubmit(), 0)
   }
 
   function clearVoiceRecording() {
@@ -702,6 +776,222 @@ export default function MoodPage() {
     }
   }
 
+  if (mode === "imagery" || mode === "quick") {
+    const isImageryMode = mode === "imagery"
+    const activeImageryBank = imageryWordBanks[imageryBankIndex % imageryWordBanks.length]
+    const simpleTitle = isImageryMode ? "意象词记录" : "快速记录"
+    const simpleHelper = isImageryMode
+      ? "不用判断自己是什么情绪，先选几个像此刻内心天气的词。"
+      : "文字、图片、语音任选一种，轻轻留下一点线索就够了。"
+
+    return (
+      <MoodWaveShell title={simpleTitle}>
+        <div className="mx-auto max-w-6xl space-y-5">
+          <section className="rounded-[34px] bg-white/84 p-5 shadow-[0_20px_60px_rgba(255,208,219,0.22)] ring-1 ring-white/75 md:p-7">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <Link href="/mood" className="inline-flex min-h-10 items-center rounded-full bg-white px-4 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]">
+                  返回记录首页
+                </Link>
+                <p className="mt-5 text-sm font-semibold text-[#ff7894]">{simpleTitle}</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-normal text-[#1f2635] md:text-4xl">
+                  {isImageryMode ? "让几个画面感词语，替你先说出感觉。" : "只留下这一刻，其他慢慢来。"}
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{simpleHelper}</p>
+              </div>
+              <RecordDatePicker value={recordDate} onChange={setRecordDate} className="self-start" />
+            </div>
+          </section>
+
+          {isSubmitting || submitted ? (
+            <section className="rounded-[34px] bg-white/88 p-6 text-center shadow-[0_20px_60px_rgba(255,208,219,0.2)] ring-1 ring-white/75 md:p-8">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_18px_34px_rgba(255,181,194,0.28)]">
+                <Sparkles className="h-8 w-8" />
+              </div>
+              <h2 className="mt-5 text-2xl font-semibold">
+                {submitted ? "这次心情已经整理好了" : "灵音正在理解你刚刚留下的线索"}
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-slate-500">
+                {analysisStage || "正在把这些词语和记录转换成温柔的情绪报告。"}
+              </p>
+              <div className="mx-auto mt-6 max-w-2xl">
+                <div className="h-3 overflow-hidden rounded-full bg-[#f6e9ee]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffc3d0] to-[#8de1d5] transition-[width] duration-500 ease-out"
+                    style={{ width: `${analysisProgress}%` }}
+                  />
+                </div>
+              </div>
+              {submitNotice ? (
+                <p className="mx-auto mt-4 max-w-xl rounded-full bg-[#fff7d8] px-4 py-2 text-xs text-[#b67820]">{submitNotice}</p>
+              ) : null}
+              <div className="mx-auto mt-6 max-w-3xl">
+                {submitted ? <MoodAnalysisReport report={analysisReport ?? buildFallbackReport()} /> : null}
+              </div>
+              {submitted ? (
+                <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmitted(false)
+                      setAnalysisReport(null)
+                      setSubmitNotice("")
+                      setAnalysisStage("")
+                    }}
+                    className="rounded-full border border-[#f1dbe2] bg-white px-6 py-3 text-sm font-semibold text-slate-700"
+                  >
+                    继续调整
+                  </button>
+                  <Link
+                    href={`/music?mood=${selectedMood}&intensity=${intensity}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 py-3 text-sm font-semibold text-white"
+                  >
+                    <Play className="h-4 w-4" />
+                    播放治愈音乐
+                  </Link>
+                </div>
+              ) : null}
+            </section>
+          ) : isImageryMode ? (
+            <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="rounded-[34px] bg-white/86 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-7">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-slate-900">意象词云</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">最多选择 5 个。找不到贴切的词，可以刷新一组。</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setImageryBankIndex((value) => value + 1)}
+                    className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#fff3f6] px-4 text-sm font-semibold text-[#ff7894]"
+                  >
+                    刷新词云
+                  </button>
+                </div>
+
+                <div className="mt-6 flex min-h-[320px] flex-wrap content-center items-center justify-center gap-3 rounded-[30px] bg-gradient-to-br from-[#fffafb] via-white to-[#effdfa] p-5 ring-1 ring-[#f6e4e9]">
+                  {activeImageryBank.map((word, index) => {
+                    const selected = imageryWords.includes(word)
+                    const disabled = !selected && imageryWords.length >= 5
+                    return (
+                      <button
+                        key={word}
+                        type="button"
+                        onClick={() => toggleImageryWord(word)}
+                        disabled={disabled}
+                        className={cn(
+                          "min-h-11 rounded-full px-4 text-sm font-semibold transition",
+                          index % 3 === 0 && "md:text-lg",
+                          index % 4 === 0 && "md:px-6",
+                          selected
+                            ? "bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] text-white shadow-[0_12px_24px_rgba(255,181,194,0.2)]"
+                            : "bg-white/88 text-slate-600 ring-1 ring-[#f3dfe5] hover:-translate-y-0.5",
+                          disabled && "cursor-not-allowed opacity-45 hover:translate-y-0",
+                        )}
+                      >
+                        {word}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <aside className="space-y-4">
+                <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                  <div className="flex items-center justify-between">
+                    <p className="text-lg font-semibold text-slate-900">已选意象</p>
+                    <span className="rounded-full bg-[#fff3f6] px-3 py-1 text-xs font-semibold text-[#ff7894]">{imageryWords.length}/5</span>
+                  </div>
+                  <div className="mt-4 flex min-h-[120px] flex-wrap content-start gap-2 rounded-[24px] bg-[#fffafb] p-3 ring-1 ring-[#f6e4e9]">
+                    {imageryWords.length ? imageryWords.map((word) => (
+                      <button
+                        key={word}
+                        type="button"
+                        onClick={() => toggleImageryWord(word)}
+                        className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#ff7894] shadow-sm"
+                      >
+                        {word} ×
+                      </button>
+                    )) : (
+                      <p className="text-sm leading-7 text-slate-400">选一个最贴近当下的画面词就可以开始。</p>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-[32px] bg-gradient-to-br from-[#fff7d8] to-[#effdfa] p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                  <p className="text-sm font-semibold text-slate-900">灵音会这样理解</p>
+                  <p className="mt-3 text-sm leading-7 text-slate-500">
+                    {imageryWords.length ? mapImageryToLegacyMood(imageryWords).note : "意象词会被转成情绪、强度和标签，再进入原有 AI 分析流程。"}
+                  </p>
+                  {submitNotice ? <p className="mt-3 text-xs text-[#b67820]">{submitNotice}</p> : null}
+                  <button
+                    type="button"
+                    onClick={handleImagerySubmit}
+                    disabled={imageryWords.length === 0}
+                    className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    记录并分析
+                  </button>
+                </div>
+              </aside>
+            </section>
+          ) : (
+            <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-[34px] bg-white/86 p-5 shadow-[0_18px_50px_rgba(255,208,219,0.18)] ring-1 ring-white/75 md:p-7">
+                <h3 className="text-xl font-semibold text-slate-900">随便留下一点小细节</h3>
+                <p className="mt-2 text-sm leading-7 text-slate-500">不用总结心情，写一句、传一张图或录一段语音都可以。</p>
+                <div className="mt-5 rounded-[28px] border border-[#f6e4e9] bg-white p-4 shadow-[0_10px_28px_rgba(255,216,225,0.12)]">
+                  <textarea
+                    value={note}
+                    onChange={(event) => setNote(event.target.value.slice(0, 500))}
+                    placeholder="比如：今天脑子有点乱，想先安静一会儿。"
+                    rows={7}
+                    className="w-full resize-none bg-transparent text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-400"
+                  />
+                  <div className="mt-3 flex items-center justify-between border-t border-[#f7e6eb] pt-4">
+                    <p className="text-xs text-slate-400">文字、图片和语音会一起进入分析</p>
+                    <p className="text-xs text-slate-400">{note.length}/500</p>
+                  </div>
+                </div>
+                <details className="mt-4 rounded-[28px] bg-[#fffafb] p-4 ring-1 ring-[#f6e4e9]">
+                  <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">补充图片或语音</summary>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <MoodMediaUpload images={images} onImagesChange={setImages} />
+                    <MoodVoiceRecorder onRecordingChange={handleVoiceRecording} resetKey={voiceResetKey} />
+                  </div>
+                </details>
+              </div>
+
+              <aside className="space-y-4">
+                <div className="rounded-[32px] bg-white/86 p-5 shadow-[0_18px_48px_rgba(255,213,223,0.16)] ring-1 ring-white/80">
+                  <p className="text-lg font-semibold text-slate-900">快速入口</p>
+                  <p className="mt-3 text-sm leading-7 text-slate-500">
+                    灵音会先根据文字和语音转写粗略判断情绪，再沿用现有 AI 分析与保存流程。
+                  </p>
+                  {submitNotice ? <p className="mt-3 text-xs text-[#b67820]">{submitNotice}</p> : null}
+                  <button
+                    type="button"
+                    onClick={handleQuickSubmit}
+                    className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff97ad] to-[#8de1d5] px-6 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(255,151,173,0.22)]"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    记录并分析
+                  </button>
+                </div>
+                <Link
+                  href="/mood?mode=classic"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]"
+                >
+                  去完整三步记录
+                </Link>
+              </aside>
+            </section>
+          )}
+        </div>
+      </MoodWaveShell>
+    )
+  }
+
   if (mode === "body") {
     const mappedBodyMood = mapBodyEntryToLegacyMood(bodySelections, breathState, musicGoal, faceExpression)
     const mappedMoodMeta = getMoodOption(mappedBodyMood.mood_type)
@@ -1041,21 +1331,21 @@ export default function MoodPage() {
         title: "意象词记录",
         helper: "用画面感和氛围词进入记录。",
         icon: Feather,
-        href: "/mood?mode=classic&entry=imagery",
+        href: "/mood?mode=imagery",
       },
       {
         key: "quick",
         title: "快速文字记录",
         helper: "只写一句也可以被接住。",
         icon: PenLine,
-        href: "/mood?mode=classic&entry=quick",
+        href: "/mood?mode=quick",
       },
       {
         key: "voice",
         title: "语音碎碎念",
         helper: "直接说出来，后续转写进分析。",
         icon: Mic2,
-        href: "/mood?mode=classic&entry=voice",
+        href: "/mood?mode=quick",
       },
     ]
 
@@ -1086,7 +1376,7 @@ export default function MoodPage() {
                         开始体感记录
                       </Link>
                       <Link
-                        href="/mood?mode=classic&entry=voice"
+                        href="/mood?mode=quick"
                         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-slate-600 ring-1 ring-[#f1dfe5]"
                       >
                         <Mic2 className="h-4 w-4 text-[#ff7894]" />
