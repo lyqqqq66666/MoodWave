@@ -652,6 +652,13 @@ async def analyze_mood_multi_modal(
     history_moods: list[dict] | None = None,
     mbti: str = "",
     zodiac: str = "",
+    input_mode: str = "classic",
+    body_sensations: str = "",
+    imagery_words: str = "",
+    breath_state: str = "",
+    voice_features: str = "",
+    music_goal: str = "",
+    emotion_vector: str = "",
 ) -> dict:
     """
     综合多模态输入，生成完整情绪分析报告
@@ -670,6 +677,7 @@ async def analyze_mood_multi_modal(
     parts = [
         f"情绪类型：{_mood_label(mood_type)}",
         f"情绪强度：{intensity}/10",
+        f"输入方式：{input_mode}",
     ]
     if mbti:
         parts.append(f"用户 MBTI：{mbti}")
@@ -683,6 +691,18 @@ async def analyze_mood_multi_modal(
         parts.append(f"图片分析：{image_analysis}")
     if voice_text:
         parts.append(f"语音转写：{voice_text}")
+    if body_sensations:
+        parts.append(f"身体体感结构化线索：{body_sensations}")
+    if imagery_words:
+        parts.append(f"意象词：{imagery_words}")
+    if breath_state:
+        parts.append(f"呼吸状态：{breath_state}")
+    if voice_features:
+        parts.append(f"语音基础特征：{voice_features}")
+    if music_goal:
+        parts.append(f"用户希望音乐达到的目标：{music_goal}")
+    if emotion_vector:
+        parts.append(f"前端/规则侧情绪向量：{emotion_vector}")
     if history_moods:
         recent = history_moods[-5:]  # 最近5条
         history_text = "; ".join(

@@ -61,8 +61,8 @@ export const postsAPI = {
 
 // 音乐推荐接口
 export const musicAPI = {
-  recommend: (moodType?: string) =>
-    apiClient.get('/api/music/recommend', { params: { mood_type: moodType } }),
+  recommend: (moodType?: string, params?: { music_goal?: string; recent_context?: string }) =>
+    apiClient.get('/api/music/recommend', { params: { mood_type: moodType, ...params } }),
   favorite: (data: any) => apiClient.post('/api/music/favorite', data),
   favorites: () => apiClient.get('/api/music/favorites'),
 }

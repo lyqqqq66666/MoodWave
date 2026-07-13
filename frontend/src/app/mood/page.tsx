@@ -636,6 +636,9 @@ export default function MoodPage() {
           voice_text: submittedVoiceText,
           mbti: user?.mbti || "",
           zodiac: user?.zodiac || "",
+          input_mode: mode === "imagery" || mode === "quick" ? mode : "classic",
+          imagery_words: mode === "imagery" ? JSON.stringify(imageryWords) : "",
+          voice_features: voiceFile ? JSON.stringify({ duration: voiceDuration }) : "",
         })
         .then((response) => {
           const envelope = response.data as { code?: number; msg?: string; fallback?: boolean; data?: MoodAnalysisReportData | null }
@@ -664,6 +667,9 @@ export default function MoodPage() {
         image_analysis: imageAnalysis,
         voice_url: submittedVoiceUrl,
         voice_text: submittedVoiceText,
+        input_mode: mode === "imagery" || mode === "quick" ? mode : "classic",
+        imagery_words: mode === "imagery" ? JSON.stringify(imageryWords) : "",
+        voice_features: voiceFile ? JSON.stringify({ duration: voiceDuration }) : "",
       })
     } catch {
       setAnalysisStage("网络有点不稳，我先把这次心情接住，再给你一版本地反馈。")
@@ -731,6 +737,10 @@ export default function MoodPage() {
           voice_text: "",
           mbti: user?.mbti || "",
           zodiac: user?.zodiac || "",
+          input_mode: "body_map",
+          body_sensations: JSON.stringify(bodySelections),
+          breath_state: breathState,
+          music_goal: musicGoal,
         })
         .then((response) => {
           const envelope = response.data as { code?: number; msg?: string; fallback?: boolean; data?: MoodAnalysisReportData | null }
@@ -759,6 +769,10 @@ export default function MoodPage() {
         image_analysis: `身体体感记录：${mapped.note}`,
         voice_url: "",
         voice_text: "",
+        input_mode: "body_map",
+        body_sensations: JSON.stringify(bodySelections),
+        breath_state: breathState,
+        music_goal: musicGoal,
       })
     } catch {
       setAnalysisStage("网络有点不稳，我先把这次身体线索接住，再给你一版本地反馈。")

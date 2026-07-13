@@ -39,6 +39,13 @@ def _ensure_runtime_columns():
             "image_analysis": "TEXT DEFAULT ''",
             "voice_url": "TEXT DEFAULT ''",
             "voice_text": "TEXT DEFAULT ''",
+            "input_mode": "TEXT DEFAULT 'classic'",
+            "body_sensations": "TEXT DEFAULT ''",
+            "imagery_words": "TEXT DEFAULT ''",
+            "breath_state": "TEXT DEFAULT ''",
+            "voice_features": "TEXT DEFAULT ''",
+            "music_goal": "TEXT DEFAULT ''",
+            "emotion_vector": "TEXT DEFAULT ''",
         }
         with engine.begin() as connection:
             for column_name, column_sql in mood_required.items():

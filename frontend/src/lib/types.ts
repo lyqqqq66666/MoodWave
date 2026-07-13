@@ -11,6 +11,13 @@ export interface MoodEntry {
   intensity: number
   tags: MoodTag[]
   note: string
+  input_mode?: string
+  body_sensations?: string
+  imagery_words?: string
+  breath_state?: string
+  voice_features?: string
+  music_goal?: string
+  emotion_vector?: string
   created_at: string
   updated_at: string
 }
@@ -21,6 +28,13 @@ export interface CreateMoodEntryRequest {
   intensity: number
   tags: MoodTag[]
   note: string
+  input_mode?: string
+  body_sensations?: string
+  imagery_words?: string
+  breath_state?: string
+  voice_features?: string
+  music_goal?: string
+  emotion_vector?: string
 }
 
 export interface WeeklyAnalytics {

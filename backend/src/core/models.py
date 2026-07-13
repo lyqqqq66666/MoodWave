@@ -93,6 +93,13 @@ class MoodEntryBase(SQLModel):
     image_analysis: str = Field(default="")  # qwen3-vl-plus 图片分析结果（JSON）
     voice_url: str = Field(default="")  # 语音文件URL
     voice_text: str = Field(default="")  # qwen3-asr-flash 语音转文字结果
+    input_mode: str = Field(default="classic")  # classic/body_map/imagery/quick
+    body_sensations: str = Field(default="")  # JSON字符串，身体体感结构化数据
+    imagery_words: str = Field(default="")  # JSON字符串，意象词
+    breath_state: str = Field(default="")  # rapid/shallow/steady/open
+    voice_features: str = Field(default="")  # JSON字符串，语音基础特征
+    music_goal: str = Field(default="")  # calm_down/sleep/energize/release/accompany
+    emotion_vector: str = Field(default="")  # JSON字符串，多维情绪向量
 
 
 class MoodEntry(MoodEntryBase, table=True):
@@ -118,6 +125,13 @@ class MoodEntryCreate(SQLModel):
     image_analysis: Optional[str] = None  # AI分析结果
     voice_url: Optional[str] = None
     voice_text: Optional[str] = None
+    input_mode: Optional[str] = None
+    body_sensations: Optional[str] = None
+    imagery_words: Optional[str] = None
+    breath_state: Optional[str] = None
+    voice_features: Optional[str] = None
+    music_goal: Optional[str] = None
+    emotion_vector: Optional[str] = None
 
 
 class MoodEntryUpdate(BaseModel):
@@ -127,6 +141,13 @@ class MoodEntryUpdate(BaseModel):
     intensity: Optional[int] = None
     tags: Optional[str] = None  # 前端传JSON字符串，接口层转换
     note: Optional[str] = None
+    input_mode: Optional[str] = None
+    body_sensations: Optional[str] = None
+    imagery_words: Optional[str] = None
+    breath_state: Optional[str] = None
+    voice_features: Optional[str] = None
+    music_goal: Optional[str] = None
+    emotion_vector: Optional[str] = None
 
 
 class MoodEntryResponse(SQLModel):

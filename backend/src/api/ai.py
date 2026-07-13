@@ -388,6 +388,13 @@ class AnalyzeMoodRequest(BaseModel):
     history_moods: Optional[List[dict]] = None  # 近期情绪历史
     mbti: str = ""                         # 用户 MBTI
     zodiac: str = ""                       # 用户星座
+    input_mode: str = "classic"
+    body_sensations: Optional[str] = None
+    imagery_words: Optional[str] = None
+    breath_state: Optional[str] = None
+    voice_features: Optional[str] = None
+    music_goal: Optional[str] = None
+    emotion_vector: Optional[str] = None
 
 
 @router.post("/ai/analyze-mood")
@@ -447,6 +454,13 @@ async def analyze_mood_endpoint(request: AnalyzeMoodRequest):
             history_moods=request.history_moods,
             mbti=request.mbti,
             zodiac=request.zodiac,
+            input_mode=request.input_mode,
+            body_sensations=request.body_sensations or "",
+            imagery_words=request.imagery_words or "",
+            breath_state=request.breath_state or "",
+            voice_features=request.voice_features or "",
+            music_goal=request.music_goal or "",
+            emotion_vector=request.emotion_vector or "",
         )
         is_fallback = bool(result.pop("_fallback", False))
         return JSONResponse({

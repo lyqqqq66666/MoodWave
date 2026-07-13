@@ -20,6 +20,8 @@ router = APIRouter()
 async def recommend_music(
     mood_type: Optional[str] = Query(None, description="情绪类型（mood_type 或 mood 均可）"),
     mood: Optional[str] = Query(None, description="情绪类型别名，与 mood_type 等价"),
+    music_goal: Optional[str] = Query(None, description="V2 音乐目标，预留兼容参数"),
+    recent_context: Optional[str] = Query(None, description="V2 近期情绪上下文，预留兼容参数"),
     limit: int = Query(5, ge=1, le=20, description="返回的推荐数量"),
 ):
     """
@@ -41,6 +43,11 @@ async def recommend_music(
         "code": 0,
         "msg": "ok",
         "data": recommendations,
+        "meta": {
+            "music_goal": music_goal or "",
+            "recent_context": recent_context or "",
+            "strategy": "local_library_rule_based",
+        },
     }
 
 

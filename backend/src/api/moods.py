@@ -21,6 +21,19 @@ from src.api.auth import get_current_user
 router = APIRouter()
 
 
+def mood_v2_fields(mood: MoodEntry) -> dict:
+    """返回 V2 扩展字段，旧数据缺列时保持空值兼容。"""
+    return {
+        "input_mode": getattr(mood, "input_mode", "classic") or "classic",
+        "body_sensations": getattr(mood, "body_sensations", "") or "",
+        "imagery_words": getattr(mood, "imagery_words", "") or "",
+        "breath_state": getattr(mood, "breath_state", "") or "",
+        "voice_features": getattr(mood, "voice_features", "") or "",
+        "music_goal": getattr(mood, "music_goal", "") or "",
+        "emotion_vector": getattr(mood, "emotion_vector", "") or "",
+    }
+
+
 @router.post("/moods", response_model=dict)
 async def create_mood(
     mood: MoodEntryCreate,
@@ -58,6 +71,13 @@ async def create_mood(
             image_analysis=mood.image_analysis or "",
             voice_url=mood.voice_url or "",
             voice_text=mood.voice_text or "",
+            input_mode=mood.input_mode or "classic",
+            body_sensations=mood.body_sensations or "",
+            imagery_words=mood.imagery_words or "",
+            breath_state=mood.breath_state or "",
+            voice_features=mood.voice_features or "",
+            music_goal=mood.music_goal or "",
+            emotion_vector=mood.emotion_vector or "",
             user_id=current_user.id  # 从 JWT token 解析
         )
         session.add(db_mood)
@@ -83,6 +103,7 @@ async def create_mood(
                 "image_analysis": db_mood.image_analysis,
                 "voice_url": db_mood.voice_url,
                 "voice_text": db_mood.voice_text,
+                **mood_v2_fields(db_mood),
                 "created_at": db_mood.created_at.isoformat() if db_mood.created_at else None,
                 "updated_at": db_mood.updated_at.isoformat() if db_mood.updated_at else None,
             }
@@ -139,6 +160,7 @@ async def list_moods(
             "image_analysis": mood.image_analysis,
             "voice_url": mood.voice_url,
             "voice_text": mood.voice_text,
+            **mood_v2_fields(mood),
             "created_at": mood.created_at.isoformat() if mood.created_at else None,
             "updated_at": mood.updated_at.isoformat() if mood.updated_at else None,
         }
@@ -192,6 +214,7 @@ async def get_mood(
             "image_analysis": mood.image_analysis,
             "voice_url": mood.voice_url,
             "voice_text": mood.voice_text,
+            **mood_v2_fields(mood),
             "user_id": mood.user_id,
             "created_at": mood.created_at.isoformat() if mood.created_at else None,
             "updated_at": mood.updated_at.isoformat() if mood.updated_at else None,
@@ -258,6 +281,7 @@ async def update_mood(
             "image_analysis": mood.image_analysis,
             "voice_url": mood.voice_url,
             "voice_text": mood.voice_text,
+            **mood_v2_fields(mood),
             "user_id": mood.user_id,
             "created_at": mood.created_at.isoformat() if mood.created_at else None,
             "updated_at": mood.updated_at.isoformat() if mood.updated_at else None,
