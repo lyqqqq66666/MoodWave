@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import os
 
 # JWT 密钥（生产环境建议从环境变量读取）
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "moodwave-dev-secret-key-2024-change-in-prod")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or "moodwave-dev-secret-key-2024-change-in-prod"
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = 7
 
@@ -30,7 +30,24 @@ class User(SQLModel, table=True):
     mbti: Optional[str] = Field(default=None)
     avatar_character: str = Field(default="cat")  # 灵音伙伴角色形象
     zodiac: str = Field(default="")  # 星座
+    email_verified: bool = Field(default=False, index=True)
+    email_verified_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EmailVerificationCode(SQLModel, table=True):
+    """邮箱验证码数据库模型"""
+    __tablename__ = "email_verification_codes"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True)
+    purpose: str = Field(index=True)  # register / login
+    code_hash: str
+    expires_at: datetime
+    consumed_at: Optional[datetime] = Field(default=None)
+    attempts: int = Field(default=0)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_sent_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class UserCreate(BaseModel):
@@ -38,12 +55,26 @@ class UserCreate(BaseModel):
     email: str
     username: str
     password: str
+    confirm_password: str
+    code: str
 
 
 class UserLogin(BaseModel):
     """登录请求模型"""
     email: str
     password: str
+
+
+class EmailCodeRequest(BaseModel):
+    """发送邮箱验证码请求模型"""
+    email: str
+    purpose: str
+
+
+class EmailCodeLogin(BaseModel):
+    """邮箱验证码登录请求模型"""
+    email: str
+    code: str
 
 
 class Token(BaseModel):

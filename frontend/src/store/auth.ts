@@ -14,6 +14,8 @@ export interface AuthUser {
   zodiac?: string | null
   avatar_character?: string | null
   character_color?: string | null
+  email_verified?: boolean
+  email_verified_at?: string | null
   created_at: string
 }
 
@@ -24,8 +26,10 @@ interface AuthState {
   error: string | null
 
   // Actions
-  register: (email: string, username: string, password: string) => Promise<void>
+  sendEmailCode: (email: string, purpose: "register" | "login") => Promise<void>
+  register: (email: string, username: string, password: string, confirmPassword: string, code: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
+  loginWithCode: (email: string, code: string) => Promise<void>
   logout: () => void
   clearError: () => void
   fetchMe: () => Promise<void>
@@ -54,13 +58,33 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
 
-      register: async (email, username, password) => {
+      sendEmailCode: async (email, purpose) => {
+        set({ isLoading: true, error: null })
+        try {
+          await axios.post(`${API_URL}/api/auth/email-code`, {
+            email,
+            purpose,
+          })
+          set({ isLoading: false })
+        } catch (err: any) {
+          const msg =
+            err.response?.data?.detail ||
+            err.response?.data?.msg ||
+            "验证码发送失败，请稍后重试"
+          set({ error: msg, isLoading: false })
+          throw err
+        }
+      },
+
+      register: async (email, username, password, confirmPassword, code) => {
         set({ isLoading: true, error: null })
         try {
           const res = await axios.post(`${API_URL}/api/auth/register`, {
             email,
             username,
             password,
+            confirm_password: confirmPassword,
+            code,
           })
           const { access_token, user } = res.data.data
           setAuthCookie(access_token)
@@ -90,6 +114,26 @@ export const useAuthStore = create<AuthState>()(
             err.response?.data?.detail ||
             err.response?.data?.msg ||
             "登录失败，请检查邮箱和密码"
+          set({ error: msg, isLoading: false })
+          throw err
+        }
+      },
+
+      loginWithCode: async (email, code) => {
+        set({ isLoading: true, error: null })
+        try {
+          const res = await axios.post(`${API_URL}/api/auth/login/code`, {
+            email,
+            code,
+          })
+          const { access_token, user } = res.data.data
+          setAuthCookie(access_token)
+          set({ user, token: access_token, isLoading: false })
+        } catch (err: any) {
+          const msg =
+            err.response?.data?.detail ||
+            err.response?.data?.msg ||
+            "验证码登录失败，请检查邮箱和验证码"
           set({ error: msg, isLoading: false })
           throw err
         }

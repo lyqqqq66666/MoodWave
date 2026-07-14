@@ -58,6 +58,8 @@ def _ensure_runtime_columns():
         user_required = {
             "avatar_character": "VARCHAR DEFAULT 'cat'",
             "zodiac": "VARCHAR DEFAULT ''",
+            "email_verified": "BOOLEAN DEFAULT FALSE",
+            "email_verified_at": "TIMESTAMP",
         }
         with engine.begin() as connection:
             for column_name, column_sql in user_required.items():
@@ -75,7 +77,7 @@ def create_db_and_tables():
     """
     # 导入所有数据库模型（让 SQLModel.metadata 扫描到它们）
     from src.core.models import (
-        FavoriteMusic, MoodEntry, MusicAsset, Post, User,
+        EmailVerificationCode, FavoriteMusic, MoodEntry, MusicAsset, Post, User,
         CompanionConversation, CompanionMessage, CompanionMemory  # 新增灵音伙伴会话模型
     )  # noqa: F401
     SQLModel.metadata.create_all(engine)

@@ -4,12 +4,13 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState } from "react"
-import { Eye, EyeOff, Lock, Mail, User } from "lucide-react"
+import { Eye, EyeOff, KeyRound, Lock, Mail, User } from "lucide-react"
 import { CompanionHeroMascot } from "@/components/companion-avatar"
 import { useAuthStore } from "@/store/auth"
 import { hasCompletedOnboarding } from "@/lib/onboarding"
 
 type Mode = "login" | "register"
+type LoginMethod = "password" | "code"
 
 const companionHighlights = [
   "先把模糊的情绪接住。",
@@ -49,13 +50,17 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectUrl = searchParams.get("redirect") || "/dashboard"
-  const { user, isLoading, error, login, register, clearError } = useAuthStore()
+  const { user, isLoading, error, sendEmailCode, login, loginWithCode, register, clearError } = useAuthStore()
 
   const [mode, setMode] = useState<Mode>("login")
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("password")
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [emailCode, setEmailCode] = useState("")
+  const [codeCountdown, setCodeCountdown] = useState(0)
   const [localError, setLocalError] = useState("")
   const [notice, setNotice] = useState("")
   const [successNotice, setSuccessNotice] = useState("")
@@ -67,10 +72,30 @@ function LoginForm() {
     }
   }, [user, router, redirectUrl])
 
+  useEffect(() => {
+    if (codeCountdown <= 0) return
+    const timer = window.setTimeout(() => {
+      setCodeCountdown((value) => Math.max(0, value - 1))
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [codeCountdown])
+
   const switchMode = (nextMode: Mode) => {
     setMode(nextMode)
     setLocalError("")
     setNotice("")
+    setSuccessNotice("")
+    setEmailCode("")
+    setPassword("")
+    setConfirmPassword("")
+    clearError()
+  }
+
+  const switchLoginMethod = (nextMethod: LoginMethod) => {
+    setLoginMethod(nextMethod)
+    setLocalError("")
+    setNotice("")
+    setSuccessNotice("")
     clearError()
   }
 
@@ -78,28 +103,64 @@ function LoginForm() {
     setNotice(`${label} 即将上线，当前请先使用邮箱登录。`)
   }
 
+  const validateEmail = () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setLocalError("请输入有效的邮箱地址")
+      return false
+    }
+    return true
+  }
+
+  const handleSendCode = async () => {
+    setLocalError("")
+    setNotice("")
+    setSuccessNotice("")
+    clearError()
+    if (!validateEmail()) return
+
+    try {
+      await sendEmailCode(email, mode === "register" ? "register" : "login")
+      setCodeCountdown(60)
+      setNotice("验证码已发送，请去邮箱查收。")
+    } catch {
+      // store 持有错误状态
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setLocalError("")
+    setNotice("")
 
-    if (!email.includes("@")) {
-      setLocalError("请输入有效的邮箱地址")
-      return
-    }
-    if (password.length < 6) {
-      setLocalError("密码至少 6 位")
-      return
-    }
+    if (!validateEmail()) return
     if (mode === "register" && !username.trim()) {
       setLocalError("请输入用户名")
+      return
+    }
+    if (mode === "register" || loginMethod === "password") {
+      if (password.length < 6) {
+        setLocalError("密码至少 6 位")
+        return
+      }
+    }
+    if (mode === "register" && password !== confirmPassword) {
+      setLocalError("两次输入的密码不一致")
+      return
+    }
+    if ((mode === "register" || loginMethod === "code") && !/^\d{6}$/.test(emailCode.trim())) {
+      setLocalError("请输入 6 位邮箱验证码")
       return
     }
 
     try {
       if (mode === "login") {
-        await login(email, password)
+        if (loginMethod === "password") {
+          await login(email, password)
+        } else {
+          await loginWithCode(email, emailCode)
+        }
       } else {
-        await register(email, username, password)
+        await register(email, username, password, confirmPassword, emailCode)
       }
       justAuthenticatedRef.current = true
       setSuccessNotice(mode === "login" ? "登录成功，正在进入你的情绪空间…" : "注册成功，正在为你打开灵音空间…")
@@ -114,8 +175,8 @@ function LoginForm() {
   const displayError = localError || error || ""
 
   return (
-    <main className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,204,219,0.85),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.88),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(213,205,255,0.45),_transparent_28%),linear-gradient(180deg,#fffdfb_0%,#fff6ef_100%)]">
-      <div className="mx-auto grid h-screen max-w-[1480px] items-stretch lg:grid-cols-[1.02fr_0.98fr]">
+    <main className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,204,219,0.85),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.88),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(213,205,255,0.45),_transparent_28%),linear-gradient(180deg,#fffdfb_0%,#fff6ef_100%)]">
+      <div className="mx-auto grid h-full max-w-[1480px] items-stretch lg:grid-cols-[1.02fr_0.98fr]">
         <section className="relative hidden overflow-hidden px-7 py-5 lg:grid lg:grid-rows-[auto_1fr]">
           <div className="relative z-10 flex items-center gap-3">
             <div className="relative h-16 w-24 shrink-0">
@@ -188,7 +249,7 @@ function LoginForm() {
           </div>
         </section>
 
-        <section className="flex h-screen items-center justify-center overflow-hidden px-4 py-4 md:px-6 lg:py-6">
+        <section className="flex h-full items-center justify-center overflow-y-auto overflow-x-hidden px-4 py-4 md:px-6 lg:py-6">
           <div className="w-full max-w-md rounded-[36px] border border-white/70 bg-white/82 p-6 shadow-[0_24px_80px_rgba(255,201,213,0.3)] backdrop-blur-2xl md:p-8">
             <div className="mb-8 lg:hidden">
               <Link href="/" className="flex min-w-0 items-center gap-3">
@@ -260,6 +321,29 @@ function LoginForm() {
               </div>
             ) : null}
 
+            {mode === "login" ? (
+              <div className="mt-5 grid grid-cols-2 rounded-full bg-[#fff1f5] p-1">
+                <button
+                  type="button"
+                  onClick={() => switchLoginMethod("password")}
+                  className={`rounded-full py-2 text-sm font-medium transition-all ${
+                    loginMethod === "password" ? "bg-white text-[#ff708b] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  密码登录
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchLoginMethod("code")}
+                  className={`rounded-full py-2 text-sm font-medium transition-all ${
+                    loginMethod === "code" ? "bg-white text-[#ff708b] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  验证码登录
+                </button>
+              </div>
+            ) : null}
+
             <form className="mt-7 space-y-[18px] transition-all duration-300" onSubmit={handleSubmit}>
               {mode === "register" ? (
                 <label className="block space-y-2">
@@ -291,34 +375,78 @@ function LoginForm() {
                 </span>
               </label>
 
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-700">密码</span>
-                <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
-                  <Lock className="h-4 w-4 text-slate-400" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="请输入密码"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((value) => !value)}
-                    className="text-slate-400 transition hover:text-slate-600"
-                    aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </span>
-              </label>
+              {mode === "register" || loginMethod === "password" ? (
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-700">密码</span>
+                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                    <Lock className="h-4 w-4 text-slate-400" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="请输入密码"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="text-slate-400 transition hover:text-slate-600"
+                      aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </span>
+                </label>
+              ) : null}
+
+              {mode === "register" ? (
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-700">确认密码</span>
+                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                    <Lock className="h-4 w-4 text-slate-400" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="请再次输入密码"
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                  </span>
+                </label>
+              ) : null}
+
+              {mode === "register" || loginMethod === "code" ? (
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-slate-700">邮箱验证码</span>
+                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                    <KeyRound className="h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="6 位验证码"
+                      value={emailCode}
+                      onChange={(event) => setEmailCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="ml-3 w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendCode}
+                      disabled={isLoading || codeCountdown > 0}
+                      className="shrink-0 rounded-full bg-[#fff1f5] px-3 py-1.5 text-xs font-semibold text-[#ff708b] transition hover:bg-[#ffe6ed] disabled:cursor-not-allowed disabled:text-slate-400"
+                    >
+                      {codeCountdown > 0 ? `${codeCountdown}s` : "获取验证码"}
+                    </button>
+                  </span>
+                </label>
+              ) : null}
 
               <button
                 type="submit"
                 disabled={isLoading}
                 className="flex min-h-[54px] w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.3)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isLoading ? (mode === "login" ? "登录中..." : "注册中...") : mode === "login" ? "登录" : "注册"}
+                {isLoading ? (mode === "login" ? "登录中..." : "注册中...") : mode === "login" ? "登录" : "注册并登录"}
               </button>
             </form>
 
