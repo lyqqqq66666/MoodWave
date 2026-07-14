@@ -10,6 +10,8 @@ import os
 import smtplib
 import ssl
 
+import certifi
+
 
 class EmailServiceError(RuntimeError):
     """邮箱服务配置或发送失败。"""
@@ -48,7 +50,7 @@ def send_verification_email(email: str, code: str, purpose: str) -> None:
     )
 
     try:
-        context = ssl.create_default_context()
+        context = ssl.create_default_context(cafile=certifi.where())
         smtp_class = smtplib.SMTP_SSL if smtp_ssl else smtplib.SMTP
         with smtp_class(smtp_host, smtp_port, timeout=12, context=context) if smtp_ssl else smtp_class(smtp_host, smtp_port, timeout=12) as server:
             if smtp_tls and not smtp_ssl:
