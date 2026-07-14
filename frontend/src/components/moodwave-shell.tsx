@@ -108,20 +108,9 @@ export function MoodWaveShell({
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <header
-            className={cn(
-              "sticky top-0 z-20 shrink-0 items-center justify-between bg-transparent px-5 py-1 lg:min-h-[56px] lg:px-10",
-              "hidden lg:flex",
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="lg:hidden">
-                <MoodWaveLogo href="/dashboard" compact markOnly />
-              </div>
-              {title ? <h1 className="text-lg font-semibold lg:text-2xl">{title}</h1> : null}
-            </div>
-            <div className="flex items-center gap-3">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="pointer-events-none absolute right-5 top-4 z-30 hidden items-center gap-3 lg:right-10 lg:flex">
+            <div className="pointer-events-auto flex items-center gap-3">
               {rightSlot}
               <button
                 type="button"
@@ -132,39 +121,26 @@ export function MoodWaveShell({
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#ff7f96]" />
               </button>
-              <Link
-                href="/profile"
-                className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#ffb4c4] to-[#8de1d5] text-sm font-semibold text-white shadow-[0_8px_24px_rgba(255,192,203,0.18)] overflow-hidden lg:hidden"
-                aria-label="个人主页"
-              >
-                {avatarUrl ? (
-                  <Image
-                    src={resolveAssetUrl(avatarUrl)}
-                    alt={displayName}
-                    width={40}
-                    height={40}
-                    sizes="40px"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  avatarChar
-                )}
-              </Link>
             </div>
-          </header>
+          </div>
           {notice ? (
-            <div className="mx-4 mt-2 rounded-[22px] border border-[#d6f3ea] bg-white/88 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(255,216,225,0.16)] md:mx-6 lg:mx-10">
+            <div className="absolute right-5 top-16 z-30 max-w-sm rounded-[22px] border border-[#d6f3ea] bg-white/92 px-4 py-3 text-sm text-slate-600 shadow-[0_12px_30px_rgba(255,216,225,0.16)] backdrop-blur-xl md:right-6 lg:right-10">
               {notice}
             </div>
           ) : null}
 
           <main
             className={cn(
-              "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-28 pt-1 md:px-6 lg:px-10 lg:pb-10 lg:pt-1",
+              "min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-28 pt-4 md:px-6 lg:px-10 lg:pb-10 lg:pt-5",
               appMode && "pt-[calc(env(safe-area-inset-top)+6px)]",
               contentClassName,
             )}
           >
+            {title ? (
+              <div className="mb-5 hidden pr-20 lg:block">
+                <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+              </div>
+            ) : null}
             {children}
           </main>
 

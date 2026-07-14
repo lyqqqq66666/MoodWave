@@ -18,26 +18,6 @@ const companionHighlights = [
   "最后把陪伴、趋势和音乐留给你自己选择。",
 ]
 
-function WechatBrandIcon() {
-  return (
-    <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden="true">
-      <rect x="2" y="2" width="44" height="44" rx="12" fill="#07C160" />
-      <path
-        d="M20.5 13.5c-5.7 0-10.3 3.75-10.3 8.37 0 2.55 1.42 4.82 3.64 6.35l-1.12 3.35 3.9-1.95c1.14.28 2.35.42 3.88.42 5.68 0 10.28-3.75 10.28-8.37 0-4.62-4.6-8.17-10.28-8.17Z"
-        fill="white"
-      />
-      <path
-        d="M31.76 19.68c-4.73 0-8.57 3.1-8.57 6.95 0 3.84 3.84 6.95 8.57 6.95.9 0 1.75-.1 2.56-.32l3.07 1.54-.86-2.58c1.73-1.17 2.8-3 2.8-5.59 0-3.85-3.84-6.95-8.57-6.95Z"
-        fill="white"
-      />
-      <circle cx="17.4" cy="21.1" r="1.3" fill="#07C160" />
-      <circle cx="23.7" cy="21.1" r="1.3" fill="#07C160" />
-      <circle cx="29.7" cy="26.5" r="1.15" fill="#07C160" />
-      <circle cx="34.7" cy="26.5" r="1.15" fill="#07C160" />
-    </svg>
-  )
-}
-
 export default function LoginPage() {
   return (
     <Suspense>
@@ -97,10 +77,6 @@ function LoginForm() {
     setNotice("")
     setSuccessNotice("")
     clearError()
-  }
-
-  const showComingSoon = (label: string) => {
-    setNotice(`${label} 即将上线，当前请先使用邮箱登录。`)
   }
 
   const validateEmail = () => {
@@ -249,9 +225,9 @@ function LoginForm() {
           </div>
         </section>
 
-        <section className="flex h-full items-center justify-center overflow-y-auto overflow-x-hidden px-4 py-4 md:px-6 lg:py-6">
-          <div className="w-full max-w-md rounded-[36px] border border-white/70 bg-white/82 p-6 shadow-[0_24px_80px_rgba(255,201,213,0.3)] backdrop-blur-2xl md:p-8">
-            <div className="mb-8 lg:hidden">
+        <section className="flex h-full items-center justify-center overflow-y-auto overflow-x-hidden px-4 py-4 md:px-6 lg:overflow-hidden lg:py-4">
+          <div className="w-full max-w-sm rounded-[30px] border border-white/70 bg-white/84 p-5 shadow-[0_20px_64px_rgba(255,201,213,0.26)] backdrop-blur-2xl md:p-6">
+            <div className="mb-5 lg:hidden">
               <Link href="/" className="flex min-w-0 items-center gap-3">
                 <div className="relative h-14 w-20 shrink-0">
                   <Image
@@ -270,7 +246,7 @@ function LoginForm() {
               </Link>
             </div>
 
-            <div className="mb-6 flex rounded-full bg-[#fff1f5] p-1">
+            <div className="mb-4 flex rounded-full bg-[#fff1f5] p-1">
               <button
                 type="button"
                 onClick={() => switchMode("login")}
@@ -292,13 +268,13 @@ function LoginForm() {
             </div>
 
             <div className="text-center">
-              <div className="mx-auto inline-flex rounded-full bg-[#fff1f5] px-4 py-2 text-sm text-[#ff708b]">
+              <div className="mx-auto inline-flex rounded-full bg-[#fff1f5] px-3.5 py-1.5 text-xs font-semibold text-[#ff708b]">
                 {mode === "login" ? "欢迎回来" : "开启你的情绪之旅"}
               </div>
-              <h1 className="mt-4 font-display text-[34px] font-bold leading-tight text-slate-900 md:text-4xl">
+              <h1 className="mt-3 font-display text-[28px] font-bold leading-tight text-slate-900 md:text-[32px]">
                 {mode === "login" ? "登录你的情绪空间" : "创建你的灵音账号"}
               </h1>
-              <p className="mt-3 text-sm leading-6 text-slate-500">
+              <p className="mt-2 text-[13px] leading-5 text-slate-500">
                 {mode === "login"
                   ? "你留下过的情绪、陪伴和节奏，都会从这里继续。"
                   : "只需要几步，就能把你的记录、陪伴和记忆留在这里。"}
@@ -322,7 +298,7 @@ function LoginForm() {
             ) : null}
 
             {mode === "login" ? (
-              <div className="mt-5 grid grid-cols-2 rounded-full bg-[#fff1f5] p-1">
+              <div className="mt-4 grid grid-cols-2 rounded-full bg-[#fff1f5] p-1">
                 <button
                   type="button"
                   onClick={() => switchLoginMethod("password")}
@@ -344,11 +320,11 @@ function LoginForm() {
               </div>
             ) : null}
 
-            <form className="mt-7 space-y-[18px] transition-all duration-300" onSubmit={handleSubmit}>
+            <form className="mt-5 space-y-3 transition-all duration-300" onSubmit={handleSubmit}>
               {mode === "register" ? (
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-700">用户名</span>
-                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                  <span className="text-xs font-semibold text-slate-700">用户名</span>
+                  <span className="relative flex min-h-11 items-center rounded-[18px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                     <User className="h-4 w-4 text-slate-400" />
                     <input
                       type="text"
@@ -362,8 +338,8 @@ function LoginForm() {
               ) : null}
 
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-700">邮箱地址</span>
-                <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                <span className="text-xs font-semibold text-slate-700">邮箱地址</span>
+                <span className="relative flex min-h-11 items-center rounded-[18px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                   <Mail className="h-4 w-4 text-slate-400" />
                   <input
                     type="email"
@@ -377,8 +353,8 @@ function LoginForm() {
 
               {mode === "register" || loginMethod === "password" ? (
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-700">密码</span>
-                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                  <span className="text-xs font-semibold text-slate-700">密码</span>
+                  <span className="relative flex min-h-11 items-center rounded-[18px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                     <Lock className="h-4 w-4 text-slate-400" />
                     <input
                       type={showPassword ? "text" : "password"}
@@ -401,8 +377,8 @@ function LoginForm() {
 
               {mode === "register" ? (
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-700">确认密码</span>
-                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                  <span className="text-xs font-semibold text-slate-700">确认密码</span>
+                  <span className="relative flex min-h-11 items-center rounded-[18px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                     <Lock className="h-4 w-4 text-slate-400" />
                     <input
                       type={showPassword ? "text" : "password"}
@@ -417,8 +393,8 @@ function LoginForm() {
 
               {mode === "register" || loginMethod === "code" ? (
                 <label className="block space-y-2">
-                  <span className="text-sm font-medium text-slate-700">邮箱验证码</span>
-                  <span className="relative flex min-h-12 items-center rounded-[20px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
+                  <span className="text-xs font-semibold text-slate-700">邮箱验证码</span>
+                  <span className="relative flex min-h-11 items-center rounded-[18px] border border-[#f4dde3] bg-white/90 px-4 shadow-[0_8px_20px_rgba(255,220,228,0.12)] transition-all duration-300 focus-within:border-[#ff8fa7] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(255,143,167,0.12),0_12px_26px_rgba(255,180,194,0.22)]">
                     <KeyRound className="h-4 w-4 text-slate-400" />
                     <input
                       type="text"
@@ -444,53 +420,13 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex min-h-[54px] w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.3)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
+                className="flex min-h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#ff97ad] via-[#ffbfd0] to-[#85dfd4] px-6 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(255,181,194,0.3)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isLoading ? (mode === "login" ? "登录中..." : "注册中...") : mode === "login" ? "登录" : "注册并登录"}
               </button>
             </form>
 
-            <div className="mt-6">
-              <p className="mb-3 text-center text-xs font-medium uppercase tracking-[0.22em] text-slate-400">更多方式</p>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  {
-                    label: "微信登录",
-                    icon: <WechatBrandIcon />,
-                  },
-                  {
-                    label: "Apple 登录",
-                    icon: (
-                      <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current" aria-hidden="true">
-                        <path d="M15.53 3.83c.84-1.01 1.4-2.43 1.24-3.83-1.2.05-2.66.81-3.53 1.82-.78.89-1.45 2.33-1.27 3.71 1.34.11 2.72-.68 3.56-1.7Zm3.59 8.23c.03-2.58 2.12-3.82 2.21-3.87-1.21-1.77-3.08-2.01-3.74-2.04-1.59-.16-3.11.94-3.92.94-.81 0-2.04-.92-3.35-.89-1.72.03-3.31 1-4.2 2.55-1.8 3.11-.46 7.71 1.29 10.24.86 1.24 1.88 2.64 3.22 2.59 1.29-.05 1.77-.83 3.33-.83 1.56 0 2 .83 3.36.8 1.39-.02 2.27-1.25 3.12-2.5.98-1.43 1.38-2.82 1.4-2.89-.03-.01-2.68-1.03-2.72-4.1Z" />
-                      </svg>
-                    ),
-                  },
-                  {
-                    label: "Google 登录",
-                    icon: (
-                      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                      </svg>
-                    ),
-                  },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => showComingSoon(item.label)}
-                    className="flex min-h-12 items-center justify-center gap-2 rounded-[20px] border border-[#f3dfe5] bg-white/90 text-sm font-semibold text-slate-600 shadow-[0_10px_24px_rgba(255,220,228,0.12)] transition hover:-translate-y-0.5"
-                  >
-                    <span>{item.icon}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <p className="mt-6 text-center text-sm text-slate-500">
+            <p className="mt-4 text-center text-sm text-slate-500">
               {mode === "login" ? "还没有账号？" : "已经有账号了？"}
               <button
                 type="button"

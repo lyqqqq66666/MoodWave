@@ -25,10 +25,10 @@ const quickHighlights = ["记录情绪", "灵音陪伴", "趋势回看", "音乐
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(255,213,224,0.9),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(185,239,228,0.85),_transparent_26%),radial-gradient(circle_at_bottom_center,_rgba(210,200,255,0.5),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff6ef_100%)] text-slate-900">
-      <section className="relative min-h-screen">
+    <main className="h-[100dvh] overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,_rgba(255,213,224,0.9),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(185,239,228,0.85),_transparent_26%),radial-gradient(circle_at_bottom_center,_rgba(210,200,255,0.5),_transparent_30%),linear-gradient(180deg,#fffdf9_0%,#fff6ef_100%)] text-slate-900">
+      <section className="relative min-h-[100dvh]">
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.38),transparent_28%,rgba(255,255,255,0.18))]" />
-        <div className="relative mx-auto flex min-h-screen max-w-[1380px] flex-col px-5 pb-20 pt-6 md:px-8 lg:px-10">
+        <div className="relative mx-auto flex min-h-[100dvh] max-w-[1380px] flex-col px-5 pb-20 pt-6 md:px-8 lg:px-10">
           <header className="flex items-center justify-between">
             <MoodWaveLogo href="/" />
             <div className="flex items-center gap-3">
