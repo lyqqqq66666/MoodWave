@@ -4,18 +4,38 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState } from "react"
-import { Eye, EyeOff, KeyRound, Lock, Mail, User } from "lucide-react"
-import { CompanionHeroMascot } from "@/components/companion-avatar"
+import { ChevronLeft, ChevronRight, Eye, EyeOff, KeyRound, Lock, Mail, User } from "lucide-react"
+import { CompanionPetOrb } from "@/components/companion-avatar"
 import { useAuthStore } from "@/store/auth"
 import { hasCompletedOnboarding } from "@/lib/onboarding"
 
 type Mode = "login" | "register"
 type LoginMethod = "password" | "code"
 
-const companionHighlights = [
-  "先把模糊的情绪接住。",
-  "再慢慢整理今天真正卡住的点。",
-  "最后把陪伴、趋势和音乐留给你自己选择。",
+const showcaseScreens = [
+  {
+    title: "治愈音乐工作台",
+    image: "/showcase/music-v2-workstation.png",
+  },
+  {
+    title: "情绪总览",
+    image: "/showcase/mood-v2-overview.png",
+  },
+  {
+    title: "身体感受地图",
+    image: "/showcase/mood-v2-body-map.png",
+  },
+  {
+    title: "意象情绪记录",
+    image: "/showcase/mood-v2-imagery.png",
+  },
+]
+
+const showcaseLayers = [
+  { x: 0, y: 18, scale: 1, rotate: -2, zIndex: 40, opacity: 1 },
+  { x: 200, y: -82, scale: 0.72, rotate: 4, zIndex: 30, opacity: 0.5 },
+  { x: 154, y: 142, scale: 0.62, rotate: 1.5, zIndex: 20, opacity: 0.38 },
+  { x: -42, y: -90, scale: 0.68, rotate: -3.5, zIndex: 25, opacity: 0.48 },
 ]
 
 export default function LoginPage() {
@@ -41,10 +61,15 @@ function LoginForm() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [emailCode, setEmailCode] = useState("")
   const [codeCountdown, setCodeCountdown] = useState(0)
+  const [activeShowcase, setActiveShowcase] = useState(0)
   const [localError, setLocalError] = useState("")
   const [notice, setNotice] = useState("")
   const [successNotice, setSuccessNotice] = useState("")
   const justAuthenticatedRef = useRef(false)
+
+  const switchShowcase = (direction: -1 | 1) => {
+    setActiveShowcase((current) => (current + direction + showcaseScreens.length) % showcaseScreens.length)
+  }
 
   useEffect(() => {
     if (user && !justAuthenticatedRef.current) {
@@ -153,7 +178,7 @@ function LoginForm() {
   return (
     <main className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,204,219,0.85),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(181,240,231,0.88),_transparent_24%),radial-gradient(circle_at_bottom_center,_rgba(213,205,255,0.45),_transparent_28%),linear-gradient(180deg,#fffdfb_0%,#fff6ef_100%)]">
       <div className="mx-auto grid h-full max-w-[1480px] items-stretch lg:grid-cols-[1.02fr_0.98fr]">
-        <section className="relative hidden overflow-hidden px-7 py-5 lg:grid lg:grid-rows-[auto_1fr]">
+        <section className="relative hidden px-7 py-5 lg:grid lg:grid-rows-[auto_1fr]">
           <div className="relative z-10 flex items-center gap-3">
             <div className="relative h-16 w-24 shrink-0">
               <Image
@@ -173,59 +198,83 @@ function LoginForm() {
 
           <div className="pointer-events-none absolute left-10 top-16 h-80 w-80 rounded-full bg-[#ffd2dc]/70 blur-3xl" />
           <div className="pointer-events-none absolute right-10 top-10 h-72 w-72 rounded-full bg-[#c9fff3]/60 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-64 bg-[radial-gradient(circle_at_center,_rgba(189,174,255,0.32),_transparent_58%)]" />
+          <div className="pointer-events-none absolute bottom-[-4rem] left-10 right-0 h-72 bg-[radial-gradient(circle_at_center,_rgba(189,174,255,0.28),_transparent_58%)]" />
+          <div className="pointer-events-none absolute right-[-40px] top-24 z-[5] h-72 w-72 rounded-full bg-[#fffdfb]/62 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-10 right-[-20px] z-[5] h-80 w-64 rounded-full bg-[#fff5ef]/48 blur-3xl" />
 
-          <div className="relative z-10 flex min-h-0 flex-col justify-between pt-2">
-            <div className="max-w-[760px] space-y-3">
-              <div className="space-y-2">
-                <p className="inline-flex rounded-full bg-white/70 px-4 py-2 text-[13px] font-semibold text-[#ff7894] shadow-[0_10px_24px_rgba(255,190,205,0.16)]">
-                  先被温柔接住
-                </p>
-                <h1 className="font-['Sora','PingFang_SC',sans-serif] text-[clamp(1.75rem,2.2vw,2.45rem)] font-semibold leading-[1.15] tracking-[-0.055em] text-[#18233b]">
-                  <span className="block whitespace-nowrap">不用急着解释自己怎么了，</span>
-                  <span className="block whitespace-nowrap bg-gradient-to-r from-[#ff8ea6] via-[#ff86a2] to-[#ff7594] bg-clip-text text-transparent">
-                    先让灵音陪你浮一会儿。
-                  </span>
-                </h1>
-                <p className="max-w-[60ch] text-[14px] leading-6 text-slate-600">
-                  先登录，再把今天的心情交给一个更柔软的入口。你可以从一句话开始，也可以先安静看着它陪你慢慢落地。
-                </p>
+          <div className="relative z-10 min-h-0">
+            <div className="relative h-full min-h-[620px]">
+              {showcaseScreens.map((screen, index) => {
+                const layer = showcaseLayers[(index - activeShowcase + showcaseScreens.length) % showcaseScreens.length]
+                const isActive = index === activeShowcase
+
+                return (
+                  <button
+                    key={screen.image}
+                    type="button"
+                    onMouseEnter={() => setActiveShowcase(index)}
+                    onFocus={() => setActiveShowcase(index)}
+                    aria-label={`查看${screen.title}`}
+                    className="absolute left-[1%] top-[18%] aspect-[16/10] w-[96%] max-w-[980px] overflow-hidden rounded-[32px] border border-white/78 bg-white/72 shadow-[0_34px_105px_rgba(255,181,194,0.3)] outline-none backdrop-blur-xl transition-all duration-500 ease-out focus-visible:ring-4 focus-visible:ring-[#ffb6c8]/35"
+                    style={{
+                      transform: `translate3d(${layer.x}px, ${layer.y}px, 0) rotate(${layer.rotate}deg) scale(${layer.scale})`,
+                      zIndex: layer.zIndex,
+                      opacity: layer.opacity,
+                    }}
+                  >
+                    <Image
+                      src={screen.image}
+                      alt={screen.title}
+                      fill
+                      sizes="(min-width: 1024px) 48vw, 100vw"
+                      className="object-cover"
+                      priority={isActive}
+                    />
+                    <span className="pointer-events-none absolute inset-0 rounded-[32px] ring-1 ring-white/55" />
+                  </button>
+                )
+              })}
+
+              <button
+                type="button"
+                onClick={() => switchShowcase(-1)}
+                className="absolute left-[-8px] top-[49%] z-50 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/84 text-[#ff7894] shadow-[0_14px_30px_rgba(255,181,194,0.24)] ring-1 ring-white/75 backdrop-blur-xl transition hover:-translate-x-0.5 hover:bg-white"
+                aria-label="上一张界面"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => switchShowcase(1)}
+                className="absolute right-[-4px] top-[49%] z-50 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/84 text-[#ff7894] shadow-[0_14px_30px_rgba(255,181,194,0.24)] ring-1 ring-white/75 backdrop-blur-xl transition hover:translate-x-0.5 hover:bg-white"
+                aria-label="下一张界面"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+
+              <div className="absolute bottom-[-1px] left-[47%] z-50 flex -translate-x-1/2 items-center gap-2.5">
+                {showcaseScreens.map((screen, index) => (
+                  <button
+                    key={screen.title}
+                    type="button"
+                    onMouseEnter={() => setActiveShowcase(index)}
+                    onFocus={() => setActiveShowcase(index)}
+                    onClick={() => setActiveShowcase(index)}
+                    className={`h-2.5 w-2.5 rounded-full transition-all ${
+                      index === activeShowcase ? "bg-[#ff7f96]" : "bg-white/86 shadow-sm ring-1 ring-white/70"
+                    }`}
+                    aria-label={`切换到${screen.title}`}
+                  />
+                ))}
               </div>
-
-              <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-                <CompanionHeroMascot
-                  character="cat"
-                  compact
-                  className="rounded-[30px] p-4"
-                  subtitle="先不用把情绪说完整，靠近一点，让这只小灵体陪你慢慢落下来。"
-                />
-
-                <div className="rounded-[28px] border border-white/80 bg-white/74 p-4 shadow-[0_20px_56px_rgba(255,190,205,0.16)] backdrop-blur-2xl">
-                  <p className="text-sm font-semibold text-[#ff7894]">登录后你会看到</p>
-                  <div className="mt-3 space-y-2">
-                    {companionHighlights.map((item, index) => (
-                      <div key={item} className="rounded-[18px] bg-[#fffafb] p-3 ring-1 ring-[#f7e2e8]">
-                        <div className="flex items-center gap-3">
-                          <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-r from-[#ffbfd0] to-[#8de1d5] text-[11px] font-semibold text-white">
-                            {index + 1}
-                          </span>
-                          <p className="text-[13px] font-medium leading-5 text-slate-700">{item}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative z-10 mt-2 flex max-w-[700px] items-center gap-3 rounded-[22px] bg-white/60 px-4 py-2 text-[13px] text-slate-500 shadow-[0_16px_36px_rgba(255,214,224,0.14)] backdrop-blur-xl">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fff1f5] text-[#ff7894]">♡</span>
-              <span className="leading-5">登录后就能保留聊天历史、伙伴记忆和更完整的陪伴闭环。</span>
             </div>
           </div>
         </section>
 
-        <section className="flex h-full items-center justify-center overflow-y-auto overflow-x-hidden px-4 py-4 md:px-6 lg:overflow-hidden lg:py-4">
+        <section className="relative z-20 flex h-full items-center justify-center overflow-y-auto overflow-x-hidden px-4 py-4 md:px-6 lg:overflow-visible lg:py-4">
+          <div className="pointer-events-none absolute right-[-14px] top-[11%] z-30 hidden lg:block">
+            <CompanionPetOrb character="planet" color="blue" size="md" className="scale-[0.9]" />
+          </div>
           <div className="w-full max-w-sm rounded-[30px] border border-white/70 bg-white/84 p-5 shadow-[0_20px_64px_rgba(255,201,213,0.26)] backdrop-blur-2xl md:p-6">
             <div className="mb-5 lg:hidden">
               <Link href="/" className="flex min-w-0 items-center gap-3">
